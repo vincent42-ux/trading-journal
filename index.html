@@ -6255,7 +6255,7 @@
       type: 'bar',
       data: { labels, datasets: [{
         data,
-        backgroundColor: ctx => ctx.parsed.y >= 0 ? c.green : c.red,
+        backgroundColor: ctx => (ctx.parsed && typeof ctx.parsed.y === 'number' && ctx.parsed.y < 0) ? c.red : c.green,
         borderRadius: 6, barPercentage: 0.7,
       }] },
       options: {
@@ -6622,7 +6622,7 @@
         type: 'bar',
         data: { labels: sortedDates, datasets: [{
           data,
-          backgroundColor: ctx => ctx.parsed.y >= 0 ? c.green : c.red,
+          backgroundColor: ctx => (ctx.parsed && typeof ctx.parsed.y === 'number' && ctx.parsed.y < 0) ? c.red : c.green,
           borderRadius: 6, barPercentage: 0.7,
         }] },
         options: {
@@ -6856,7 +6856,7 @@
       type: 'bar',
       data: { labels, datasets: [{
         data,
-        backgroundColor: ctx => ctx.parsed.y >= 0 ? c.green : c.red,
+        backgroundColor: ctx => (ctx.parsed && typeof ctx.parsed.y === 'number' && ctx.parsed.y < 0) ? c.red : c.green,
         borderRadius: 3, barPercentage: 0.9,
       }] },
       options: {
@@ -7283,7 +7283,7 @@
           labels: Object.keys(rrGroups),
           datasets: [{
             data: Object.values(rrGroups),
-            backgroundColor: ctx => ctx.parsed.y >= 0 ? c.green : c.red,
+            backgroundColor: ctx => (ctx.parsed && typeof ctx.parsed.y === 'number' && ctx.parsed.y < 0) ? c.red : c.green,
             borderRadius: 4,
           }]
         },
@@ -9370,7 +9370,7 @@
           labels: ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven'],
           datasets: [{
             data: dowData,
-            backgroundColor: ctx => ctx.parsed.y >= 0 ? c.green : c.red,
+            backgroundColor: ctx => (ctx.parsed && typeof ctx.parsed.y === 'number' && ctx.parsed.y < 0) ? c.red : c.green,
             borderRadius: 4,
           }]
         },
