@@ -3079,6 +3079,49 @@
     .acc-info-line { font-size: 11px; }
   }
 
+  /* ========== VERROU DE FIN DE JOURNÉE ========== */
+  .session-lock-overlay {
+    display: none;
+    position: fixed; inset: 0; z-index: 9000;
+    background: rgba(8, 5, 20, 0.88);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  .session-lock-overlay.show { display: flex; }
+  .session-lock-box {
+    max-width: 480px; width: 100%;
+    background: var(--bg-1);
+    border: 1px solid var(--border-strong);
+    border-radius: 22px;
+    padding: 40px 32px 26px;
+    text-align: center;
+    animation: lockIn 0.45s cubic-bezier(0.18, 1.2, 0.4, 1);
+    box-shadow: 0 40px 120px rgba(0, 0, 0, 0.7);
+  }
+  @keyframes lockIn { from { opacity: 0; transform: scale(0.85) translateY(30px); } to { opacity: 1; transform: none; } }
+  .session-lock-box.win { border-color: rgba(34, 211, 154, 0.5); box-shadow: 0 0 80px rgba(34, 211, 154, 0.25), 0 40px 120px rgba(0,0,0,0.7); }
+  .session-lock-box.loss { border-color: rgba(255, 77, 107, 0.5); box-shadow: 0 0 80px rgba(255, 77, 107, 0.22), 0 40px 120px rgba(0,0,0,0.7); }
+  .session-lock-box .lock-icon { font-size: 56px; margin-bottom: 14px; animation: lockBounce 0.8s ease 0.2s; }
+  @keyframes lockBounce { 0%, 100% { transform: none; } 40% { transform: scale(1.25) rotate(-6deg); } 65% { transform: scale(0.95); } }
+  .session-lock-box .lock-title {
+    font-size: 20px; font-weight: 800; letter-spacing: 0.04em;
+    margin-bottom: 14px; color: var(--text-0);
+  }
+  .session-lock-box.win .lock-title { color: var(--green); }
+  .session-lock-box.loss .lock-title { color: var(--red); }
+  .session-lock-box .lock-msg { font-size: 14px; line-height: 1.65; color: var(--text-1); margin-bottom: 24px; }
+  .session-lock-box .lock-r { font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 800; }
+  .session-lock-box .lock-actions { display: flex; justify-content: center; margin-bottom: 14px; }
+  .session-lock-box .lock-end-btn { padding: 13px 28px; font-size: 14px; border-radius: 12px; }
+  .session-lock-box .lock-ignore {
+    background: none; border: none; cursor: pointer;
+    color: var(--text-3); font-size: 11px; font-family: inherit;
+    text-decoration: underline; opacity: 0.7;
+  }
+  .session-lock-box .lock-ignore:hover { color: var(--red); opacity: 1; }
+
   /* ========== NOTIFICATIONS ========== */
   .app.sidebar-collapsed .notif-badge { right: 4px; }
   .notif-badge {
@@ -7956,6 +7999,104 @@
     saveSession();
     renderSessionView();
   }
+
+  // ========== VERROU DE FIN DE JOURNÉE ==========
+  // Objectif atteint ou stop touché → écran bloquant « journée terminée »
+  function computeTodayR() {
+    const d = new Date();
+    const full = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+    const short = full.slice(0, 5);
+    const todays = uniqueLogicalTrades(TRADES.filter(t => t.date === full || t.date === short))
+      .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+    const risk = (PLAN && PLAN.riskPerTrade > 0) ? PLAN.riskPerTrade : 62.80;
+    let totalR = 0, trailingSL = 0;
+    for (const t of todays) {
+      const r = t.rrPlanned != null && t.rrPlanned !== '' ? parseFloat(t.rrPlanned) : ((t.pnl || 0) / risk);
+      totalR += r;
+    }
+    for (let i = todays.length - 1; i >= 0; i--) {
+      if ((todays[i].pnl || 0) < 0) trailingSL++;
+      else break;
+    }
+    return { totalR, trailingSL, count: todays.length };
+  }
+  function checkSessionLock() {
+    try {
+      if (typeof PLAN === 'undefined' || !PLAN) return;
+      const { totalR, trailingSL, count } = computeTodayR();
+      let state = null;
+      if (PLAN.targetRDay > 0 && totalR >= PLAN.targetRDay) state = 'win';
+      else if (PLAN.dailyStopR > 0 && totalR <= -PLAN.dailyStopR) state = 'loss';
+      else if (PLAN.stopAfterSL > 0 && trailingSL >= PLAN.stopAfterSL) state = 'sl';
+      else if (PLAN.maxTradesDay > 0 && count >= PLAN.maxTradesDay) state = 'max';
+      if (!state) return;
+      // Déjà affiché (et ignoré) pour cet état aujourd'hui → on ne re-bloque pas
+      const lockKey = state + '-' + todayKey();
+      if (SESSION.lockDismissed === lockKey) return;
+      showSessionLock(state, totalR, trailingSL, count, lockKey);
+    } catch (e) { console.error('[sessionLock]', e); }
+  }
+  function showSessionLock(state, totalR, trailingSL, count, lockKey) {
+    const overlay = document.getElementById('session-lock-overlay');
+    const box = document.getElementById('session-lock-content');
+    if (!overlay || !box) return;
+    const rStr = (totalR >= 0 ? '+' : '') + totalR.toFixed(1) + 'R';
+    let icon, title, msg, cls;
+    if (state === 'win') {
+      icon = '🎉'; cls = 'win';
+      title = 'BRAVO — OBJECTIF ATTEINT !';
+      msg = `<span class="lock-r pos">${rStr}</span> aujourd'hui (cible +${PLAN.targetRDay}R).<br>La journée est <strong>terminée</strong>. Protège tes gains, ferme la plateforme — chaque trade de plus est un risque inutile.`;
+    } else if (state === 'loss') {
+      icon = '🛑'; cls = 'loss';
+      title = 'JOURNÉE TERMINÉE';
+      msg = `<span class="lock-r neg">${rStr}</span> — ton stop journalier de −${PLAN.dailyStopR}R est atteint.<br>Tu t'arrêtes <strong>exactement comme ton plan le dit</strong> : c'est ça, la discipline. Le marché sera là demain.`;
+    } else if (state === 'sl') {
+      icon = '🔥'; cls = 'loss';
+      title = trailingSL + ' SL D\'AFFILÉE — STOP';
+      msg = `Ton plan dit stop après <strong>${PLAN.stopAfterSL} SL consécutifs</strong>.<br>Là maintenant, le risque n'est plus le marché : c'est le revenge trading. Ferme tout, reviens demain à tête reposée.`;
+    } else {
+      icon = '✋'; cls = 'neutral';
+      title = 'MAX TRADES ATTEINT';
+      msg = `<strong>${count} trade${count > 1 ? 's' : ''}</strong> aujourd'hui — c'est ton maximum (${PLAN.maxTradesDay}).<br>La qualité avant la quantité : ta journée de trading est terminée.`;
+    }
+    box.className = 'session-lock-box ' + cls;
+    box.innerHTML = `
+      <div class="lock-icon">${icon}</div>
+      <div class="lock-title">${title}</div>
+      <div class="lock-msg">${msg}</div>
+      <div class="lock-actions">
+        ${SESSION.active
+          ? `<button class="btn btn-primary lock-end-btn" onclick="endSessionFromLock('${lockKey}')">✓ Terminer ma session</button>`
+          : `<button class="btn btn-primary lock-end-btn" onclick="dismissSessionLock('${lockKey}')">✓ C'est noté, j'arrête</button>`}
+      </div>
+      <button class="lock-ignore" onclick="dismissSessionLock('${lockKey}')">Continuer quand même (déconseillé)</button>
+    `;
+    overlay.classList.add('show');
+    if (typeof pushNotif === 'function') {
+      const notifIcon = state === 'win' ? '🎉' : '⛔';
+      pushNotif(state === 'win' ? 'info' : 'danger', notifIcon, `<strong>Journée verrouillée</strong> — ${title.toLowerCase()} (${rStr})`, 'lock-' + lockKey);
+    }
+  }
+  function dismissSessionLock(lockKey) {
+    SESSION.lockDismissed = lockKey;
+    saveSession();
+    const overlay = document.getElementById('session-lock-overlay');
+    if (overlay) overlay.classList.remove('show');
+  }
+  function endSessionFromLock(lockKey) {
+    SESSION.lockDismissed = lockKey;
+    const count = SESSION.tradeIds.length;
+    SESSION.active = false;
+    saveSession();
+    const overlay = document.getElementById('session-lock-overlay');
+    if (overlay) overlay.classList.remove('show');
+    if (typeof pushNotif === 'function') {
+      pushNotif('info', '⏹', `<strong>Session terminée</strong> — ${count} trade${count > 1 ? 's' : ''} enregistré${count > 1 ? 's' : ''}. À demain !`, null);
+    }
+    const dashBtn = document.querySelector('.nav-item[data-view="dashboard"]');
+    if (dashBtn) dashBtn.click();
+    render();
+  }
   function renderSessionLauncher() {
     const box = document.getElementById('session-launcher');
     if (!box) return;
@@ -8233,7 +8374,11 @@
     clearQtPhoto();
     render();
     renderSessionView();
-    showToast('✓ Trade ajouté · master + ' + activeFollowers.length + ' follower' + (activeFollowers.length > 1 ? 's' : ''), 'success');
+    showToast(activeFollowers.length
+      ? '✓ Trade ajouté · master + ' + activeFollowers.length + ' follower' + (activeFollowers.length > 1 ? 's' : '')
+      : '✓ Trade ajouté', 'success');
+    // Objectif ou stop atteint ? → verrou de fin de journée
+    setTimeout(checkSessionLock, 350);
   }
   loadSession();
 
@@ -10374,6 +10519,8 @@
 
     closeTradeModal();
     render();
+    // Objectif ou stop atteint ? → verrou de fin de journée
+    if (isNew && typeof checkSessionLock === 'function') setTimeout(checkSessionLock, 350);
   }
 
   function deleteCurrentTrade() {
@@ -12089,6 +12236,11 @@
     console.log('[diag] wrappers installés sur', CRITICAL.length, 'fonctions critiques');
   })();
 </script>
+
+<!-- Verrou de fin de journée (objectif / stop atteint) -->
+<div class="session-lock-overlay" id="session-lock-overlay">
+  <div class="session-lock-box" id="session-lock-content"></div>
+</div>
 
 <!-- Overlay pour drawer mobile -->
 <div class="mobile-drawer-overlay" onclick="closeMobileDrawer()"></div>
