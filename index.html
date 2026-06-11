@@ -140,35 +140,35 @@
     --shadow-glow: 0 0 24px rgba(168, 85, 247, 0.18);
   }
 
-  /* ===== LIGHT THEME ===== */
+  /* ===== LIGHT THEME — Lavande premium, miroir du dark ===== */
   [data-theme="light"] {
-    --bg-0: #f8f7fc;
+    --bg-0: #f2f0f9;
     --bg-1: #ffffff;
-    --bg-2: #f4f1fb;
-    --bg-3: #ebe6f7;
-    --bg-hover: #f4f1fb;
-    --border: rgba(15, 8, 38, 0.06);
-    --border-strong: rgba(15, 8, 38, 0.14);
-    --text-0: #0c0a14;
-    --text-1: #4a4561;
-    --text-2: #7a7689;
-    --text-3: #afabbe;
-    --accent: #8b5cf6;
-    --accent-bright: #a855f7;
-    --accent-soft: rgba(139, 92, 246, 0.10);
-    --accent-glow: rgba(139, 92, 246, 0.22);
-    --accent-gradient: linear-gradient(135deg, #8b5cf6 0%, #c026d3 100%);
+    --bg-2: #f7f5fc;
+    --bg-3: #eee9f8;
+    --bg-hover: #f1ecfb;
+    --border: rgba(40, 24, 80, 0.09);
+    --border-strong: rgba(40, 24, 80, 0.18);
+    --text-0: #17102d;
+    --text-1: #3e3559;
+    --text-2: #6f688a;
+    --text-3: #a59fbd;
+    --accent: #7c3aed;
+    --accent-bright: #c026d3;
+    --accent-soft: rgba(124, 58, 237, 0.10);
+    --accent-glow: rgba(124, 58, 237, 0.26);
+    --accent-gradient: linear-gradient(135deg, #7c3aed 0%, #c026d3 100%);
     --green: #059669;
     --green-bright: #10b981;
-    --green-soft: rgba(5, 150, 105, 0.10);
-    --red: #dc2626;
-    --red-bright: #ef4444;
-    --red-soft: rgba(220, 38, 38, 0.10);
+    --green-soft: rgba(5, 150, 105, 0.12);
+    --red: #e11d48;
+    --red-bright: #f43f5e;
+    --red-soft: rgba(225, 29, 72, 0.10);
     --amber: #d97706;
-    --amber-soft: rgba(217, 119, 6, 0.10);
-    --shadow: 0 6px 20px rgba(15, 8, 38, 0.06);
-    --shadow-soft: 0 1px 3px rgba(15, 8, 38, 0.05);
-    --shadow-glow: 0 0 24px rgba(139, 92, 246, 0.12);
+    --amber-soft: rgba(217, 119, 6, 0.12);
+    --shadow: 0 14px 34px rgba(40, 24, 80, 0.10);
+    --shadow-soft: 0 3px 12px rgba(40, 24, 80, 0.07);
+    --shadow-glow: 0 0 28px rgba(124, 58, 237, 0.16);
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -3015,6 +3015,94 @@
     border-radius: 4px;
   }
   .plan-editable:hover { background: var(--accent-soft); }
+
+  /* ===== POLISH MODE CLAIR — même standing que le dark ===== */
+  [data-theme="light"] body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(ellipse at top right, rgba(124, 58, 237, 0.07) 0%, transparent 50%),
+                radial-gradient(ellipse at bottom left, rgba(192, 38, 211, 0.05) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 0;
+  }
+  [data-theme="light"] .card {
+    box-shadow: 0 2px 6px rgba(40, 24, 80, 0.04), 0 10px 28px rgba(40, 24, 80, 0.06);
+    border-color: rgba(40, 24, 80, 0.07);
+  }
+  [data-theme="light"] .card:hover {
+    box-shadow: 0 4px 10px rgba(40, 24, 80, 0.06), 0 14px 36px rgba(40, 24, 80, 0.09);
+  }
+  [data-theme="light"] .hero-kpi {
+    background: linear-gradient(180deg, #ffffff 0%, #fcfbff 100%);
+  }
+  [data-theme="light"] .sidebar {
+    background: rgba(255, 255, 255, 0.86);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+  }
+  [data-theme="light"] .topbar {
+    background: rgba(242, 240, 249, 0.82);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+  [data-theme="light"] .seg-btn.active { background: var(--text-1); }
+  [data-theme="light"] .seg-btn.long.active, [data-theme="light"] .seg-btn.tp.active { background: var(--green); }
+  [data-theme="light"] .seg-btn.short.active, [data-theme="light"] .seg-btn.sl.active { background: var(--red); }
+  [data-theme="light"] .seg-btn.be.active { background: var(--accent); }
+  [data-theme="light"] .insight-chip {
+    background: #ffffff;
+    box-shadow: 0 2px 8px rgba(40, 24, 80, 0.05);
+  }
+  [data-theme="light"] .stats-tabs,
+  [data-theme="light"] .dash-collapse > summary {
+    background: #ffffff;
+    box-shadow: 0 2px 8px rgba(40, 24, 80, 0.04);
+  }
+  [data-theme="light"] .stats-tab-btn.active {
+    box-shadow: 0 3px 12px rgba(124, 58, 237, 0.30);
+  }
+  [data-theme="light"] .plan-list-item,
+  [data-theme="light"] .streak-row,
+  [data-theme="light"] .day-popup-trade,
+  [data-theme="light"] .acc-box {
+    background: #fbfaff;
+  }
+  [data-theme="light"] .notif-item.unread { background: rgba(124, 58, 237, 0.06); }
+  [data-theme="light"] .notif-icon { background: #ffffff; }
+  [data-theme="light"] .mobile-bottom-nav {
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    box-shadow: 0 -4px 18px rgba(40, 24, 80, 0.08);
+  }
+  [data-theme="light"] .session-lock-overlay {
+    background: rgba(242, 240, 249, 0.88);
+  }
+  [data-theme="light"] .session-lock-box {
+    box-shadow: 0 30px 90px rgba(40, 24, 80, 0.25);
+  }
+  [data-theme="light"] .session-lock-box.win { box-shadow: 0 0 70px rgba(5, 150, 105, 0.20), 0 30px 90px rgba(40, 24, 80, 0.22); }
+  [data-theme="light"] .session-lock-box.loss { box-shadow: 0 0 70px rgba(225, 29, 72, 0.18), 0 30px 90px rgba(40, 24, 80, 0.22); }
+  [data-theme="light"] .heatmap-cell.win { background: rgba(5, 150, 105, 0.12); }
+  [data-theme="light"] .heatmap-cell.win.strong { background: rgba(5, 150, 105, 0.24); }
+  [data-theme="light"] .heatmap-cell.loss { background: rgba(225, 29, 72, 0.10); }
+  [data-theme="light"] .heatmap-cell.loss.strong { background: rgba(225, 29, 72, 0.20); }
+  [data-theme="light"] .acc-bar-track { background: var(--bg-3); border-color: transparent; }
+  [data-theme="light"] .acc-bar-fill.green { box-shadow: 0 0 8px rgba(5, 150, 105, 0.35); }
+  [data-theme="light"] .acc-bar-fill.red { box-shadow: 0 0 8px rgba(225, 29, 72, 0.30); }
+  [data-theme="light"] .sess-launch-btn {
+    box-shadow: 0 6px 20px rgba(124, 58, 237, 0.28);
+  }
+  [data-theme="light"] .btn-primary {
+    box-shadow: 0 3px 12px rgba(124, 58, 237, 0.30);
+  }
+  [data-theme="light"] .modal {
+    box-shadow: 0 30px 80px rgba(40, 24, 80, 0.25);
+  }
+  [data-theme="light"] ::-webkit-scrollbar-thumb {
+    background: rgba(40, 24, 80, 0.18);
+  }
 
   /* ========== CARTES COMPTES v2 (inspiré Analyse Avancée) ========== */
   .acc-role-badge {
