@@ -3079,37 +3079,15 @@
     .acc-info-line { font-size: 11px; }
   }
 
-  /* ========== THERMOMÈTRE DU JOUR ========== */
-  .thermo-track {
-    position: relative; height: 14px; border-radius: 99px;
-    background: var(--bg-2); border: 1px solid var(--border);
-    margin: 18px 8px 10px; overflow: visible;
-  }
-  .thermo-zone { position: absolute; top: 0; bottom: 0; }
-  .thermo-zone.loss { background: linear-gradient(90deg, rgba(255,77,107,0.35), rgba(255,77,107,0.08)); border-radius: 99px 0 0 99px; }
-  .thermo-zone.win { background: linear-gradient(90deg, rgba(34,211,154,0.08), rgba(34,211,154,0.35)); border-radius: 0 99px 99px 0; }
-  .thermo-zero {
-    position: absolute; top: -4px; bottom: -4px; width: 2px;
-    background: var(--text-3); opacity: 0.6; transform: translateX(-50%);
-  }
-  .thermo-marker {
-    position: absolute; top: 50%; transform: translate(-50%, -50%);
-    width: 22px; height: 22px; border-radius: 50%;
-    background: var(--text-2); border: 3px solid var(--bg-1);
-    box-shadow: 0 2px 12px rgba(0,0,0,0.5);
-    transition: left 0.6s cubic-bezier(0.22, 1, 0.36, 1);
-    z-index: 2;
-  }
-  .thermo-marker.pos { background: var(--green); box-shadow: 0 0 14px rgba(34,211,154,0.6); }
-  .thermo-marker.neg { background: var(--red); box-shadow: 0 0 14px rgba(255,77,107,0.6); }
-  .thermo-labels { display: flex; justify-content: space-between; font-size: 11px; padding: 0 4px; font-weight: 600; }
-
   /* ========== STREAKS ========== */
-  #streaks-card { display: flex; flex-direction: column; gap: 10px; }
+  #streaks-card { display: flex; gap: 10px; }
   .streak-row {
-    display: flex; align-items: center; gap: 12px;
-    padding: 8px 12px; border-radius: 10px;
+    display: flex; align-items: center; gap: 12px; flex: 1;
+    padding: 10px 14px; border-radius: 10px;
     background: var(--bg-2); border: 1px solid var(--border);
+  }
+  @media (max-width: 768px) {
+    #streaks-card { flex-direction: column; }
   }
   .streak-emoji { font-size: 20px; }
   .streak-num { font-size: 21px; font-weight: 800; font-family: 'JetBrains Mono', monospace; min-width: 30px; }
@@ -3400,19 +3378,10 @@
           <span class="period-info" id="period-info"></span>
         </div>
 
-        <!-- THERMOMÈTRE DU JOUR + STREAKS -->
-        <div class="row-2-3col" style="margin-bottom:16px; display:grid; grid-template-columns: 2fr 1fr; gap:14px;">
-          <div class="card">
-            <div class="card-header">
-              <span class="card-title">Ma journée — entre stop et objectif</span>
-              <span class="mono" id="thermo-value" style="font-weight:800; font-size:16px;">—</span>
-            </div>
-            <div class="card-body" id="day-thermo"></div>
-          </div>
-          <div class="card">
-            <div class="card-header"><span class="card-title">Mes séries 🔥</span></div>
-            <div class="card-body" id="streaks-card"></div>
-          </div>
+        <!-- STREAKS -->
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-header"><span class="card-title">Mes séries 🔥</span></div>
+          <div class="card-body" id="streaks-card"></div>
         </div>
 
         <!-- INSIGHTS AUTO-GÉNÉRÉS -->
@@ -6021,7 +5990,6 @@
     _safe(() => renderVTraderRadar(s), 'renderVTraderRadar');
     _safe(() => renderLast30(s), 'renderLast30');
     _safe(() => renderDashboardAlerts(s), 'renderDashboardAlerts');
-    _safe(() => renderDayThermo(), 'renderDayThermo');
     _safe(() => renderStreaksCard(), 'renderStreaksCard');
     _safe(() => renderMonthCompare(), 'renderMonthCompare');
     _safe(() => renderSessionLauncher(), 'renderSessionLauncher');
@@ -6361,39 +6329,6 @@
     container.innerHTML = insights.slice(0, 4).map(i =>
       `<div class="insight-chip ${i.cls}"><div class="insight-icon">${i.icon}</div><div>${i.html}</div></div>`
     ).join('');
-  }
-
-  // ========== THERMOMÈTRE DU JOUR ==========
-  function renderDayThermo() {
-    const box = document.getElementById('day-thermo');
-    if (!box) return;
-    const stop = PLAN.dailyStopR > 0 ? PLAN.dailyStopR : 0;
-    const target = PLAN.targetRDay > 0 ? PLAN.targetRDay : 0;
-    if (!stop && !target) {
-      box.innerHTML = '<div class="empty-state" style="padding:14px;">Définis un objectif R/jour et un stop journalier dans ton Plan.</div>';
-      return;
-    }
-    const { totalR, count } = computeTodayR();
-    const min = -(stop || target), max = target || stop;
-    const pct = Math.max(0, Math.min(100, ((totalR - min) / (max - min)) * 100));
-    const zeroPct = Math.max(0, Math.min(100, ((0 - min) / (max - min)) * 100));
-    const vEl = document.getElementById('thermo-value');
-    if (vEl) {
-      vEl.textContent = (totalR >= 0 ? '+' : '') + totalR.toFixed(1) + 'R';
-      vEl.className = 'mono ' + (totalR > 0 ? 'pos' : totalR < 0 ? 'neg' : '');
-    }
-    box.innerHTML = `
-      <div class="thermo-track">
-        <div class="thermo-zone loss" style="left:0; width:${zeroPct}%;"></div>
-        <div class="thermo-zone win" style="left:${zeroPct}%; width:${100 - zeroPct}%;"></div>
-        <div class="thermo-zero" style="left:${zeroPct}%;"></div>
-        <div class="thermo-marker ${totalR > 0 ? 'pos' : totalR < 0 ? 'neg' : ''}" style="left:${pct}%;"></div>
-      </div>
-      <div class="thermo-labels">
-        <span class="neg">🛑 −${(stop || target).toFixed(1)}R</span>
-        <span class="muted">${count} trade${count > 1 ? 's' : ''} aujourd'hui</span>
-        <span class="pos">🎯 +${(target || stop).toFixed(1)}R</span>
-      </div>`;
   }
 
   // ========== STREAKS GAMIFIÉS ==========
@@ -9021,9 +8956,13 @@
   let CALENDAR_DATE = new Date();
   function changeCalendarMonth(delta) {
     CALENDAR_DATE = new Date(CALENDAR_DATE.getFullYear(), CALENDAR_DATE.getMonth() + delta, 1);
-    renderPnlCalendar();
+    renderPnlCalendarNew();
   }
+  // ANCIEN calendrier (clés JJ/MM sans année → stats invisibles) : délègue au nouveau.
   function renderPnlCalendar() {
+    return renderPnlCalendarNew();
+  }
+  function _renderPnlCalendarOld_unused() {
     const container = document.getElementById('pnl-calendar');
     if (!container) return;
     const year = CALENDAR_DATE.getFullYear();
