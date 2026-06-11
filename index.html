@@ -3016,6 +3016,66 @@
   }
   .plan-editable:hover { background: var(--accent-soft); }
 
+  /* ========== JOURNAL : GROUPEMENT PAR JOUR + CODE COULEUR FORT ========== */
+  .journal-day-header {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding: 12px 16px;
+    margin: 14px 0 8px;
+    border-radius: 11px;
+    background: var(--bg-1);
+    border: 1px solid var(--border-strong);
+    position: sticky; top: 0; z-index: 10;
+    box-shadow: var(--shadow-soft);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  .journal-day-header:first-child { margin-top: 0; }
+  .jdh-date { font-size: 13px; font-weight: 800; color: var(--text-0); }
+  .jdh-badge {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.04em;
+    padding: 3px 9px; border-radius: 99px;
+  }
+  .jdh-badge.perfect { background: var(--amber-soft); color: var(--amber); border: 1px solid var(--amber); }
+  .jdh-badge.good { background: var(--green-soft); color: var(--green); border: 1px solid var(--green); }
+  .jdh-badge.bad { background: var(--red-soft); color: var(--red); border: 1px solid var(--red); }
+  .jdh-meta { margin-left: auto; font-size: 12px; color: var(--text-2); }
+
+  /* Bande latérale + fond teinté selon le résultat */
+  .trade-card-list .trade-row { border-left: 4px solid var(--border-strong); }
+  .trade-card-list .trade-row.tp {
+    border-left-color: var(--green);
+    background: linear-gradient(90deg, var(--green-soft) 0%, transparent 45%);
+  }
+  .trade-card-list .trade-row.sl {
+    border-left-color: var(--red);
+    background: linear-gradient(90deg, var(--red-soft) 0%, transparent 45%);
+  }
+  .trade-card-list .trade-row.be {
+    border-left-color: var(--accent);
+    background: linear-gradient(90deg, var(--accent-soft) 0%, transparent 40%);
+  }
+  /* Gros trades (≥65% du plus gros affiché) : teinte renforcée + P&L plus visible */
+  .trade-card-list .trade-row.big.tp {
+    background: linear-gradient(90deg, rgba(34, 211, 154, 0.22) 0%, var(--green-soft) 30%, transparent 70%);
+    border-left-width: 6px;
+  }
+  .trade-card-list .trade-row.big.sl {
+    background: linear-gradient(90deg, rgba(255, 77, 107, 0.22) 0%, var(--red-soft) 30%, transparent 70%);
+    border-left-width: 6px;
+  }
+  .trade-card-list .trade-row.big .tr-pnl { font-size: 15px; font-weight: 800; }
+  [data-theme="light"] .trade-card-list .trade-row.big.tp {
+    background: linear-gradient(90deg, rgba(5, 150, 105, 0.16) 0%, var(--green-soft) 30%, transparent 70%);
+  }
+  [data-theme="light"] .trade-card-list .trade-row.big.sl {
+    background: linear-gradient(90deg, rgba(225, 29, 72, 0.14) 0%, var(--red-soft) 30%, transparent 70%);
+  }
+  @media (max-width: 768px) {
+    .journal-day-header { top: 56px; padding: 10px 12px; }
+    .jdh-date { font-size: 12px; }
+    .jdh-meta { font-size: 11px; flex-basis: 100%; margin-left: 0; }
+  }
+
   /* ===== POLISH MODE CLAIR — même standing que le dark ===== */
   [data-theme="light"] body::before {
     content: '';
@@ -9299,11 +9359,12 @@
       return true;
     });
 
-    // Trier par date+heure desc
+    // Trier par date+heure desc (vraies dates — le tri texte JJ/MM cassait entre mois)
     tradesWithIndex.sort((a, b) => {
-      const dateA = (a.t.date || '') + ' ' + (a.t.time || '');
-      const dateB = (b.t.date || '') + ' ' + (b.t.time || '');
-      return dateB.localeCompare(dateA);
+      const dA = parseTradeDate(a.t.date), dB = parseTradeDate(b.t.date);
+      const tsA = (dA ? dA.getTime() : 0), tsB = (dB ? dB.getTime() : 0);
+      if (tsA !== tsB) return tsB - tsA;
+      return (b.t.time || '').localeCompare(a.t.time || '');
     });
 
     // Stats résumé filtré
@@ -9358,7 +9419,40 @@
         <div class="center">INDIC.</div>
       </div>
       <div class="trade-card-list">`;
+    // Intensité couleur : relative au plus gros trade affiché
+    const maxAbsPnl = Math.max(1, ...tradesWithIndex.map(({ t }) => Math.abs(t.pnl || 0)));
+    let currentDay = null;
     for (const { t, idx } of tradesWithIndex) {
+      // ----- En-tête de journée (groupement par jour) -----
+      if (t.date !== currentDay) {
+        currentDay = t.date;
+        const dayGroup = tradesWithIndex.filter(x => x.t.date === currentDay);
+        const dayPnl = dayGroup.reduce((s, x) => s + (x.t.pnl || 0), 0);
+        const dayR = dayGroup.reduce((s, x) => {
+          const rv = x.t.rrPlanned != null && x.t.rrPlanned !== '' ? parseFloat(x.t.rrPlanned) : ((x.t.pnl || 0) / masterRisk);
+          return s + rv;
+        }, 0);
+        const withRules = dayGroup.filter(x => x.t.rules && Object.keys(x.t.rules).length);
+        let dayBadge = '';
+        if (withRules.length) {
+          const minDisc = Math.min(...withRules.map(x => disciplineCountForRules(x.t.rules)));
+          dayBadge = minDisc === 5 ? '<span class="jdh-badge perfect">⭐ Jour parfait</span>'
+                   : minDisc >= 4 ? '<span class="jdh-badge good">✓ Bon jour</span>'
+                   : '<span class="jdh-badge bad">⚠ Dérive</span>';
+        }
+        const dObj = parseTradeDate(currentDay);
+        const dayLabel = dObj
+          ? dObj.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
+          : (currentDay || '—');
+        html += `
+          <div class="journal-day-header">
+            <span class="jdh-date">${dayLabel.charAt(0).toUpperCase() + dayLabel.slice(1)}</span>
+            ${dayBadge}
+            <span class="jdh-meta">${dayGroup.length} trade${dayGroup.length > 1 ? 's' : ''}
+              · <span class="mono ${dayR >= 0 ? 'pos' : 'neg'}">${(dayR >= 0 ? '+' : '') + dayR.toFixed(1)}R</span>
+              · <span class="mono ${dayPnl >= 0 ? 'pos' : 'neg'}">${fmt$(dayPnl)}</span></span>
+          </div>`;
+      }
       const r = t.rules || {};
       // Score discipline en X/5 (nombre de critères respectés)
       // Support des anciens formats (divergence/pasPremiere) pour rétrocompat
@@ -9400,7 +9494,8 @@
       const mentalEmoji = r.mental === 'calme' ? '🟢' : r.mental === 'stresse' ? '🟡' : r.mental === 'fatigue' ? '🟠' : r.mental === 'surconfiance' ? '🔴' : '—';
       const mentalTitle = r.mental === 'calme' ? 'Calme' : r.mental === 'stresse' ? 'Stressé' : r.mental === 'fatigue' ? 'Fatigué' : r.mental === 'surconfiance' ? 'Sur-confiance' : 'Non évalué';
 
-      html += `<div class="trade-row ${(t.result || 'be').toLowerCase()}" onclick="openTradeModal(${idx})" title="Cliquer pour éditer">
+      const bigCls = Math.abs(t.pnl || 0) / maxAbsPnl >= 0.65 && Math.abs(t.pnl || 0) > 0 ? ' big' : '';
+      html += `<div class="trade-row ${(t.result || 'be').toLowerCase()}${bigCls}" onclick="openTradeModal(${idx})" title="Cliquer pour éditer">
         <div class="tr-date"><div class="tr-date-day">${day}</div><div class="tr-date-month">${month}</div></div>
         <div class="tr-time">${t.time || '—'}</div>
         <span class="tr-side ${(t.side || 'LONG').toLowerCase()}">${sideLabel}</span>
