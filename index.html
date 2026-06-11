@@ -10668,20 +10668,18 @@
     });
     const hidden = document.getElementById('tm-result-main');
     if (hidden) hidden.value = value;
-    // Pré-remplit R réalisé selon le résultat (2 / -1 / 0)
+    // R FORCÉ par le résultat (règle de Vincent) : TP = +R:R cible du plan · SL = −1 · BE = 0 toujours
+    // (le BE peut être légèrement positif en $ pour éviter le wick, mais ça reste 0R)
+    const rrTarget = (typeof PLAN !== 'undefined' && PLAN.rrTarget > 0) ? PLAN.rrTarget : 2;
+    const autoR = value === 'TP' ? rrTarget : value === 'SL' ? -1 : 0;
     const rEl = document.getElementById('tm-rrPlanned');
-    if (rEl && (rEl.value === '' || rEl.value == null)) {
-      if (value === 'TP') rEl.value = 2;
-      else if (value === 'SL') rEl.value = -1;
-      else if (value === 'BE') rEl.value = 0;
-    }
-    // Pré-remplit aussi P&L approximatif si vide (basé sur le risque master)
+    if (rEl) rEl.value = autoR;
+    // Pré-remplit aussi le P&L correspondant si vide (basé sur le risque du plan)
     const pnlEl = document.getElementById('tm-pnl');
     if (pnlEl && (pnlEl.value === '' || pnlEl.value == null)) {
-      const masterRisk = (ACCOUNTS.find(a => a.role === 'master') || ACCOUNTS[0] || { risk: 62.80 }).risk;
-      if (value === 'TP') pnlEl.value = (masterRisk * 2).toFixed(2);
-      else if (value === 'SL') pnlEl.value = (-masterRisk).toFixed(2);
-      else if (value === 'BE') pnlEl.value = 0;
+      const risk = (typeof PLAN !== 'undefined' && PLAN.riskPerTrade > 0) ? PLAN.riskPerTrade
+                 : (ACCOUNTS.find(a => a.role === 'master') || ACCOUNTS[0] || { risk: 62.80 }).risk;
+      pnlEl.value = (autoR * risk).toFixed(2);
     }
   }
 
