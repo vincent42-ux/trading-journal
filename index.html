@@ -2601,11 +2601,17 @@
     html, body { height: auto; min-height: 100%; font-size: 14px; }
 
     /* Layout : sidebar devient un drawer overlay, bottom nav apparaît */
-    .app {
-      grid-template-columns: 1fr;
+    /* display:block (et plus grid) : la sidebar est en position:fixed, donc
+       en grid le .main se rangeait dans la 1re colonne de 68px (sidebar-collapsed)
+       → tout le site écrasé à gauche sur téléphone. */
+    .app,
+    .app.sidebar-collapsed {
+      display: block !important;
+      grid-template-columns: 1fr !important;
       height: auto;
       min-height: 100vh;
     }
+    .main { width: 100%; min-width: 0; }
     .app .sidebar {
       position: fixed;
       left: 0; top: 0; bottom: 0;
