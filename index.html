@@ -1994,19 +1994,48 @@
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 12px;
-    padding: 14px 18px;
-    background: var(--bg-1);
-    border: 1px solid var(--border);
-    border-radius: 14px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: 0;
     margin-bottom: 14px;
     box-shadow: var(--shadow-soft);
   }
   .js-stat { display: flex; flex-direction: column; gap: 4px; }
-  .js-label { font-size: 11px; color: var(--text-2); font-weight: 500; }
-  .js-value {
-    font-size: 22px;
+  .js-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 16px 18px;
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow: var(--shadow-soft);
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.2s, transform 0.2s;
+  }
+  .js-stat::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--accent-gradient);
+    opacity: 0.85;
+  }
+  .js-stat:hover { border-color: var(--border-strong); transform: translateY(-1px); }
+  .js-label {
+    font-size: 10px;
+    color: var(--text-2);
     font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+  }
+  .js-value {
+    font-size: 25px;
+    font-weight: 800;
     letter-spacing: -0.02em;
+    font-family: 'JetBrains Mono', monospace;
   }
 
   /* Trade cards premium (au lieu d'une table) */
@@ -2108,17 +2137,41 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 6px 12px;
-    border-radius: 8px;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.02em;
+    gap: 5px;
+    padding: 6px 13px;
+    border-radius: 99px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
   }
-  .tr-side.long { background: var(--green-soft); color: var(--green); }
-  .tr-side.short { background: var(--red-soft); color: var(--red); }
-  .tr-result.tp { background: var(--green); color: #fff; box-shadow: 0 2px 8px rgba(34,211,154,0.3); }
-  .tr-result.sl { background: var(--red); color: #fff; box-shadow: 0 2px 8px rgba(255,77,107,0.3); }
-  .tr-result.be { background: var(--accent); color: #fff; box-shadow: 0 2px 8px var(--accent-glow); }
+  .tr-side.long {
+    background: transparent;
+    color: var(--green);
+    border: 1.5px solid var(--green);
+  }
+  .tr-side.long::before { content: '▲'; font-size: 9px; }
+  .tr-side.short {
+    background: transparent;
+    color: var(--red);
+    border: 1.5px solid var(--red);
+  }
+  .tr-side.short::before { content: '▼'; font-size: 9px; }
+  .tr-result.tp {
+    background: linear-gradient(135deg, #059669, #22d39a);
+    color: #fff;
+    box-shadow: 0 2px 10px rgba(34, 211, 154, 0.4);
+  }
+  .tr-result.sl {
+    background: linear-gradient(135deg, #be123c, #ff4d6b);
+    color: #fff;
+    box-shadow: 0 2px 10px rgba(255, 77, 107, 0.4);
+  }
+  .tr-result.be {
+    background: linear-gradient(135deg, var(--accent), var(--accent-bright));
+    color: #fff;
+    box-shadow: 0 2px 10px var(--accent-glow);
+  }
   .tr-r, .tr-pnl {
     font-family: 'JetBrains Mono', monospace;
     font-weight: 700;
@@ -6192,7 +6245,7 @@
 
     const masterRisk = (ACCOUNTS.find(a => a.role === 'master') || ACCOUNTS[0] || { risk: 62.80 }).risk;
     const totalR = logical.reduce((sum, t) => {
-      const r = t.rrPlanned != null && t.rrPlanned !== '' ? parseFloat(t.rrPlanned) : (t.pnl / masterRisk);
+      const r = tradeRValue(t, masterRisk);
       return sum + r;
     }, 0);
     setStatEl('hs-rcum', (totalR >= 0 ? '+' : '') + totalR.toFixed(1) + 'R');
@@ -6206,7 +6259,7 @@
     // Mini sparkline trends (10 derniers points cumulés en R)
     drawMiniSpark('hs-rcum-trend', logical.slice(-12).map((t, i, arr) => {
       const cum = arr.slice(0, i+1).reduce((sum, x) => {
-        const r = x.rrPlanned != null && x.rrPlanned !== '' ? parseFloat(x.rrPlanned) : (x.pnl / masterRisk);
+        const r = tradeRValue(x, masterRisk);
         return sum + r;
       }, 0);
       return cum;
@@ -6517,7 +6570,7 @@
       const ts = logical.filter(t => { const d = parseTradeDate(t.date); return d && d.getFullYear() === y && d.getMonth() === m; });
       const risk = PLAN.riskPerTrade > 0 ? PLAN.riskPerTrade : 62.80;
       const wins = ts.filter(t => t.pnl > 0).length;
-      const r = ts.reduce((s, t) => s + (t.rrPlanned != null && t.rrPlanned !== '' ? parseFloat(t.rrPlanned) : ((t.pnl || 0) / risk)), 0);
+      const r = ts.reduce((s, t) => s + tradeRValue(t, risk), 0);
       const pnl = ts.reduce((s, t) => s + (t.pnl || 0), 0);
       const withRules = ts.filter(t => t.rules);
       const disc = withRules.length ? withRules.reduce((s, t) => s + disciplineCountForRules(t.rules), 0) / withRules.length : 0;
@@ -6593,7 +6646,7 @@
       const dayOff = (dt.getDay() + 6) % 7;
       dt.setDate(dt.getDate() - dayOff);
       const k = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
-      const r = t.rrPlanned != null && t.rrPlanned !== '' ? parseFloat(t.rrPlanned) : (t.pnl / masterRisk);
+      const r = tradeRValue(t, masterRisk);
       weekMap[k] = (weekMap[k] || 0) + r;
     }
     const sortedKeys = Object.keys(weekMap).sort();
@@ -6838,7 +6891,7 @@
       return tradeDate && tradeDate >= startDate && tradeDate <= today;
     });
     const periodR = periodTrades.reduce((sum, t) => {
-      const r = t.rrPlanned != null && t.rrPlanned !== '' ? parseFloat(t.rrPlanned) : (t.pnl / masterRisk);
+      const r = tradeRValue(t, masterRisk);
       return sum + r;
     }, 0);
     const periodPnl = periodTrades.reduce((sum, t) => sum + (t.pnl || 0), 0);
@@ -6941,7 +6994,7 @@
       // R cumulé sur les trades
       let cum = 0;
       const data = s.logical.map(t => {
-        const r = t.rrPlanned != null && t.rrPlanned !== '' ? parseFloat(t.rrPlanned) : (t.pnl / masterRisk);
+        const r = tradeRValue(t, masterRisk);
         cum += r;
         return cum;
       });
@@ -7316,7 +7369,7 @@
         .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
       const planRisk = PLAN.riskPerTrade > 0 ? PLAN.riskPerTrade : 62.80;
       const todayR = todays.reduce((sum, t) => {
-        const r = t.rrPlanned != null && t.rrPlanned !== '' ? parseFloat(t.rrPlanned) : ((t.pnl || 0) / planRisk);
+        const r = tradeRValue(t, planRisk);
         return sum + r;
       }, 0);
 
@@ -8349,8 +8402,7 @@
     const risk = (PLAN && PLAN.riskPerTrade > 0) ? PLAN.riskPerTrade : 62.80;
     let totalR = 0, trailingSL = 0;
     for (const t of todays) {
-      const r = t.rrPlanned != null && t.rrPlanned !== '' ? parseFloat(t.rrPlanned) : ((t.pnl || 0) / risk);
-      totalR += r;
+      totalR += tradeRValue(t, risk);
     }
     for (let i = todays.length - 1; i >= 0; i--) {
       if ((todays[i].pnl || 0) < 0) trailingSL++;
@@ -8853,7 +8905,7 @@
     const worst = weekTrades.reduce((w, t) => t.pnl < w.pnl ? t : w);
     const masterRisk = (ACCOUNTS.find(a => a.role === 'master') || ACCOUNTS[0] || { risk: 62.80 }).risk;
     const totalR = weekTrades.reduce((s, t) => {
-      const r = t.rrPlanned != null && t.rrPlanned !== '' ? parseFloat(t.rrPlanned) : (t.pnl / masterRisk);
+      const r = tradeRValue(t, masterRisk);
       return s + r;
     }, 0);
 
@@ -9373,7 +9425,7 @@
     const winrate = tradesWithIndex.length ? (wins / tradesWithIndex.length * 100).toFixed(0) : '0';
     const masterRisk = (ACCOUNTS.find(a => a.role === 'master') || ACCOUNTS[0] || { risk: 62.80 }).risk;
     const totalR = tradesWithIndex.reduce((s, { t }) => {
-      const r = t.rrPlanned != null && t.rrPlanned !== '' ? parseFloat(t.rrPlanned) : (t.pnl / masterRisk);
+      const r = tradeRValue(t, masterRisk);
       return s + r;
     }, 0);
 
@@ -9429,8 +9481,7 @@
         const dayGroup = tradesWithIndex.filter(x => x.t.date === currentDay);
         const dayPnl = dayGroup.reduce((s, x) => s + (x.t.pnl || 0), 0);
         const dayR = dayGroup.reduce((s, x) => {
-          const rv = x.t.rrPlanned != null && x.t.rrPlanned !== '' ? parseFloat(x.t.rrPlanned) : ((x.t.pnl || 0) / masterRisk);
-          return s + rv;
+          return s + tradeRValue(x.t, masterRisk);
         }, 0);
         const withRules = dayGroup.filter(x => x.t.rules && Object.keys(x.t.rules).length);
         let dayBadge = '';
@@ -9471,7 +9522,7 @@
         ${t.comment ? `<span class="trade-indicator has-comment" title="${(t.comment || '').replace(/"/g, '&quot;').slice(0, 80)}">💬</span>` : ''}
         <span class="trade-indicator ${discCls}" title="Discipline : ${discCount}/5 règles respectées">${discCount}/5</span>
       `;
-      const rVal = t.rrPlanned != null && t.rrPlanned !== '' ? parseFloat(t.rrPlanned) : (t.pnl / masterRisk);
+      const rVal = tradeRValue(t, masterRisk);
       const sideLabel = t.side === 'LONG' ? 'Achat' : 'Vente';
       const resultLabel = t.result || 'BE';
       // Parse date JJ/MM
@@ -10069,6 +10120,19 @@
     const year = parts.length >= 3 ? parseInt(parts[2], 10) : new Date().getFullYear();
     if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
     return new Date(year, month, day);
+  }
+
+  // ========== R PAR TRADE — SOURCE UNIQUE DE VÉRITÉ ==========
+  // Règle de Vincent : BE = TOUJOURS 0R (même avec quelques $ de BE+) ·
+  // sinon R saisi · sinon défaut par résultat (TP = +cible du plan, SL = −1) · sinon pnl/risque
+  function tradeRValue(t, risk) {
+    if (!t) return 0;
+    if ((t.result || '') === 'BE') return 0;
+    if (t.rrPlanned != null && t.rrPlanned !== '') return parseFloat(t.rrPlanned) || 0;
+    const rrTarget = (typeof PLAN !== 'undefined' && PLAN && PLAN.rrTarget > 0) ? PLAN.rrTarget : 2;
+    if (t.result === 'TP') return rrTarget;
+    if (t.result === 'SL') return -1;
+    return risk > 0 ? (t.pnl || 0) / risk : 0;
   }
 
   // ========== TOAST ==========
