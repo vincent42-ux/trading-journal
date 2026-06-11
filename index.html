@@ -3129,6 +3129,111 @@
     .jdh-meta { font-size: 11px; flex-basis: 100%; margin-left: 0; }
   }
 
+  /* Compte unique : carte master centrée pleine largeur */
+  .accounts-grid.solo { grid-template-columns: 1fr; max-width: 760px; }
+
+  /* ========== OBJECTIFS — ESCALIER ========== */
+  .goal-auto-card { position: relative; overflow: hidden; }
+  .goal-auto-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: var(--accent-gradient); opacity: 0.85;
+  }
+  .goal-h-label {
+    font-size: 10.5px; font-weight: 700; color: var(--text-2);
+    text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px;
+  }
+  .goal-h-value { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; }
+  .goal-h-value .goal-target { font-size: 13px; color: var(--text-3); font-weight: 600; }
+  .goal-h-bar {
+    height: 8px; border-radius: 99px; background: var(--bg-2);
+    border: 1px solid var(--border); overflow: hidden; margin: 10px 0 8px;
+  }
+  .goal-h-fill {
+    height: 100%; border-radius: 99px; width: 0;
+    background: linear-gradient(90deg, var(--accent), var(--accent-bright));
+    box-shadow: 0 0 10px var(--accent-glow);
+    transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .goal-h-fill.gold { background: linear-gradient(90deg, #d97706, #fbbf24); box-shadow: 0 0 12px rgba(251, 191, 36, 0.5); }
+  .goal-h-fill.red { background: linear-gradient(90deg, #be123c, #ff4d6b); box-shadow: 0 0 10px rgba(255, 77, 107, 0.4); }
+  .goal-h-sub { font-size: 11px; color: var(--text-2); }
+
+  .goal-step { display: flex; gap: 16px; }
+  .goal-step-rail { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; }
+  .goal-step-dot {
+    width: 34px; height: 34px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--bg-2); border: 2px solid var(--border-strong);
+    font-weight: 800; font-size: 13px; color: var(--text-2);
+    font-family: 'JetBrains Mono', monospace; flex-shrink: 0;
+  }
+  .goal-step.complete .goal-step-dot {
+    background: linear-gradient(135deg, #059669, #22d39a);
+    border-color: transparent; color: #fff;
+    box-shadow: 0 0 16px rgba(34, 211, 154, 0.45);
+  }
+  .goal-step-line { width: 2px; flex: 1; background: var(--border-strong); margin: 6px 0; min-height: 24px; }
+  .goal-step.complete .goal-step-line { background: var(--green); opacity: 0.5; }
+  .goal-step-body { flex: 1; padding-bottom: 26px; min-width: 0; }
+  .goal-step-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+  .goal-step-horizon {
+    font-size: 9.5px; font-weight: 800; letter-spacing: 0.1em;
+    padding: 3px 9px; border-radius: 99px;
+    background: var(--accent-soft); color: var(--accent);
+    border: 1px solid var(--accent);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .goal-step.complete .goal-step-horizon { background: var(--green-soft); color: var(--green); border-color: var(--green); }
+  .goal-step-title { font-size: 14.5px; font-weight: 800; color: var(--text-0); cursor: pointer; }
+  .goal-step-title:hover { color: var(--accent); }
+  .goal-step-meta { margin-left: auto; font-size: 11px; color: var(--text-2); }
+  .goal-step-bar {
+    height: 6px; border-radius: 99px; background: var(--bg-2);
+    border: 1px solid var(--border); overflow: hidden; margin-bottom: 10px;
+  }
+  .goal-step-fill {
+    height: 100%; border-radius: 99px;
+    background: linear-gradient(90deg, var(--accent), var(--accent-bright));
+    transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .goal-step-fill.gold { background: linear-gradient(90deg, #059669, #22d39a); box-shadow: 0 0 10px rgba(34, 211, 154, 0.4); }
+  .goal-item {
+    display: flex; align-items: center; gap: 11px;
+    padding: 9px 12px; border-radius: 10px;
+    background: var(--bg-2); border: 1px solid var(--border);
+    margin-bottom: 6px; font-size: 13px;
+    transition: all 0.15s;
+  }
+  .goal-item:hover { border-color: var(--border-strong); }
+  .goal-item.done { opacity: 0.72; }
+  .goal-item.done .goal-item-text { text-decoration: line-through; color: var(--text-2); }
+  .goal-item-check {
+    width: 22px; height: 22px; border-radius: 7px; flex-shrink: 0;
+    border: 1.5px solid var(--border-strong); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 800; color: #fff;
+    transition: all 0.15s;
+  }
+  .goal-item-check:hover { border-color: var(--green); }
+  .goal-item.done .goal-item-check {
+    background: linear-gradient(135deg, #059669, #22d39a);
+    border-color: transparent;
+    box-shadow: 0 0 10px rgba(34, 211, 154, 0.4);
+  }
+  .goal-item-text { flex: 1; cursor: pointer; line-height: 1.4; }
+  .goal-add-row { display: flex; gap: 8px; margin-top: 8px; }
+  .goal-add-row input {
+    flex: 1; background: var(--bg-2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 9px 13px; color: var(--text-0);
+    font-family: 'Inter', sans-serif; font-size: 12.5px;
+  }
+  .goal-add-row input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  @media (max-width: 768px) {
+    .goal-step { gap: 10px; }
+    .goal-step-meta { flex-basis: 100%; margin-left: 0; }
+  }
+
   /* ===== POLISH MODE CLAIR — même standing que le dark ===== */
   [data-theme="light"] body::before {
     content: '';
@@ -4062,113 +4167,12 @@
       <section class="view" id="view-accounts">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
           <div>
-            <div style="font-size:18px; font-weight:700; letter-spacing:-0.02em;">Mes comptes prop firms</div>
-            <div style="font-size:12px; color:var(--text-2); margin-top:4px;">Solde, performance, et règles complètes par firme</div>
+            <div style="font-size:18px; font-weight:700; letter-spacing:-0.02em;">Mon compte</div>
+            <div style="font-size:12px; color:var(--text-2); margin-top:4px;">Tout se joue sur le master — c'est lui que je valide, c'est lui qui paie.</div>
           </div>
           <button class="btn btn-primary" onclick="openAccountModal()">+ Nouveau compte</button>
         </div>
         <div id="accounts-grid-dyn"></div>
-        <div class="row-3col" style="display:none;">
-          <div class="account-card">
-            <div class="account-header">
-              <div>
-                <div class="account-name">MFFU 25K</div>
-                <div class="account-firm">MyFundedFutures · Master</div>
-              </div>
-              <span class="account-role role-master">Master</span>
-            </div>
-            <div class="account-stats">
-              <div class="stat-mini"><div class="label">Balance</div><div class="value" id="acc-mffu-bal">$25,000</div></div>
-              <div class="stat-mini"><div class="label">P&L total</div><div class="value" id="acc-mffu-pnl">$0</div></div>
-              <div class="stat-mini"><div class="label">Risque/trade</div><div class="value">$62.80</div></div>
-              <div class="stat-mini"><div class="label">DD restant</div><div class="value" id="acc-mffu-dd">$1,000</div></div>
-            </div>
-            <div style="margin-bottom: 6px; font-size: 11px; color: var(--text-2); display: flex; justify-content: space-between;">
-              <span>Objectif challenge</span><span class="mono" id="acc-mffu-prog-txt">$0 / $1,500</span>
-            </div>
-            <div class="progress"><div class="progress-bar" id="acc-mffu-prog" style="width: 0%"></div></div>
-          </div>
-
-          <div class="account-card">
-            <div class="account-header">
-              <div>
-                <div class="account-name">Apex 50K #1</div>
-                <div class="account-firm">Apex · Follower x4</div>
-              </div>
-              <span class="account-role role-follower">Follower</span>
-            </div>
-            <div class="account-stats">
-              <div class="stat-mini"><div class="label">Balance</div><div class="value" id="acc-apex1-bal">$50,000</div></div>
-              <div class="stat-mini"><div class="label">P&L total</div><div class="value" id="acc-apex1-pnl">$0</div></div>
-              <div class="stat-mini"><div class="label">Risque/trade</div><div class="value">$250</div></div>
-              <div class="stat-mini"><div class="label">Trailing floor</div><div class="value">$47,500</div></div>
-            </div>
-            <div style="margin-bottom: 6px; font-size: 11px; color: var(--text-2); display: flex; justify-content: space-between;">
-              <span>Objectif challenge</span><span class="mono" id="acc-apex1-prog-txt">$0 / $3,000</span>
-            </div>
-            <div class="progress"><div class="progress-bar amber" id="acc-apex1-prog" style="width: 0%"></div></div>
-          </div>
-
-          <div class="account-card">
-            <div class="account-header">
-              <div>
-                <div class="account-name">Apex 50K #2</div>
-                <div class="account-firm">Apex · Follower x4</div>
-              </div>
-              <span class="account-role role-follower">Follower</span>
-            </div>
-            <div class="account-stats">
-              <div class="stat-mini"><div class="label">Balance</div><div class="value" id="acc-apex2-bal">$50,000</div></div>
-              <div class="stat-mini"><div class="label">P&L total</div><div class="value" id="acc-apex2-pnl">$0</div></div>
-              <div class="stat-mini"><div class="label">Risque/trade</div><div class="value">$250</div></div>
-              <div class="stat-mini"><div class="label">Trailing floor</div><div class="value">$47,500</div></div>
-            </div>
-            <div style="margin-bottom: 6px; font-size: 11px; color: var(--text-2); display: flex; justify-content: space-between;">
-              <span>Objectif challenge</span><span class="mono" id="acc-apex2-prog-txt">$0 / $3,000</span>
-            </div>
-            <div class="progress"><div class="progress-bar amber" id="acc-apex2-prog" style="width: 0%"></div></div>
-          </div>
-        </div>
-
-        <div class="card" style="margin-top: 14px;">
-          <div class="card-header">
-            <span class="card-title">Limites journalières · règles</span>
-          </div>
-          <table>
-            <thead>
-              <tr>
-                <th>Compte</th>
-                <th style="text-align: right;">Risque/trade</th>
-                <th style="text-align: right;">Stop loss (-3RR)</th>
-                <th style="text-align: right;">Stop gain (+4RR)</th>
-                <th style="text-align: right;">DLL</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td class="text">MFFU 25K</td>
-                <td style="text-align: right;">$62.80</td>
-                <td style="text-align: right;" class="neg">-$188.40</td>
-                <td style="text-align: right;" class="pos">+$251.20</td>
-                <td style="text-align: right;" class="muted">$500</td>
-              </tr>
-              <tr>
-                <td class="text">Apex 50K #1</td>
-                <td style="text-align: right;">$250</td>
-                <td style="text-align: right;" class="neg">-$750.00</td>
-                <td style="text-align: right;" class="pos">+$1,000.00</td>
-                <td style="text-align: right;" class="muted">$1,000</td>
-              </tr>
-              <tr>
-                <td class="text">Apex 50K #2</td>
-                <td style="text-align: right;">$250</td>
-                <td style="text-align: right;" class="neg">-$750.00</td>
-                <td style="text-align: right;" class="pos">+$1,000.00</td>
-                <td style="text-align: right;" class="muted">$1,000</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
       </section>
 
       <!-- ============ BACKTEST ============ -->
@@ -4640,65 +4644,55 @@
 
       <!-- ============ OBJECTIVES ============ -->
       <section class="view" id="view-objectives">
-        <div class="card">
-          <div class="card-header"><span class="card-title">Roadmap scaling</span></div>
-          <div>
-            <div class="objective">
-              <div class="objective-header">
-                <span class="objective-title">Phase 1 · Valider les 3 challenges simultanément</span>
-                <span class="objective-meta" id="obj1-meta">0% complet</span>
-              </div>
-              <div class="progress"><div class="progress-bar" id="obj1-bar" style="width: 0%"></div></div>
-              <div style="margin-top: 8px; font-size: 11px; color: var(--text-2);">MFFU 25K · Apex 50K #1 · Apex 50K #2 — via TradeSyncer</div>
+        <!-- COURT TERME : auto-mesuré depuis les trades -->
+        <div class="stats-section-title">Maintenant — mesuré automatiquement sur tes trades</div>
+        <div class="row-4col" style="margin-bottom:18px;">
+          <div class="card goal-auto-card">
+            <div class="card-body">
+              <div class="goal-h-label">📅 Aujourd'hui</div>
+              <div class="goal-h-value mono" id="goal-day-value">—</div>
+              <div class="goal-h-bar"><div class="goal-h-fill" id="goal-day-bar"></div></div>
+              <div class="goal-h-sub" id="goal-day-sub">—</div>
             </div>
-
-            <div class="objective">
-              <div class="objective-header">
-                <span class="objective-title">Phase 2 · 1 mois de données funded</span>
-                <span class="objective-meta">0%</span>
-              </div>
-              <div class="progress"><div class="progress-bar amber" style="width: 0%"></div></div>
-              <div style="margin-top: 8px; font-size: 11px; color: var(--text-2);">Valider le copier + consistency rule Apex + winrate en conditions réelles</div>
+          </div>
+          <div class="card goal-auto-card">
+            <div class="card-body">
+              <div class="goal-h-label">📆 Cette semaine</div>
+              <div class="goal-h-value mono" id="goal-week-value">—</div>
+              <div class="goal-h-bar"><div class="goal-h-fill" id="goal-week-bar"></div></div>
+              <div class="goal-h-sub" id="goal-week-sub">—</div>
             </div>
-
-            <div class="objective">
-              <div class="objective-header">
-                <span class="objective-title">Phase 3 · Ajouter des followers (Phidias, Alpha Futures)</span>
-                <span class="objective-meta">Bloqué par Phase 2</span>
-              </div>
-              <div class="progress"><div class="progress-bar amber" style="width: 0%"></div></div>
-              <div style="margin-top: 8px; font-size: 11px; color: var(--text-2);">Racheter des challenges, multiplier le profit par trade exécuté</div>
+          </div>
+          <div class="card goal-auto-card">
+            <div class="card-body">
+              <div class="goal-h-label">🗓️ Ce mois</div>
+              <div class="goal-h-value mono" id="goal-month-value">—</div>
+              <div class="goal-h-bar"><div class="goal-h-fill" id="goal-month-bar"></div></div>
+              <div class="goal-h-sub" id="goal-month-sub">—</div>
             </div>
-
-            <div class="objective">
-              <div class="objective-header">
-                <span class="objective-title">Objectif final · 3 000€ – 4 000€/mois consistants</span>
-                <span class="objective-meta">12 mois</span>
-              </div>
-              <div class="progress"><div class="progress-bar green" style="width: 0%"></div></div>
-              <div style="margin-top: 8px; font-size: 11px; color: var(--text-2);">Quitter l'usine · sortie cible : mai 2027</div>
+          </div>
+          <div class="card goal-auto-card">
+            <div class="card-body">
+              <div class="goal-h-label">🎆 Cette année</div>
+              <div class="goal-h-value mono" id="goal-year-value">—</div>
+              <div class="goal-h-bar"><div class="goal-h-fill" id="goal-year-bar"></div></div>
+              <div class="goal-h-sub" id="goal-year-sub">—</div>
             </div>
           </div>
         </div>
 
-        <div class="row-2col" style="margin-top: 14px;">
-          <div class="card">
-            <div class="card-header"><span class="card-title">Payouts cumulés</span></div>
-            <div class="card-body">
-              <div class="chart-container-sm"><canvas id="payoutChart"></canvas></div>
-            </div>
+        <!-- L'ESCALIER : 3 mois → 5 ans -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">L'escalier — petits paliers, grande destination 🏔️</span>
+            <span class="muted" style="font-size:11px;" id="goals-ladder-progress">—</span>
           </div>
-          <div class="card">
-            <div class="card-header"><span class="card-title">Jalons</span></div>
-            <div class="card-body">
-              <table>
-                <tr><td class="text">Premier funded MFFU</td><td style="text-align: right;" class="muted">à venir</td></tr>
-                <tr><td class="text">Premier funded Apex</td><td style="text-align: right;" class="muted">à venir</td></tr>
-                <tr><td class="text">Premier payout MFFU</td><td style="text-align: right;" class="muted">à venir</td></tr>
-                <tr><td class="text">100 trades funded</td><td style="text-align: right;" class="muted">0 / 100</td></tr>
-                <tr><td class="text">Salaire usine remplacé</td><td style="text-align: right;" class="muted">0 mois</td></tr>
-              </table>
+          <div class="card-body">
+            <div class="muted" style="font-size:12px; margin-bottom:16px;">
+              Coche les jalons au fur et à mesure. Clique un jalon pour le modifier, un titre pour le renommer —
+              c'est TON escalier, adapte-le.
             </div>
+            <div id="goals-ladder"></div>
           </div>
         </div>
       </section>
@@ -8883,11 +8877,11 @@
 
     const filtered = filteredTrades();
     const logical = (computeStats(filtered) || {logical:[]}).logical;
+    monday.setHours(0, 0, 0, 0);
+    sunday.setHours(23, 59, 59, 999);
     const weekTrades = logical.filter(t => {
-      if (!t.date) return false;
-      const [d, m] = t.date.split('/').map(Number);
-      const tradeDate = new Date(today.getFullYear(), m - 1, d);
-      return tradeDate >= monday && tradeDate <= sunday;
+      const tradeDate = parseTradeDate(t.date);
+      return tradeDate && tradeDate >= monday && tradeDate <= sunday;
     });
 
     if (!weekTrades.length) {
@@ -9018,27 +9012,27 @@
 
     // === RENDU ===
     c.innerHTML = `
-      <!-- 4 KPIs hero -->
-      <div class="row-4col" style="margin-bottom:20px;">
-        <div class="card" style="padding:18px 20px;">
-          <div class="muted" style="font-size:11px;">P&L semaine</div>
-          <div class="mono ${totalPnl >= 0 ? 'pos' : 'neg'}" style="font-size:28px; font-weight:800; letter-spacing:-0.02em;">${fmt$(totalPnl)}</div>
-          <div class="muted" style="font-size:11px; margin-top:4px;">${totalR >= 0 ? '+' : ''}${totalR.toFixed(1)}R cumulés</div>
+      <!-- 4 KPIs hero (blocs premium, même style que le journal) -->
+      <div class="journal-summary" style="margin-bottom:20px;">
+        <div class="js-stat">
+          <span class="js-label">P&L semaine</span>
+          <span class="js-value ${totalPnl >= 0 ? 'pos' : 'neg'}">${fmt$(totalPnl)}</span>
+          <span class="muted" style="font-size:11px;">${totalR >= 0 ? '+' : ''}${totalR.toFixed(1)}R cumulés</span>
         </div>
-        <div class="card" style="padding:18px 20px;">
-          <div class="muted" style="font-size:11px;">Trades</div>
-          <div style="font-size:28px; font-weight:800; letter-spacing:-0.02em;">${weekTrades.length}</div>
-          <div class="muted" style="font-size:11px; margin-top:4px;">${wins.length} TP · ${losses.length} SL · ${be.length} BE</div>
+        <div class="js-stat">
+          <span class="js-label">Trades</span>
+          <span class="js-value">${weekTrades.length}</span>
+          <span class="muted" style="font-size:11px;"><span class="pos">${wins.length} TP</span> · <span class="neg">${losses.length} SL</span> · ${be.length} BE</span>
         </div>
-        <div class="card" style="padding:18px 20px;">
-          <div class="muted" style="font-size:11px;">Win rate</div>
-          <div class="${wr >= 50 ? 'pos' : ''}" style="font-size:28px; font-weight:800; letter-spacing:-0.02em;">${wr.toFixed(0)}%</div>
-          <div class="muted" style="font-size:11px; margin-top:4px;">${winningDays}/${daysTraded} jours gagnants</div>
+        <div class="js-stat">
+          <span class="js-label">Win rate</span>
+          <span class="js-value ${wr >= 50 ? 'pos' : wr >= 40 ? '' : 'neg'}">${wr.toFixed(0)}%</span>
+          <span class="muted" style="font-size:11px;">${winningDays}/${daysTraded} jours gagnants</span>
         </div>
-        <div class="card" style="padding:18px 20px;">
-          <div class="muted" style="font-size:11px;">Discipline</div>
-          <div class="${avgDiscScore >= 4 ? 'pos' : avgDiscScore >= 3 ? '' : 'neg'}" style="font-size:28px; font-weight:800; letter-spacing:-0.02em;">${avgDiscScore.toFixed(1)}/5</div>
-          <div class="muted" style="font-size:11px; margin-top:4px;">${tradesPerfect} parfait${tradesPerfect>1?'s':''} · ${tradesDerive} dérive${tradesDerive>1?'s':''}</div>
+        <div class="js-stat">
+          <span class="js-label">Discipline</span>
+          <span class="js-value ${avgDiscScore >= 4 ? 'pos' : avgDiscScore >= 3 ? '' : 'neg'}">${avgDiscScore.toFixed(1)}/5</span>
+          <span class="muted" style="font-size:11px;">${tradesPerfect} parfait${tradesPerfect>1?'s':''} · ${tradesDerive} dérive${tradesDerive>1?'s':''}</span>
         </div>
       </div>
 
@@ -9093,9 +9087,8 @@
           <table style="width:100%; font-size:13px;">
             <thead><tr><th>Jour</th><th style="text-align:right;">Trades</th><th style="text-align:right;">WR</th><th style="text-align:right;">P&L</th></tr></thead>
             <tbody>${Object.entries(dayPnl).sort((a,b)=>{
-              const [da,ma] = a[0].split('/').map(Number);
-              const [db,mb] = b[0].split('/').map(Number);
-              return (ma*100+da)-(mb*100+db);
+              const dA = parseTradeDate(a[0]), dB = parseTradeDate(b[0]);
+              return (dA ? dA.getTime() : 0) - (dB ? dB.getTime() : 0);
             }).map(([d, data]) => {
               const wrDay = data.trades ? (data.wins/data.trades*100).toFixed(0) : '0';
               return `<tr>
@@ -9719,15 +9712,17 @@
       container.innerHTML = '<div class="empty-state" style="padding:40px;">Aucun compte. Clique <strong>+ Nouveau compte</strong> en haut.</div>';
       return;
     }
-    container.className = 'accounts-grid';
+    container.className = 'accounts-grid' + (ACCOUNTS.length === 1 ? ' solo' : '');
     container.removeAttribute('style');
+    // Master toujours en premier — c'est lui qui compte
+    const ACCOUNTS_SORTED = ACCOUNTS.slice().sort((a, b) => (a.role === 'master' ? -1 : 1) - (b.role === 'master' ? -1 : 1));
 
     // Clé du jour (format JJ/MM/AAAA + legacy JJ/MM)
     const _d = new Date();
     const _todayFull = `${String(_d.getDate()).padStart(2,'0')}/${String(_d.getMonth()+1).padStart(2,'0')}/${_d.getFullYear()}`;
     const _todayShort = _todayFull.slice(0, 5);
 
-    container.innerHTML = ACCOUNTS.map(acc => {
+    container.innerHTML = ACCOUNTS_SORTED.map(acc => {
       const accTrades = TRADES.filter(t => t.account === acc.name);
       const pnl = accTrades.reduce((sum, t) => sum + (t.pnl || 0), 0);
       const balance = (acc.currentBalance || acc.size) + pnl;
@@ -9858,15 +9853,166 @@
     }
   }
 
+  // ========== OBJECTIFS — ESCALIER DE PALIERS ==========
+  const DEFAULT_GOALS_LADDER = [
+    { id: 'm3', horizon: '3 MOIS', due: 'Septembre 2026', title: 'Valider et encaisser', items: [
+      { text: 'Valider le compte MFFU 25K (objectif $1 500)', done: false },
+      { text: '30 jours avec discipline moyenne ≥ 80 %', done: false },
+      { text: 'Recevoir mon premier payout', done: false }
+    ]},
+    { id: 'm6', horizon: '6 MOIS', due: 'Décembre 2026', title: 'Devenir régulier', items: [
+      { text: '3 payouts consécutifs sans casser de compte', done: false },
+      { text: '1 000 €/mois de moyenne sur 3 mois', done: false },
+      { text: 'Ajouter un 2e compte funded', done: false }
+    ]},
+    { id: 'y1', horizon: '1 AN', due: 'Juin 2027', title: 'Remplacer le salaire', items: [
+      { text: '3 000–4 000 €/mois pendant 3 mois d\'affilée', done: false },
+      { text: 'Quitter l\'usine 🏭→🏠', done: false }
+    ]},
+    { id: 'y2', horizon: '2 ANS', due: '2028', title: 'Trader à temps plein', items: [
+      { text: 'Vivre du trading sans stress financier', done: false },
+      { text: 'Scaling multi-comptes maîtrisé (followers actifs)', done: false },
+      { text: 'Capital personnel en croissance', done: false }
+    ]},
+    { id: 'y5', horizon: '5 ANS', due: '2031', title: 'La liberté', items: [
+      { text: 'Indépendance financière installée', done: false },
+      { text: 'Un patrimoine qui travaille pour moi', done: false }
+    ]}
+  ];
+  let GOALS_LADDER = JSON.parse(JSON.stringify(DEFAULT_GOALS_LADDER));
+  function loadGoalsLadder() {
+    try {
+      const raw = localStorage.getItem('goals_ladder');
+      if (raw) {
+        const saved = JSON.parse(raw);
+        if (Array.isArray(saved) && saved.length) GOALS_LADDER = saved;
+      }
+    } catch (e) {}
+  }
+  function saveGoalsLadder() {
+    try { localStorage.setItem('goals_ladder', JSON.stringify(GOALS_LADDER)); } catch (e) {}
+    renderGoalsLadder();
+  }
+  function toggleGoalItem(g, i) {
+    const item = GOALS_LADDER[g] && GOALS_LADDER[g].items[i];
+    if (!item) return;
+    item.done = !item.done;
+    if (item.done && typeof pushNotif === 'function') {
+      pushNotif('info', '🏔️', `<strong>Jalon atteint !</strong> ${escPlanText(item.text)} — un palier de plus vers la sortie d'usine.`, null);
+    }
+    saveGoalsLadder();
+  }
+  function editGoalItem(g, i) {
+    const item = GOALS_LADDER[g] && GOALS_LADDER[g].items[i];
+    if (!item) return;
+    const nv = prompt('Modifier le jalon :', item.text);
+    if (nv == null || !nv.trim()) return;
+    item.text = nv.trim();
+    saveGoalsLadder();
+  }
+  function removeGoalItem(g, i) {
+    if (!GOALS_LADDER[g]) return;
+    if (!confirm('Supprimer ce jalon ?')) return;
+    GOALS_LADDER[g].items.splice(i, 1);
+    saveGoalsLadder();
+  }
+  function addGoalItem(g) {
+    const input = document.getElementById('goal-new-' + g);
+    if (!input || !input.value.trim()) return;
+    GOALS_LADDER[g].items.push({ text: input.value.trim(), done: false });
+    input.value = '';
+    saveGoalsLadder();
+  }
+  function editGoalTitle(g) {
+    const step = GOALS_LADDER[g];
+    if (!step) return;
+    const nv = prompt('Renommer ce palier :', step.title);
+    if (!nv || !nv.trim()) return;
+    step.title = nv.trim();
+    saveGoalsLadder();
+  }
+  function renderGoalsLadder() {
+    const box = document.getElementById('goals-ladder');
+    if (!box) return;
+    let totalItems = 0, totalDone = 0;
+    box.innerHTML = GOALS_LADDER.map((step, g) => {
+      const done = step.items.filter(it => it.done).length;
+      const total = step.items.length;
+      totalItems += total; totalDone += done;
+      const pct = total ? (done / total * 100) : 0;
+      const complete = total > 0 && done === total;
+      return `
+        <div class="goal-step ${complete ? 'complete' : ''}">
+          <div class="goal-step-rail">
+            <div class="goal-step-dot">${complete ? '✓' : g + 1}</div>
+            ${g < GOALS_LADDER.length - 1 ? '<div class="goal-step-line"></div>' : ''}
+          </div>
+          <div class="goal-step-body">
+            <div class="goal-step-head">
+              <span class="goal-step-horizon">${step.horizon}</span>
+              <span class="goal-step-title" onclick="editGoalTitle(${g})" title="Cliquer pour renommer">${escPlanText(step.title)}</span>
+              <span class="goal-step-meta">${step.due} · <strong class="${complete ? 'pos' : ''}">${done}/${total}</strong></span>
+            </div>
+            <div class="goal-step-bar"><div class="goal-step-fill ${complete ? 'gold' : ''}" style="width:${pct}%;"></div></div>
+            <div class="goal-step-items">
+              ${step.items.map((it, i) => `
+                <div class="goal-item ${it.done ? 'done' : ''}">
+                  <div class="goal-item-check" onclick="toggleGoalItem(${g}, ${i})">${it.done ? '✓' : ''}</div>
+                  <div class="goal-item-text" onclick="editGoalItem(${g}, ${i})" title="Cliquer pour modifier">${escPlanText(it.text)}</div>
+                  <button class="plan-item-del" onclick="removeGoalItem(${g}, ${i})" title="Supprimer">✕</button>
+                </div>`).join('')}
+              <div class="goal-add-row">
+                <input type="text" id="goal-new-${g}" placeholder="Ajouter un jalon…" onkeydown="if(event.key==='Enter')addGoalItem(${g})">
+                <button class="btn" onclick="addGoalItem(${g})" style="padding:6px 13px;">+</button>
+              </div>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+    const prog = document.getElementById('goals-ladder-progress');
+    if (prog) prog.textContent = totalDone + ' / ' + totalItems + ' jalons · ' + (totalItems ? (totalDone / totalItems * 100).toFixed(0) : 0) + '%';
+  }
+  function renderGoalsAuto() {
+    if (!document.getElementById('goal-day-value')) return;
+    const risk = (PLAN && PLAN.riskPerTrade > 0) ? PLAN.riskPerTrade : 62.80;
+    const logical = uniqueLogicalTrades(TRADES);
+    const now = new Date();
+    const setGoal = (key, currentR, targetR, subExtra) => {
+      const vEl = document.getElementById('goal-' + key + '-value');
+      const bEl = document.getElementById('goal-' + key + '-bar');
+      const sEl = document.getElementById('goal-' + key + '-sub');
+      const pct = targetR > 0 ? Math.max(0, Math.min(100, (currentR / targetR) * 100)) : 0;
+      const reached = targetR > 0 && currentR >= targetR;
+      if (vEl) {
+        vEl.innerHTML = `<span class="${currentR > 0 ? 'pos' : currentR < 0 ? 'neg' : ''}">${(currentR >= 0 ? '+' : '') + currentR.toFixed(1)}R</span> <span class="goal-target">/ +${targetR.toFixed(0)}R</span>`;
+      }
+      if (bEl) {
+        bEl.style.width = pct + '%';
+        bEl.className = 'goal-h-fill' + (reached ? ' gold' : currentR < 0 ? ' red' : '');
+      }
+      if (sEl) sEl.innerHTML = reached ? '🎉 <strong class="pos">Objectif atteint !</strong>' + (subExtra || '') : pct.toFixed(0) + ' % du palier' + (subExtra || '');
+    };
+    // Jour
+    setGoal('day', computeTodayR().totalR, PLAN.targetRDay || 0, '');
+    // Semaine (depuis lundi)
+    const monday = new Date(now); monday.setDate(now.getDate() - ((now.getDay() + 6) % 7)); monday.setHours(0, 0, 0, 0);
+    const weekR = logical.filter(t => { const d = parseTradeDate(t.date); return d && d >= monday; })
+      .reduce((s, t) => s + tradeRValue(t, risk), 0);
+    setGoal('week', weekR, PLAN.targetRWeek || 0, '');
+    // Mois (R cible = semaine × 4, € depuis le plan)
+    const monthTrades = logical.filter(t => { const d = parseTradeDate(t.date); return d && d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth(); });
+    const monthR = monthTrades.reduce((s, t) => s + tradeRValue(t, risk), 0);
+    const monthPnl = monthTrades.reduce((s, t) => s + (t.pnl || 0), 0);
+    setGoal('month', monthR, (PLAN.targetRWeek || 0) * 4, ` · <span class="mono ${monthPnl >= 0 ? 'pos' : 'neg'}">${fmt$(monthPnl)}</span>${PLAN.targetMonthEur ? ' / objectif ' + PLAN.targetMonthEur + '€' : ''}`);
+    // Année (R cible = semaine × 48 semaines tradées)
+    const yearTrades = logical.filter(t => { const d = parseTradeDate(t.date); return d && d.getFullYear() === now.getFullYear(); });
+    const yearR = yearTrades.reduce((s, t) => s + tradeRValue(t, risk), 0);
+    const yearPnl = yearTrades.reduce((s, t) => s + (t.pnl || 0), 0);
+    setGoal('year', yearR, (PLAN.targetRWeek || 0) * 48, ` · <span class="mono ${yearPnl >= 0 ? 'pos' : 'neg'}">${fmt$(yearPnl)}</span> en ${now.getFullYear()}`);
+  }
   function renderObjectives(s) {
-    if (!s) return;
-    // Phase 1 progression = avg challenge completion across 3 accounts
-    // Simplified: use total P&L vs target ~$7,500 total
-    const phase1Target = 1500 + 3000 + 3000;
-    const phase1Cur = s.totalPnl + s.totalPnl * (250 / 62.80) * 2;
-    const phase1Pct = Math.max(0, Math.min(100, (phase1Cur / phase1Target) * 100));
-    document.getElementById('obj1-bar').style.width = phase1Pct + '%';
-    document.getElementById('obj1-meta').textContent = phase1Pct.toFixed(0) + '% complet';
+    renderGoalsAuto();
+    renderGoalsLadder();
   }
 
   // ========== CHARTS ==========
@@ -11585,13 +11731,22 @@
     downloadFile(`trading-journal_${todayStamp()}.csv`, csv, 'text/csv');
   }
   function exportJSON() {
+    // Sauvegarde COMPLÈTE : tout l'état du site dans un seul fichier
     const data = {
-      version: 1,
+      version: 2,
+      kind: 'tj_full_backup',
       exportedAt: new Date().toISOString(),
       trades: TRADES,
       accounts: ACCOUNTS,
       rotationWeeks: ROTATION_WEEKS,
       prefs: PREFS,
+      plan: (typeof PLAN !== 'undefined') ? PLAN : null,
+      goalsLadder: (typeof GOALS_LADDER !== 'undefined') ? GOALS_LADDER : null,
+      marketNotes: (typeof MARKET_NOTES !== 'undefined') ? MARKET_NOTES : null,
+      notifications: (typeof NOTIFS !== 'undefined') ? NOTIFS : null,
+      session: (typeof SESSION !== 'undefined') ? SESSION : null,
+      backtestScenarios: (typeof SCENARIOS !== 'undefined') ? SCENARIOS : null,
+      backtestTrades: (typeof BACKTEST_TRADES !== 'undefined') ? BACKTEST_TRADES : null,
     };
     downloadFile(`trading-journal_backup_${todayStamp()}.json`, JSON.stringify(data, null, 2), 'application/json');
   }
@@ -11661,15 +11816,51 @@
     reader.onload = ev => {
       try {
         const data = JSON.parse(ev.target.result);
-        if (data.trades) TRADES = data.trades;
-        if (data.accounts) ACCOUNTS = data.accounts;
-        if (data.rotationWeeks) ROTATION_WEEKS = data.rotationWeeks;
-        if (data.prefs) PREFS = { ...DEFAULT_PREFS, ...data.prefs };
+        // Tolérant : accepte la sauvegarde complète v2, l'ancienne v1, ou un simple tableau de trades
+        if (Array.isArray(data)) {
+          TRADES = data;
+        } else {
+          if (Array.isArray(data.trades)) TRADES = data.trades;
+          if (Array.isArray(data.accounts)) ACCOUNTS = data.accounts;
+          if (Array.isArray(data.rotationWeeks)) ROTATION_WEEKS = data.rotationWeeks;
+          if (data.prefs) PREFS = { ...DEFAULT_PREFS, ...data.prefs };
+          if (data.plan && typeof data.plan === 'object') {
+            PLAN = { ...JSON.parse(JSON.stringify(DEFAULT_PLAN)), ...data.plan };
+            try { localStorage.setItem('trading_plan', JSON.stringify(PLAN)); localStorage.setItem('trading_plan_backup', JSON.stringify(PLAN)); } catch (e2) {}
+          }
+          if (Array.isArray(data.goalsLadder) && data.goalsLadder.length) {
+            GOALS_LADDER = data.goalsLadder;
+            try { localStorage.setItem('goals_ladder', JSON.stringify(GOALS_LADDER)); } catch (e2) {}
+          }
+          if (Array.isArray(data.marketNotes)) {
+            MARKET_NOTES = data.marketNotes;
+            try { localStorage.setItem('market_notes', JSON.stringify(MARKET_NOTES)); } catch (e2) {}
+          }
+          if (Array.isArray(data.notifications)) {
+            NOTIFS = data.notifications;
+            try { localStorage.setItem('notifications', JSON.stringify(NOTIFS)); } catch (e2) {}
+          }
+          if (data.session && typeof data.session === 'object') {
+            SESSION = { ...SESSION, ...data.session };
+            try { localStorage.setItem('session_state', JSON.stringify(SESSION)); } catch (e2) {}
+          }
+          if (Array.isArray(data.backtestScenarios)) {
+            SCENARIOS = data.backtestScenarios;
+            try { localStorage.setItem('backtest_scenarios', JSON.stringify(SCENARIOS)); } catch (e2) {}
+          }
+          if (Array.isArray(data.backtestTrades)) {
+            BACKTEST_TRADES = data.backtestTrades;
+            try { localStorage.setItem('backtest_trades', JSON.stringify(BACKTEST_TRADES)); } catch (e2) {}
+          }
+        }
         saveTrades(); saveAccountsAndRotation(); savePrefs();
         applyAllPrefs();
+        if (typeof renderPlanView === 'function') renderPlanView();
+        if (typeof renderGoalsLadder === 'function') renderGoalsLadder();
+        if (typeof updateNotifBadge === 'function') updateNotifBadge();
         closeSettingsModal();
         render(); renderRotation();
-        alert('Restauration réussie.');
+        alert('Restauration réussie — tout a été réimporté (trades, plan, objectifs, notes, session, backtest).');
       } catch (err) {
         alert('Fichier JSON invalide : ' + err.message);
       }
@@ -12599,6 +12790,7 @@
   try { loadTrades(); console.log('[init] loadTrades OK — TRADES:', TRADES.length); } catch (e) { console.error('[init loadTrades]', e); }
   try { if (typeof loadMarketNotes === 'function') loadMarketNotes(); } catch (e) { console.error('[init loadMarketNotes]', e); }
   try { loadPlan(); renderPlanView(); console.log('[init] loadPlan OK'); } catch (e) { console.error('[init loadPlan]', e); }
+  try { loadGoalsLadder(); console.log('[init] loadGoalsLadder OK'); } catch (e) { console.error('[init loadGoalsLadder]', e); }
   try { updateNotifBadge(); renderNotifications(); console.log('[init] notifications OK'); } catch (e) { console.error('[init notifications]', e); }
   try { if (typeof loadBacktestData === 'function') loadBacktestData(); } catch (e) { console.error('[init loadBacktestData]', e); }
   try {
