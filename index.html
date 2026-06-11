@@ -6,6 +6,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="theme-color" content="#0e0c17" />
+<link rel="manifest" href="./manifest.json" />
+<link rel="apple-touch-icon" href="./apple-touch-icon.png" />
 <title>Trading Journal — MNQ / CVD</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%23a855f7'/%3E%3Cstop offset='100%25' style='stop-color:%23d946ef'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' rx='22' fill='url(%23g)'/%3E%3Cpath d='M 28 30 L 50 72 L 72 30' stroke='white' stroke-width='10' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -3234,6 +3237,47 @@
     .goal-step-meta { flex-basis: 100%; margin-left: 0; }
   }
 
+  /* ========== CHIPS ERREURS ========== */
+  .mistake-chip {
+    padding: 7px 12px; border-radius: 99px;
+    background: var(--bg-2); border: 1px solid var(--border);
+    color: var(--text-2); font-family: inherit;
+    font-size: 11.5px; font-weight: 600; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .mistake-chip:hover { border-color: var(--red); color: var(--red); }
+  .mistake-chip.on {
+    background: var(--red-soft); color: var(--red);
+    border-color: var(--red);
+    box-shadow: 0 0 8px rgba(255, 77, 107, 0.2);
+  }
+
+  /* ========== BADGES ========== */
+  .badges-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+  }
+  .badge-card {
+    text-align: center;
+    padding: 16px 10px 13px;
+    border-radius: 13px;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    transition: all 0.2s;
+  }
+  .badge-card.unlocked {
+    border-color: rgba(251, 191, 36, 0.45);
+    background: linear-gradient(180deg, var(--amber-soft), var(--bg-2));
+    box-shadow: 0 0 16px rgba(251, 191, 36, 0.12);
+  }
+  .badge-card.unlocked:hover { transform: translateY(-2px); box-shadow: 0 4px 20px rgba(251, 191, 36, 0.22); }
+  .badge-card.locked { opacity: 0.42; filter: grayscale(0.9); }
+  .badge-icon { font-size: 30px; margin-bottom: 7px; }
+  .badge-name { font-size: 12px; font-weight: 700; color: var(--text-0); margin-bottom: 3px; }
+  .badge-desc { font-size: 10px; color: var(--text-2); line-height: 1.35; }
+  .badge-card.unlocked .badge-desc { color: var(--amber); font-weight: 700; }
+
   /* ===== POLISH MODE CLAIR — même standing que le dark ===== */
   [data-theme="light"] body::before {
     content: '';
@@ -3828,8 +3872,14 @@
         <!-- HEATMAP SEMAINE : sessions × jours -->
         <div class="card" style="margin-bottom:16px;">
           <div class="card-header">
-            <span class="card-title">Heatmap de la semaine — sessions</span>
-            <span class="muted" style="font-size:11px;" id="heatmap-week-label">—</span>
+            <span class="card-title">Heatmap — sessions × jours</span>
+            <div style="display:flex; align-items:center; gap:12px;">
+              <span class="muted" style="font-size:11px;" id="heatmap-week-label">—</span>
+              <div class="mode-toggle">
+                <button class="mode-btn active" id="heatmap-mode-week" onclick="setHeatmapMode('week')">Semaine</button>
+                <button class="mode-btn" id="heatmap-mode-all" onclick="setHeatmapMode('all')">Cumul total</button>
+              </div>
+            </div>
           </div>
           <div class="card-body" id="heatmap-week"></div>
         </div>
@@ -4458,6 +4508,14 @@
             <div class="card-body" id="stats-bias"></div>
           </div>
         </div>
+
+        <div class="card" style="margin-bottom: 18px;">
+          <div class="card-header">
+            <span class="card-title">💸 Mes erreurs les plus chères</span>
+            <span class="muted" style="font-size:11px;">taguées dans le modal de trade</span>
+          </div>
+          <div class="card-body" id="stats-mistakes"></div>
+        </div>
         </div>
 
         <!-- ===== ONGLET COMPTES ===== -->
@@ -4679,6 +4737,15 @@
               <div class="goal-h-sub" id="goal-year-sub">—</div>
             </div>
           </div>
+        </div>
+
+        <!-- BADGES -->
+        <div class="card" style="margin-bottom:18px;">
+          <div class="card-header">
+            <span class="card-title">Mes badges 🏅</span>
+            <span class="muted" style="font-size:11px;" id="badges-count">—</span>
+          </div>
+          <div class="card-body"><div id="badges-grid" class="badges-grid"></div></div>
         </div>
 
         <!-- L'ESCALIER : 3 mois → 5 ans -->
@@ -5646,6 +5713,11 @@
               <button type="button" class="seg-btn" data-mental="fatigue" onclick="setRuleMental('fatigue')">🟠 Fatigué</button>
               <button type="button" class="seg-btn" data-mental="surconfiance" onclick="setRuleMental('surconfiance')">🔴 Sur-conf.</button>
             </div>
+          </div>
+
+          <div style="margin-top:16px;">
+            <div style="font-size:12px; color:var(--text-2); margin-bottom:8px;">Erreur commise ? <span style="color:var(--text-3);">(optionnel — sois honnête, c'est ta mine d'or)</span></div>
+            <div id="tm-mistakes" style="display:flex; gap:6px; flex-wrap:wrap;"></div>
           </div>
         </div>
       </div>
@@ -7547,6 +7619,15 @@
     if (summary) summary.textContent = `${ACCOUNTS.length} compte${ACCOUNTS.length > 1 ? 's' : ''} suivi${ACCOUNTS.length > 1 ? 's' : ''}`;
   }
 
+  let HEATMAP_MODE = 'week'; // 'week' = semaine courante · 'all' = toutes les semaines cumulées
+  function setHeatmapMode(mode) {
+    HEATMAP_MODE = mode;
+    const w = document.getElementById('heatmap-mode-week');
+    const a = document.getElementById('heatmap-mode-all');
+    if (w) w.classList.toggle('active', mode === 'week');
+    if (a) a.classList.toggle('active', mode === 'all');
+    renderHeatmapWeek();
+  }
   function renderHeatmapWeek() {
     const container = document.getElementById('heatmap-week');
     const labelEl = document.getElementById('heatmap-week-label');
@@ -7561,7 +7642,7 @@
     const dayWeek = (today.getDay() + 6) % 7; // 0 = Monday
     const monday = new Date(today); monday.setDate(today.getDate() - dayWeek);
     const days = [];        // clés complètes JJ/MM/AAAA (format de stockage des trades)
-    const dayLabels = [];   // affichage court JJ/MM
+    const dayLabels = [];   // affichage court JJ/MM (ou noms de jours en mode cumul)
     for (let i = 0; i < 5; i++) {
       const d = new Date(monday); d.setDate(monday.getDate() + i);
       const short = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`;
@@ -7569,7 +7650,11 @@
       dayLabels.push(short);
     }
     const sundayEnd = new Date(monday); sundayEnd.setDate(monday.getDate() + 6);
-    if (labelEl) labelEl.textContent = `Semaine du ${dayLabels[0]} au ${String(sundayEnd.getDate()).padStart(2,'0')}/${String(sundayEnd.getMonth()+1).padStart(2,'0')}`;
+    if (labelEl) {
+      labelEl.textContent = HEATMAP_MODE === 'all'
+        ? `${logical.length} trades cumulés — où est ton ATM ?`
+        : `Semaine du ${dayLabels[0]} au ${String(sundayEnd.getDate()).padStart(2,'0')}/${String(sundayEnd.getMonth()+1).padStart(2,'0')}`;
+    }
 
     // Sessions ICT: Asia 0-5, London 7-12, NY-AM 13-17, NY-PM 17-22 (heure de Paris approx)
     const sessions = [
@@ -7581,11 +7666,21 @@
 
     // Build P&L per (session × day)
     const grid = sessions.map(() => days.map(() => ({ pnl: 0, count: 0 })));
+    const weekdayNames = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi'];
     for (const t of logical) {
       if (!t.date || !t.time) continue;
-      // Match JJ/MM/AAAA complet, ou JJ/MM legacy
-      let dayIdx = days.indexOf(t.date);
-      if (dayIdx < 0) dayIdx = dayLabels.indexOf(t.date);
+      let dayIdx;
+      if (HEATMAP_MODE === 'all') {
+        // Cumul : agrégé par jour de la semaine, toutes dates confondues
+        const dObj = parseTradeDate(t.date);
+        if (!dObj) continue;
+        dayIdx = (dObj.getDay() + 6) % 7;
+        if (dayIdx > 4) continue; // week-end ignoré
+      } else {
+        // Semaine courante : match JJ/MM/AAAA complet, ou JJ/MM legacy
+        dayIdx = days.indexOf(t.date);
+        if (dayIdx < 0) dayIdx = dayLabels.indexOf(t.date);
+      }
       if (dayIdx < 0) continue;
       const hour = parseInt(t.time.split(':')[0]);
       const sessionIdx = sessions.findIndex(s => hour >= s.min && hour < s.max);
@@ -7600,7 +7695,7 @@
 
     let html = `<div class="heatmap-grid">`;
     html += `<div></div>`;
-    for (const d of dayLabels) html += `<div class="heatmap-cell-header">${d}</div>`;
+    for (const d of (HEATMAP_MODE === 'all' ? weekdayNames : dayLabels)) html += `<div class="heatmap-cell-header">${d}</div>`;
     sessions.forEach((session, sIdx) => {
       html += `<div class="heatmap-cell-row">${session.name}</div>`;
       days.forEach((_, dIdx) => {
@@ -7651,6 +7746,37 @@
       expContainer.innerHTML = rows
         ? `<table style="width:100%;"><thead><tr><th>Setup</th><th style="text-align:right;">N</th><th style="text-align:right;">WR</th><th style="text-align:right;">Expectancy</th></tr></thead><tbody>${rows}</tbody></table>`
         : '<div class="empty-state" style="padding:20px;">Pas assez de données. Renseigne le setup dans le mode détaillé.</div>';
+    }
+
+    // ----- Mes erreurs les plus chères -----
+    const mistakesBox = document.getElementById('stats-mistakes');
+    if (mistakesBox) {
+      const agg = {};
+      for (const t of logical) {
+        if (!Array.isArray(t.mistakes)) continue;
+        for (const tag of t.mistakes) {
+          if (!agg[tag]) agg[tag] = { n: 0, pnl: 0 };
+          agg[tag].n++;
+          agg[tag].pnl += (t.pnl || 0);
+        }
+      }
+      const entries = Object.entries(agg).sort((a, b) => a[1].pnl - b[1].pnl); // la plus chère d'abord
+      if (!entries.length) {
+        mistakesBox.innerHTML = '<div class="empty-state" style="padding:20px;">Aucune erreur taguée pour l\'instant.<br><span style="font-size:11px;">Quand un trade dérape, tague l\'erreur dans le modal — au fil des semaines tu verras lesquelles te coûtent le plus.</span></div>';
+      } else {
+        const totalCost = entries.reduce((s, [, d]) => s + Math.min(0, d.pnl), 0);
+        mistakesBox.innerHTML = `
+          <table style="width:100%; font-size:13px;">
+            <thead><tr><th>Erreur</th><th style="text-align:right;">Fois</th><th style="text-align:right;">Impact P&L</th></tr></thead>
+            <tbody>${entries.map(([tag, d]) => `
+              <tr>
+                <td class="text" style="font-weight:600;">${tag}</td>
+                <td style="text-align:right; color:var(--text-2);">${d.n}×</td>
+                <td style="text-align:right;" class="mono ${d.pnl >= 0 ? 'pos' : 'neg'}" style="font-weight:700;">${fmt$(d.pnl)}</td>
+              </tr>`).join('')}</tbody>
+          </table>
+          ${totalCost < 0 ? `<div style="margin-top:12px; font-size:12px; padding:10px 14px; border-radius:10px; background:var(--red-soft); color:var(--red);">💸 Tes erreurs taguées t'ont coûté <strong class="mono">${fmt$(totalCost)}</strong> — chaque erreur éliminée, c'est du P&L récupéré.</div>` : ''}`;
+      }
     }
 
     // ----- Performance après une perte -----
@@ -8658,13 +8784,15 @@
     if (!file) return;
     const reader = new FileReader();
     reader.onload = ev => {
-      QT_PHOTO = ev.target.result;
-      const img = document.getElementById('sq-photo-img');
-      if (img) img.src = QT_PHOTO;
-      const prev = document.getElementById('sq-photo-preview');
-      const empty = document.getElementById('sq-photo-empty');
-      if (prev) prev.style.display = 'block';
-      if (empty) empty.style.display = 'none';
+      compressImageDataUrl(ev.target.result, out => {
+        QT_PHOTO = out;
+        const img = document.getElementById('sq-photo-img');
+        if (img) img.src = QT_PHOTO;
+        const prev = document.getElementById('sq-photo-preview');
+        const empty = document.getElementById('sq-photo-empty');
+        if (prev) prev.style.display = 'block';
+        if (empty) empty.style.display = 'none';
+      });
     };
     reader.readAsDataURL(file);
   }
@@ -10010,9 +10138,78 @@
     const yearPnl = yearTrades.reduce((s, t) => s + (t.pnl || 0), 0);
     setGoal('year', yearR, (PLAN.targetRWeek || 0) * 48, ` · <span class="mono ${yearPnl >= 0 ? 'pos' : 'neg'}">${fmt$(yearPnl)}</span> en ${now.getFullYear()}`);
   }
+  // ========== BADGES & ACCOMPLISSEMENTS ==========
+  function renderBadges() {
+    const grid = document.getElementById('badges-grid');
+    if (!grid) return;
+    const risk = (PLAN && PLAN.riskPerTrade > 0) ? PLAN.riskPerTrade : 62.80;
+    const logical = uniqueLogicalTrades(TRADES);
+    const withRules = logical.filter(t => t.rules && Object.keys(t.rules).length);
+    const perfect = withRules.filter(t => disciplineCountForRules(t.rules) === 5).length;
+    const totalR = logical.reduce((s, t) => s + tradeRValue(t, risk), 0);
+    // Par jour
+    const byDay = {};
+    for (const t of logical) { if (t.date) byDay[t.date] = (byDay[t.date] || 0) + (t.pnl || 0); }
+    const dayKeys = Object.keys(byDay).sort((a, b) => {
+      const A = parseTradeDate(a), B = parseTradeDate(b);
+      return (A ? A.getTime() : 0) - (B ? B.getTime() : 0);
+    });
+    const greenDays = dayKeys.filter(d => byDay[d] > 0).length;
+    let bestGreenStreak = 0, cur = 0;
+    for (const d of dayKeys) { if (byDay[d] > 0) { cur++; bestGreenStreak = Math.max(bestGreenStreak, cur); } else cur = 0; }
+    // Jour parfait (tous les trades du jour à 5/5)
+    let hasPerfectDay = false, bestDiscStreak = 0, curDisc = 0;
+    for (const d of dayKeys) {
+      const dts = logical.filter(t => t.date === d && t.rules);
+      if (dts.length && Math.min(...dts.map(t => disciplineCountForRules(t.rules))) === 5) {
+        hasPerfectDay = true; curDisc++; bestDiscStreak = Math.max(bestDiscStreak, curDisc);
+      } else curDisc = 0;
+    }
+    // Mois positif
+    const byMonth = {};
+    for (const t of logical) {
+      const d = parseTradeDate(t.date);
+      if (!d) continue;
+      const k = d.getFullYear() + '-' + d.getMonth();
+      byMonth[k] = (byMonth[k] || 0) + (t.pnl || 0);
+    }
+    const hasPositiveMonth = Object.values(byMonth).some(p => p > 0);
+    const accountValidated = ACCOUNTS.some(acc => {
+      if (!acc.payoutTarget) return false;
+      const pnl = TRADES.filter(t => t.account === acc.name).reduce((s, t) => s + (t.pnl || 0), 0);
+      return pnl >= acc.payoutTarget;
+    });
+
+    const BADGES = [
+      { icon: '🎬', name: 'Premier trade', desc: 'Le voyage commence', ok: logical.length >= 1 },
+      { icon: '⭐', name: 'Jour parfait', desc: 'Tous les trades du jour à 5/5', ok: hasPerfectDay },
+      { icon: '🛡️', name: '10 trades 5/5', desc: 'La discipline devient une habitude', ok: perfect >= 10 },
+      { icon: '🏰', name: '50 trades 5/5', desc: 'Machine de discipline', ok: perfect >= 50 },
+      { icon: '🔥', name: '3 jours verts d\'affilée', desc: 'La série commence', ok: bestGreenStreak >= 3 },
+      { icon: '⚡', name: '5 jours discipline', desc: '5 jours parfaits d\'affilée', ok: bestDiscStreak >= 5 },
+      { icon: '📈', name: '10 jours verts', desc: 'La régularité paie', ok: greenDays >= 10 },
+      { icon: '🎯', name: '25 trades', desc: 'L\'échantillon grandit', ok: logical.length >= 25 },
+      { icon: '💯', name: '100 trades', desc: 'Vraie base statistique', ok: logical.length >= 100 },
+      { icon: '🚀', name: '+10R cumulés', desc: 'Le système fonctionne', ok: totalR >= 10 },
+      { icon: '🌕', name: '+50R cumulés', desc: 'Trajectoire lunaire', ok: totalR >= 50 },
+      { icon: '🗓️', name: 'Mois positif', desc: 'Un mois entier dans le vert', ok: hasPositiveMonth },
+      { icon: '🏆', name: 'Compte validé', desc: 'Objectif payout atteint', ok: accountValidated },
+    ];
+    const unlocked = BADGES.filter(b => b.ok).length;
+    grid.innerHTML = BADGES.map(b => `
+      <div class="badge-card ${b.ok ? 'unlocked' : 'locked'}" title="${b.desc}">
+        <div class="badge-icon">${b.icon}</div>
+        <div class="badge-name">${b.name}</div>
+        <div class="badge-desc">${b.ok ? '✓ débloqué' : b.desc}</div>
+      </div>`).join('');
+    const count = document.getElementById('badges-count');
+    if (count) count.textContent = unlocked + ' / ' + BADGES.length + ' débloqués';
+  }
+
   function renderObjectives(s) {
     renderGoalsAuto();
     renderGoalsLadder();
+    renderBadges();
   }
 
   // ========== CHARTS ==========
@@ -10772,6 +10969,7 @@
 
       // Rules (new system)
       loadRules(t.rules || {});
+      loadTmMistakes(t.mistakes || []);
       // Result main (TP/SL/BE)
       const userRes = t.result || (t.pnl > 0.01 ? 'TP' : t.pnl < -0.01 ? 'SL' : '');
       if (userRes) {
@@ -10815,6 +11013,7 @@
       document.getElementById('tm-photo-preview').style.display = 'none';
       document.getElementById('tm-photo-empty').style.display = 'block';
       loadRules({});
+      loadTmMistakes([]);
       // Reset TP/SL/BE selector
       document.querySelectorAll('[data-tm-result]').forEach(b => b.classList.remove('active'));
       const hiddenRes = document.getElementById('tm-result-main');
@@ -10836,6 +11035,28 @@
     input.value = '';
     input.click();
   }
+  // Compression d'image : JPEG max 1400px, ~10× plus léger → le localStorage (5 Mo) respire
+  function compressImageDataUrl(dataUrl, cb) {
+    try {
+      const img = new Image();
+      img.onload = function () {
+        try {
+          const maxW = 1400;
+          const scale = Math.min(1, maxW / img.width);
+          const w = Math.max(1, Math.round(img.width * scale));
+          const h = Math.max(1, Math.round(img.height * scale));
+          const cv = document.createElement('canvas');
+          cv.width = w; cv.height = h;
+          cv.getContext('2d').drawImage(img, 0, 0, w, h);
+          let out = cv.toDataURL('image/jpeg', 0.72);
+          if (!out || out.length >= dataUrl.length) out = dataUrl; // jamais pire que l'original
+          cb(out);
+        } catch (e) { cb(dataUrl); }
+      };
+      img.onerror = function () { cb(dataUrl); };
+      img.src = dataUrl;
+    } catch (e) { cb(dataUrl); }
+  }
   function handlePhoto(e) {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
@@ -10844,13 +11065,15 @@
       alert('Erreur lecture image : ' + (err && err.message ? err.message : 'inconnue'));
     };
     reader.onload = ev => {
-      CURRENT_PHOTO = ev.target.result;
-      const img = document.getElementById('tm-photo-img');
-      const preview = document.getElementById('tm-photo-preview');
-      const empty = document.getElementById('tm-photo-empty');
-      if (img) img.src = CURRENT_PHOTO;
-      if (preview) preview.style.display = 'block';
-      if (empty) empty.style.display = 'none';
+      compressImageDataUrl(ev.target.result, out => {
+        CURRENT_PHOTO = out;
+        const img = document.getElementById('tm-photo-img');
+        const preview = document.getElementById('tm-photo-preview');
+        const empty = document.getElementById('tm-photo-empty');
+        if (img) img.src = CURRENT_PHOTO;
+        if (preview) preview.style.display = 'block';
+        if (empty) empty.style.display = 'none';
+      });
     };
     reader.readAsDataURL(file);
   }
@@ -10988,6 +11211,27 @@
     return (disciplineCountForRules(rules) / 5) * 100;
   }
 
+  // ========== BIBLIOTHÈQUE D'ERREURS ==========
+  const MISTAKE_TAGS = ['Entrée anticipée', 'Arc incomplet', 'Stop déplacé', 'Hors horaires', 'Revenge trade', 'Taille trop grosse', 'FOMO', 'Sortie paniquée'];
+  let TM_MISTAKES = [];
+  function renderTmMistakes() {
+    const box = document.getElementById('tm-mistakes');
+    if (!box) return;
+    box.innerHTML = MISTAKE_TAGS.map(tag => {
+      const on = TM_MISTAKES.includes(tag);
+      return `<button type="button" class="mistake-chip ${on ? 'on' : ''}" onclick="toggleTmMistake('${tag.replace(/'/g, "\\'")}')">${tag}</button>`;
+    }).join('');
+  }
+  function toggleTmMistake(tag) {
+    const i = TM_MISTAKES.indexOf(tag);
+    if (i >= 0) TM_MISTAKES.splice(i, 1); else TM_MISTAKES.push(tag);
+    renderTmMistakes();
+  }
+  function loadTmMistakes(arr) {
+    TM_MISTAKES = Array.isArray(arr) ? arr.slice() : [];
+    renderTmMistakes();
+  }
+
   function closeTradeModal() {
     document.getElementById('trade-modal-backdrop').classList.remove('show');
     EDITING_INDEX = -1;
@@ -11035,6 +11279,7 @@
     const trade = {
       date, time, account, symbol, side, qty, entry, exit, pnl, result, comment, photo, rules,
       setup, rrPlanned,
+      mistakes: TM_MISTAKES.slice(),
     };
 
     let editedTrade;
@@ -12246,10 +12491,12 @@
     if (!file) return;
     const reader = new FileReader();
     reader.onload = ev => {
-      BTM_CURRENT_PHOTO = ev.target.result;
-      document.getElementById('btm-photo-img').src = BTM_CURRENT_PHOTO;
-      document.getElementById('btm-photo-preview').style.display = 'block';
-      document.getElementById('btm-photo-empty').style.display = 'none';
+      compressImageDataUrl(ev.target.result, out => {
+        BTM_CURRENT_PHOTO = out;
+        document.getElementById('btm-photo-img').src = BTM_CURRENT_PHOTO;
+        document.getElementById('btm-photo-preview').style.display = 'block';
+        document.getElementById('btm-photo-empty').style.display = 'none';
+      });
     };
     reader.readAsDataURL(file);
   }
@@ -12806,6 +13053,12 @@
       switchStatsTab(savedTab);
     }
   } catch (e) { console.error('[init statsTab]', e); }
+  // PWA : service worker (hors-ligne) — seulement en https (site hébergé), pas en file://
+  try {
+    if ('serviceWorker' in navigator && location.protocol === 'https:') {
+      navigator.serviceWorker.register('./sw.js').then(() => console.log('[pwa] service worker OK')).catch(() => {});
+    }
+  } catch (e) {}
 
 
   // Pas d'auto-load démo — Vincent démarre clean

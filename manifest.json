@@ -1,0 +1,15 @@
+{
+  "name": "Trading Journal — MNQ / CVD",
+  "short_name": "TJ MNQ",
+  "description": "Journal de trading de Vincent — discipline d'abord, le P&L suit.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#07060d",
+  "theme_color": "#0e0c17",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "apple-touch-icon.png", "sizes": "180x180", "type": "image/png", "purpose": "any" }
+  ]
+}
