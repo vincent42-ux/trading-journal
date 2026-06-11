@@ -2597,8 +2597,8 @@
      ════════════ VERSION MOBILE / TÉLÉPHONE ═══════════════════
      ═══════════════════════════════════════════════════════════ */
   @media (max-width: 768px) {
-    body { overflow: auto; -webkit-overflow-scrolling: touch; }
-    html, body { height: auto; min-height: 100%; font-size: 14px; }
+    /* Le scroll se fait sur la PAGE (body), pas dans un cadre interne */
+    html, body { overflow: visible !important; height: auto !important; min-height: 100%; font-size: 14px; -webkit-overflow-scrolling: touch; }
 
     /* Layout : sidebar devient un drawer overlay, bottom nav apparaît */
     /* display:block (et plus grid) : la sidebar est en position:fixed, donc
@@ -2611,7 +2611,8 @@
       height: auto;
       min-height: 100vh;
     }
-    .main { width: 100%; min-width: 0; }
+    .main { width: 100%; min-width: 0; overflow: visible !important; height: auto !important; }
+    .content { overflow: visible !important; height: auto !important; flex: none; }
     .app .sidebar {
       position: fixed;
       left: 0; top: 0; bottom: 0;
