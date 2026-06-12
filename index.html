@@ -3237,6 +3237,16 @@
     .goal-step-meta { flex-basis: 100%; margin-left: 0; }
   }
 
+  /* ========== SYNCHRO CLOUD ========== */
+  .sync-status {
+    padding: 11px 14px; border-radius: 10px;
+    background: var(--bg-2); border: 1px solid var(--border);
+    font-size: 12.5px; font-weight: 600;
+  }
+  .sync-status.ok { border-color: rgba(34, 211, 154, 0.4); color: var(--green); background: var(--green-soft); }
+  .sync-status.busy { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+  .sync-status.err { border-color: rgba(255, 77, 107, 0.4); color: var(--red); background: var(--red-soft); }
+
   /* ========== CHIPS ERREURS ========== */
   .mistake-chip {
     padding: 7px 12px; border-radius: 99px;
@@ -5022,6 +5032,32 @@
           <input type="file" id="settings-import-csv" accept=".csv" style="display:none;" onchange="importCSVFromSettings(event)">
           <input type="file" id="settings-import-json" accept=".json" style="display:none;" onchange="importJSONFromSettings(event)">
           <p style="font-size:11px; color:var(--text-2); margin-top:10px; line-height:1.5;">Le parser CSV auto-détecte les formats TradeSyncer, NinjaTrader et Tradovate.</p>
+        </div>
+
+        <!-- Synchro cloud -->
+        <div class="modal-section">
+          <div class="section-label">☁️ Synchro Mac ↔ iPhone (GitHub)</div>
+          <div id="sync-setup">
+            <div class="muted" style="font-size:12px; line-height:1.55; margin-bottom:12px;">
+              Tes données (trades, plan, objectifs…) sont stockées dans un <strong>coffre privé</strong> de ton compte GitHub.
+              Colle le même token ici sur chaque appareil → tout se synchronise automatiquement, tu n'as plus rien à faire.
+            </div>
+            <div style="display:flex; gap:8px;">
+              <input type="password" id="sync-token-input" placeholder="Token GitHub (scope « gist » uniquement)" style="flex:1; background:var(--bg-2); border:1px solid var(--border); border-radius:10px; padding:11px 14px; color:var(--text-0); font-family:'JetBrains Mono', monospace; font-size:12px;">
+              <button class="btn btn-primary" onclick="activateSync()">Activer</button>
+            </div>
+            <div class="muted" style="font-size:11px; margin-top:8px;">
+              Créer le token : github.com → Settings → Developer settings → Personal access tokens → <strong>Tokens (classic)</strong> → Generate new token (classic) → coche <strong>uniquement « gist »</strong> → Generate → copie-colle ici.
+            </div>
+          </div>
+          <div id="sync-active" style="display:none;">
+            <div id="sync-status" class="sync-status ok">☁️ Synchro active</div>
+            <div style="display:flex; gap:8px; margin-top:10px;">
+              <button class="btn" onclick="syncPull(false)" style="flex:1;">⬇ Récupérer maintenant</button>
+              <button class="btn" onclick="syncPush()" style="flex:1;">⬆ Envoyer maintenant</button>
+              <button class="btn" onclick="deactivateSync()" style="border-color:var(--red); color:var(--red);">Désactiver</button>
+            </div>
+          </div>
         </div>
 
         <!-- Sauvegarde automatique -->
@@ -8169,6 +8205,7 @@
       const payload = JSON.stringify(PLAN);
       localStorage.setItem('trading_plan', payload);
       localStorage.setItem('trading_plan_backup', payload); // miroir, même logique que les trades
+      if (typeof markLocalChange === 'function') markLocalChange();
       renderPlanView();
       // Les limites du plan pilotent les alertes du Dashboard
       if (typeof renderDashboardAlerts === 'function') {
@@ -8909,6 +8946,7 @@
   }
   function saveMarketNotes() {
     try { localStorage.setItem('market_notes', JSON.stringify(MARKET_NOTES)); } catch (e) {}
+    if (typeof markLocalChange === 'function') markLocalChange();
   }
   function addMarketNote() {
     const content = prompt('Note de marché (contexte, news, FOMC, biais H1...) :', '');
@@ -10019,6 +10057,7 @@
   }
   function saveGoalsLadder() {
     try { localStorage.setItem('goals_ladder', JSON.stringify(GOALS_LADDER)); } catch (e) {}
+    if (typeof markLocalChange === 'function') markLocalChange();
     renderGoalsLadder();
   }
   function toggleGoalItem(g, i) {
@@ -10597,6 +10636,8 @@
       localStorage.setItem('last_save_path', window.location.pathname);
       // Marque "modifié depuis dernier export disque"
       window.__unsavedToDisk = true;
+      // Synchro cloud auto
+      if (typeof markLocalChange === 'function') markLocalChange();
       // Update indicateur visuel
       updateTradesIndicator();
       // Toast de confirmation (sauf si silent)
@@ -11393,7 +11434,8 @@
       ROTATION_WEEKS = w ? JSON.parse(w) : [];
     } catch (e) { ACCOUNTS = defaultAccounts(); ROTATION_WEEKS = []; }
   }
-  function saveAccountsAndRotation() {
+  function saveAccountsAndRotation(skipSync) {
+    if (!skipSync && typeof markLocalChange === 'function') markLocalChange();
     try {
       localStorage.setItem('accounts', JSON.stringify(ACCOUNTS));
       localStorage.setItem('rotation_weeks', JSON.stringify(ROTATION_WEEKS));
@@ -11819,6 +11861,7 @@
     applyAllPrefs();
   }
   function savePrefs() {
+    if (typeof markLocalChange === 'function') markLocalChange();
     try { localStorage.setItem('prefs', JSON.stringify(PREFS)); } catch (e) {}
   }
   function setPref(key, value) {
@@ -11889,6 +11932,7 @@
   }
 
   function openSettingsModal() {
+    if (typeof renderSyncUI === 'function') renderSyncUI();
     // Sync inputs with current PREFS
     for (const key of Object.keys(PREFS)) {
       const el = document.getElementById('pref-' + key);
@@ -11975,9 +12019,9 @@
     }).join(',')).join('\n');
     downloadFile(`trading-journal_${todayStamp()}.csv`, csv, 'text/csv');
   }
-  function exportJSON() {
-    // Sauvegarde COMPLÈTE : tout l'état du site dans un seul fichier
-    const data = {
+  // Construit la sauvegarde COMPLÈTE (utilisée par l'export ET la synchro cloud)
+  function buildFullBackup() {
+    return {
       version: 2,
       kind: 'tj_full_backup',
       exportedAt: new Date().toISOString(),
@@ -11993,7 +12037,202 @@
       backtestScenarios: (typeof SCENARIOS !== 'undefined') ? SCENARIOS : null,
       backtestTrades: (typeof BACKTEST_TRADES !== 'undefined') ? BACKTEST_TRADES : null,
     };
-    downloadFile(`trading-journal_backup_${todayStamp()}.json`, JSON.stringify(data, null, 2), 'application/json');
+  }
+  // Applique une sauvegarde (import fichier OU synchro cloud)
+  // mergeTrades=true : union des trades par id (ne perd jamais un trade)
+  function applyBackupData(data, mergeTrades) {
+    window.__syncApplying = true;
+    try {
+    if (Array.isArray(data)) { TRADES = data; }
+    else {
+      if (Array.isArray(data.trades)) {
+        if (mergeTrades && Array.isArray(TRADES) && TRADES.length) {
+          const incoming = new Map(data.trades.filter(t => t && t.id).map(t => [t.id, t]));
+          const localOnly = TRADES.filter(t => t && t.id && !incoming.has(t.id));
+          TRADES = data.trades.concat(localOnly);
+        } else {
+          TRADES = data.trades;
+        }
+      }
+      if (Array.isArray(data.accounts)) ACCOUNTS = data.accounts;
+      if (Array.isArray(data.rotationWeeks)) ROTATION_WEEKS = data.rotationWeeks;
+      if (data.prefs) PREFS = { ...DEFAULT_PREFS, ...data.prefs };
+      if (data.plan && typeof data.plan === 'object') {
+        PLAN = { ...JSON.parse(JSON.stringify(DEFAULT_PLAN)), ...data.plan };
+        try { localStorage.setItem('trading_plan', JSON.stringify(PLAN)); localStorage.setItem('trading_plan_backup', JSON.stringify(PLAN)); } catch (e2) {}
+      }
+      if (Array.isArray(data.goalsLadder) && data.goalsLadder.length) {
+        GOALS_LADDER = data.goalsLadder;
+        try { localStorage.setItem('goals_ladder', JSON.stringify(GOALS_LADDER)); } catch (e2) {}
+      }
+      if (Array.isArray(data.marketNotes)) {
+        MARKET_NOTES = data.marketNotes;
+        try { localStorage.setItem('market_notes', JSON.stringify(MARKET_NOTES)); } catch (e2) {}
+      }
+      if (Array.isArray(data.notifications)) {
+        NOTIFS = data.notifications;
+        try { localStorage.setItem('notifications', JSON.stringify(NOTIFS)); } catch (e2) {}
+      }
+      if (Array.isArray(data.backtestScenarios)) {
+        SCENARIOS = data.backtestScenarios;
+        try { localStorage.setItem('backtest_scenarios', JSON.stringify(SCENARIOS)); } catch (e2) {}
+      }
+      if (Array.isArray(data.backtestTrades)) {
+        BACKTEST_TRADES = data.backtestTrades;
+        try { localStorage.setItem('backtest_trades', JSON.stringify(BACKTEST_TRADES)); } catch (e2) {}
+      }
+    }
+    saveTrades(true); saveAccountsAndRotation(); savePrefs();
+    applyAllPrefs();
+    if (typeof renderPlanView === 'function') renderPlanView();
+    if (typeof renderGoalsLadder === 'function') renderGoalsLadder();
+    if (typeof updateNotifBadge === 'function') updateNotifBadge();
+    render();
+    } finally { window.__syncApplying = false; }
+  }
+  function exportJSON() {
+    downloadFile(`trading-journal_backup_${todayStamp()}.json`, JSON.stringify(buildFullBackup(), null, 2), 'application/json');
+  }
+
+  // ========== SYNCHRO CLOUD (GitHub Gist privé) ==========
+  // Les données vivent dans un Gist SECRET du compte GitHub de Vincent.
+  // Même token collé sur chaque appareil → tout le monde lit/écrit le même coffre.
+  // Stratégie : pull au démarrage (le plus récent gagne, trades fusionnés par id), push auto 4s après chaque changement.
+  const SYNC_GIST_DESC = 'trading-journal-sync (tj.html) — ne pas supprimer';
+  const SYNC_FILE = 'tj-data.json';
+  let SYNC = { token: '', gistId: '', lastSync: 0 };
+  try { SYNC = { ...SYNC, ...(JSON.parse(localStorage.getItem('sync_config') || '{}')) }; } catch (e) {}
+  function saveSyncConfig() {
+    try { localStorage.setItem('sync_config', JSON.stringify(SYNC)); } catch (e) {}
+  }
+  function syncEnabled() { return !!(SYNC.token && SYNC.gistId); }
+  function setSyncStatus(msg, cls) {
+    const el = document.getElementById('sync-status');
+    if (el) { el.innerHTML = msg; el.className = 'sync-status ' + (cls || ''); }
+    const dot = document.getElementById('sync-dot');
+    if (dot) dot.className = 'sync-dot ' + (cls || '');
+  }
+  function syncHeaders() {
+    return { 'Authorization': 'Bearer ' + SYNC.token, 'Accept': 'application/vnd.github+json' };
+  }
+  function markLocalChange() {
+    if (window.__syncApplying) return; // pas de re-push pendant qu'on applique une synchro reçue
+    try { localStorage.setItem('last_local_change', String(Date.now())); } catch (e) {}
+    syncPushDebounced();
+  }
+  let _syncPushTimer = null;
+  function syncPushDebounced() {
+    if (!syncEnabled()) return;
+    clearTimeout(_syncPushTimer);
+    _syncPushTimer = setTimeout(syncPush, 4000);
+  }
+  async function syncPush() {
+    if (!syncEnabled()) return;
+    try {
+      setSyncStatus('☁️ Envoi…', 'busy');
+      const body = { files: {} };
+      body.files[SYNC_FILE] = { content: JSON.stringify(buildFullBackup()) };
+      const resp = await fetch('https://api.github.com/gists/' + SYNC.gistId, {
+        method: 'PATCH', headers: syncHeaders(), body: JSON.stringify(body)
+      });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      SYNC.lastSync = Date.now();
+      saveSyncConfig();
+      setSyncStatus('☁️ Synchronisé · ' + new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }), 'ok');
+    } catch (e) {
+      console.error('[sync push]', e);
+      setSyncStatus('⚠️ Échec envoi — ' + e.message + ' (réessai au prochain changement)', 'err');
+    }
+  }
+  async function syncPull(silent) {
+    if (!syncEnabled()) return;
+    try {
+      setSyncStatus('☁️ Vérification…', 'busy');
+      const resp = await fetch('https://api.github.com/gists/' + SYNC.gistId + '?t=' + Date.now(), { headers: syncHeaders() });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const gist = await resp.json();
+      const file = gist.files && gist.files[SYNC_FILE];
+      if (!file || !file.content) { setSyncStatus('☁️ Coffre vide — premier envoi au prochain trade', 'ok'); return; }
+      let content = file.content;
+      if (file.truncated && file.raw_url) {
+        content = await (await fetch(file.raw_url)).text();
+      }
+      const remote = JSON.parse(content);
+      const remoteTs = remote.exportedAt ? new Date(remote.exportedAt).getTime() : 0;
+      const localTs = parseInt(localStorage.getItem('last_local_change') || '0');
+      if (remoteTs > localTs) {
+        applyBackupData(remote, true); // fusion des trades par id : on ne perd jamais rien
+        try { localStorage.setItem('last_local_change', String(remoteTs)); } catch (e2) {}
+        SYNC.lastSync = Date.now();
+        saveSyncConfig();
+        setSyncStatus('☁️ Synchronisé (données récupérées du cloud)', 'ok');
+        if (!silent && typeof showToast === 'function') showToast('☁️ Données synchronisées depuis le cloud', 'success');
+      } else if (localTs > remoteTs) {
+        syncPush(); // le local est plus récent → on pousse
+      } else {
+        setSyncStatus('☁️ Synchronisé · à jour', 'ok');
+      }
+    } catch (e) {
+      console.error('[sync pull]', e);
+      setSyncStatus('⚠️ Synchro impossible — ' + e.message, 'err');
+    }
+  }
+  async function activateSync() {
+    const input = document.getElementById('sync-token-input');
+    const token = input ? input.value.trim() : '';
+    if (!token) { alert('Colle d\'abord ton token GitHub (scope « gist » uniquement).'); return; }
+    try {
+      setSyncStatus('☁️ Connexion…', 'busy');
+      SYNC.token = token;
+      // Cherche un coffre existant (créé depuis un autre appareil)
+      const listResp = await fetch('https://api.github.com/gists?per_page=100', { headers: syncHeaders() });
+      if (!listResp.ok) throw new Error(listResp.status === 401 ? 'Token invalide ou sans le scope « gist »' : 'HTTP ' + listResp.status);
+      const gists = await listResp.json();
+      const existing = gists.find(g => g.description === SYNC_GIST_DESC);
+      if (existing) {
+        SYNC.gistId = existing.id;
+        saveSyncConfig();
+        if (input) input.value = '';
+        renderSyncUI();
+        await syncPull(false); // récupère ce qui existe déjà
+        if (typeof showToast === 'function') showToast('☁️ Synchro connectée au coffre existant', 'success');
+      } else {
+        const createResp = await fetch('https://api.github.com/gists', {
+          method: 'POST', headers: syncHeaders(),
+          body: JSON.stringify({ description: SYNC_GIST_DESC, public: false, files: { [SYNC_FILE]: { content: JSON.stringify(buildFullBackup()) } } })
+        });
+        if (!createResp.ok) throw new Error('Création du coffre impossible (HTTP ' + createResp.status + ')');
+        const gist = await createResp.json();
+        SYNC.gistId = gist.id;
+        SYNC.lastSync = Date.now();
+        saveSyncConfig();
+        if (input) input.value = '';
+        renderSyncUI();
+        setSyncStatus('☁️ Coffre créé — tes données sont dans le cloud', 'ok');
+        if (typeof showToast === 'function') showToast('☁️ Synchro activée ! Colle le même token sur ton autre appareil.', 'success');
+      }
+      if (typeof pushNotif === 'function') pushNotif('info', '☁️', '<strong>Synchro cloud activée</strong> — Mac et iPhone partagent maintenant les mêmes données.', null);
+    } catch (e) {
+      SYNC.token = '';
+      setSyncStatus('⚠️ ' + e.message, 'err');
+      alert('Activation impossible : ' + e.message);
+    }
+  }
+  function deactivateSync() {
+    if (!confirm('Désactiver la synchro sur CET appareil ?\n(Le coffre cloud et tes autres appareils ne sont pas touchés)')) return;
+    SYNC = { token: '', gistId: '', lastSync: 0 };
+    saveSyncConfig();
+    renderSyncUI();
+  }
+  function renderSyncUI() {
+    const on = syncEnabled();
+    const setup = document.getElementById('sync-setup');
+    const active = document.getElementById('sync-active');
+    if (setup) setup.style.display = on ? 'none' : 'block';
+    if (active) active.style.display = on ? 'block' : 'none';
+    if (on && SYNC.lastSync) {
+      setSyncStatus('☁️ Dernière synchro : ' + new Date(SYNC.lastSync).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }), 'ok');
+    }
   }
   function exportFiltered() {
     const account = prompt('Compte à exporter (laisser vide pour tous) :', '');
@@ -12062,50 +12301,11 @@
       try {
         const data = JSON.parse(ev.target.result);
         // Tolérant : accepte la sauvegarde complète v2, l'ancienne v1, ou un simple tableau de trades
-        if (Array.isArray(data)) {
-          TRADES = data;
-        } else {
-          if (Array.isArray(data.trades)) TRADES = data.trades;
-          if (Array.isArray(data.accounts)) ACCOUNTS = data.accounts;
-          if (Array.isArray(data.rotationWeeks)) ROTATION_WEEKS = data.rotationWeeks;
-          if (data.prefs) PREFS = { ...DEFAULT_PREFS, ...data.prefs };
-          if (data.plan && typeof data.plan === 'object') {
-            PLAN = { ...JSON.parse(JSON.stringify(DEFAULT_PLAN)), ...data.plan };
-            try { localStorage.setItem('trading_plan', JSON.stringify(PLAN)); localStorage.setItem('trading_plan_backup', JSON.stringify(PLAN)); } catch (e2) {}
-          }
-          if (Array.isArray(data.goalsLadder) && data.goalsLadder.length) {
-            GOALS_LADDER = data.goalsLadder;
-            try { localStorage.setItem('goals_ladder', JSON.stringify(GOALS_LADDER)); } catch (e2) {}
-          }
-          if (Array.isArray(data.marketNotes)) {
-            MARKET_NOTES = data.marketNotes;
-            try { localStorage.setItem('market_notes', JSON.stringify(MARKET_NOTES)); } catch (e2) {}
-          }
-          if (Array.isArray(data.notifications)) {
-            NOTIFS = data.notifications;
-            try { localStorage.setItem('notifications', JSON.stringify(NOTIFS)); } catch (e2) {}
-          }
-          if (data.session && typeof data.session === 'object') {
-            SESSION = { ...SESSION, ...data.session };
-            try { localStorage.setItem('session_state', JSON.stringify(SESSION)); } catch (e2) {}
-          }
-          if (Array.isArray(data.backtestScenarios)) {
-            SCENARIOS = data.backtestScenarios;
-            try { localStorage.setItem('backtest_scenarios', JSON.stringify(SCENARIOS)); } catch (e2) {}
-          }
-          if (Array.isArray(data.backtestTrades)) {
-            BACKTEST_TRADES = data.backtestTrades;
-            try { localStorage.setItem('backtest_trades', JSON.stringify(BACKTEST_TRADES)); } catch (e2) {}
-          }
-        }
-        saveTrades(); saveAccountsAndRotation(); savePrefs();
-        applyAllPrefs();
-        if (typeof renderPlanView === 'function') renderPlanView();
-        if (typeof renderGoalsLadder === 'function') renderGoalsLadder();
-        if (typeof updateNotifBadge === 'function') updateNotifBadge();
+        applyBackupData(data, false);
         closeSettingsModal();
-        render(); renderRotation();
-        alert('Restauration réussie — tout a été réimporté (trades, plan, objectifs, notes, session, backtest).');
+        renderRotation();
+        if (typeof syncPushDebounced === 'function') syncPushDebounced();
+        alert('Restauration réussie — tout a été réimporté (trades, plan, objectifs, notes, backtest).');
       } catch (err) {
         alert('Fichier JSON invalide : ' + err.message);
       }
@@ -13039,6 +13239,10 @@
   try { loadPlan(); renderPlanView(); console.log('[init] loadPlan OK'); } catch (e) { console.error('[init loadPlan]', e); }
   try { loadGoalsLadder(); console.log('[init] loadGoalsLadder OK'); } catch (e) { console.error('[init loadGoalsLadder]', e); }
   try { updateNotifBadge(); renderNotifications(); console.log('[init] notifications OK'); } catch (e) { console.error('[init notifications]', e); }
+  try {
+    renderSyncUI();
+    if (syncEnabled()) setTimeout(() => syncPull(true), 800); // récupère le cloud au démarrage
+  } catch (e) { console.error('[init sync]', e); }
   try { if (typeof loadBacktestData === 'function') loadBacktestData(); } catch (e) { console.error('[init loadBacktestData]', e); }
   try {
     if (typeof PREFS !== 'undefined' && PREFS.defaultView && PREFS.defaultView !== 'dashboard') {
