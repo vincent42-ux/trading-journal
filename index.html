@@ -4638,6 +4638,12 @@
                   </div>
                 </div>
                 <div class="form-field">
+                  <label>TP 2RR fixé avant l'entrée</label>
+                  <div style="display:flex; gap:8px;">
+                    <button class="seg-btn tp active" id="sq-tp2rr" onclick="setQtTp2rr()" style="border:1px solid var(--border);">✓ Oui</button>
+                  </div>
+                </div>
+                <div class="form-field">
                   <label>Mental</label>
                   <div style="display:flex; gap:6px;">
                     <button class="seg-btn" id="sq-mental-calme" onclick="setQtMental('calme')" title="Calme" style="border:1px solid var(--border); padding:8px 6px;">🟢</button>
@@ -8808,6 +8814,18 @@
     if (non) non.classList.toggle('active', QT_ARC === 'non');
     updateQtDiscCount();
   }
+  // TP 2RR fixé AVANT l'entrée = une INTENTION (ta règle), pas le résultat du trade.
+  // Actif par défaut (c'est ton plan de base) — décoche seulement si tu ne l'avais pas fixé.
+  let QT_TP2RR = true;
+  function setQtTp2rr() {
+    QT_TP2RR = !QT_TP2RR;
+    const btn = document.getElementById('sq-tp2rr');
+    if (btn) {
+      btn.classList.toggle('active', QT_TP2RR);
+      btn.textContent = QT_TP2RR ? '✓ Oui' : '✗ Non';
+    }
+    updateQtDiscCount();
+  }
   function setQtMental(m) {
     QT_MENTAL = QT_MENTAL === m ? '' : m;
     ['calme', 'stresse', 'fatigue', 'surconfiance'].forEach(k => {
@@ -8851,7 +8869,8 @@
       bougies: bougiesCount != null && bougiesCount >= bMin && bougiesCount <= bMax,
       bougiesCount,
       arcJoli: QT_ARC,
-      tp2rr: QT_RESULT === 'TP',
+      // La discipline juge tes RÈGLES, pas le résultat : un SL à −1R avec plan suivi reste 5/5
+      tp2rr: QT_TP2RR,
       mental: QT_MENTAL
     };
   }
@@ -8921,6 +8940,10 @@
     ['sq-res-tp', 'sq-res-sl', 'sq-res-be', 'sq-arc-oui', 'sq-arc-non'].forEach(id => {
       const el = document.getElementById(id); if (el) el.classList.remove('active');
     });
+    // TP 2RR : retour à la valeur par défaut (oui — c'est la règle du plan)
+    QT_TP2RR = true;
+    const tp2Btn = document.getElementById('sq-tp2rr');
+    if (tp2Btn) { tp2Btn.classList.add('active'); tp2Btn.textContent = '✓ Oui'; }
     ['calme', 'stresse', 'fatigue', 'surconfiance'].forEach(k => {
       const el = document.getElementById('sq-mental-' + k); if (el) el.classList.remove('plan-on');
     });
