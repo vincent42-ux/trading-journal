@@ -2843,6 +2843,25 @@
     .modal-header { padding: 16px; }
     .modal-footer { padding: 12px 16px; }
 
+    /* Modals : UNE colonne, AUCUN défilement horizontal */
+    .modal { overflow-x: hidden !important; }
+    .modal-body { overflow-x: hidden !important; }
+    .modal .form-row,
+    .modal-section .form-row {
+      display: flex !important;
+      flex-direction: column !important;
+      grid-template-columns: 1fr !important;
+      gap: 10px !important;
+    }
+    .modal .form-field { width: 100%; min-width: 0; }
+    .modal input, .modal select, .modal textarea, .modal button { max-width: 100%; min-width: 0; }
+    /* En-tête du modal : les onglets Affichage / Données passent sur leur propre ligne, pleine largeur */
+    .modal-header { flex-wrap: wrap; gap: 10px; }
+    .modal-header .mode-toggle { order: 3; flex-basis: 100%; display: flex; }
+    .modal-header .mode-toggle .mode-btn { flex: 1; padding: 10px 8px; font-size: 12px; }
+    /* Compteurs et stats du panneau Données : 2 colonnes max */
+    #settings-counts { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 8px !important; }
+
     /* Charts plus petits */
     .chart-container { height: 200px !important; }
     .chart-container-sm { height: 160px !important; }
