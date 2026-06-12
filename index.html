@@ -3280,6 +3280,19 @@
     .goal-step-meta { flex-basis: 100%; margin-left: 0; }
   }
 
+  /* ========== ÉPURE PREMIUM (demande Vincent) ========== */
+  /* Titre de page dans la topbar : inutile, on sait où on est */
+  #view-title { display: none !important; }
+  .topbar-stats { margin-left: auto; }
+  /* Sous-titre « MNQ · CVD » du logo : caché */
+  .brand-text .sub { display: none !important; }
+  /* Footer sidebar : on ne garde QUE le bouton Paramètres
+     (Session active, compteur trades, date de save, boutons JSON, path, version → cachés.
+     Tout existe toujours dans le DOM : le JS continue de les mettre à jour sans erreur,
+     et l'export complet reste dispo dans Paramètres → Données.) */
+  .sidebar-footer-info,
+  .sidebar-footer .sidebar-text { display: none !important; }
+
   /* ========== SYNCHRO CLOUD ========== */
   .sync-status {
     padding: 11px 14px; border-radius: 10px;
