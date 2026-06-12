@@ -3765,7 +3765,6 @@
       </button>
       <h1 id="view-title">Dashboard</h1>
       <div class="topbar-stats">
-        <button class="btn btn-icon" onclick="openSettingsModal()" title="Paramètres">⚙️</button>
         <button class="btn btn-icon" onclick="toggleTheme()" id="theme-toggle" title="Basculer thème">☾</button>
         <button class="btn btn-primary" onclick="openTradeModal()">+ Trade</button>
       </div>
@@ -3786,10 +3785,8 @@
           <span class="period-label">Période</span>
           <div class="period-group">
             <button class="period-btn" data-period="7d" onclick="setDashboardPeriod('7d')">7 jours</button>
-            <button class="period-btn" data-period="30d" onclick="setDashboardPeriod('30d')">1 mois</button>
-            <button class="period-btn" data-period="60d" onclick="setDashboardPeriod('60d')">2 mois</button>
-            <button class="period-btn" data-period="180d" onclick="setDashboardPeriod('180d')">6 mois</button>
-            <button class="period-btn" data-period="365d" onclick="setDashboardPeriod('365d')">1 an</button>
+            <button class="period-btn" data-period="last-week" onclick="setDashboardPeriod('last-week')">Semaine dernière</button>
+            <button class="period-btn" data-period="this-month" onclick="setDashboardPeriod('this-month')">Mois en cours</button>
             <button class="period-btn active" data-period="all" onclick="setDashboardPeriod('all')">Tout</button>
           </div>
           <span class="period-info" id="period-info"></span>
@@ -3935,21 +3932,6 @@
           </div>
         </div>
         </details>
-
-        <!-- HEATMAP SEMAINE : sessions × jours -->
-        <div class="card" style="margin-bottom:16px;">
-          <div class="card-header">
-            <span class="card-title">Heatmap — sessions × jours</span>
-            <div style="display:flex; align-items:center; gap:12px;">
-              <span class="muted" style="font-size:11px;" id="heatmap-week-label">—</span>
-              <div class="mode-toggle">
-                <button class="mode-btn active" id="heatmap-mode-week" onclick="setHeatmapMode('week')">Semaine</button>
-                <button class="mode-btn" id="heatmap-mode-all" onclick="setHeatmapMode('all')">Cumul total</button>
-              </div>
-            </div>
-          </div>
-          <div class="card-body" id="heatmap-week"></div>
-        </div>
 
         <!-- COMPARAISON MOIS + NOTES DE MARCHÉ -->
         <div class="row-2col" style="margin-bottom:16px;">
@@ -4816,17 +4798,8 @@
           </div>
         </div>
 
-        <!-- BADGES -->
-        <div class="card" style="margin-bottom:18px;">
-          <div class="card-header">
-            <span class="card-title">Mes badges 🏅</span>
-            <span class="muted" style="font-size:11px;" id="badges-count">—</span>
-          </div>
-          <div class="card-body"><div id="badges-grid" class="badges-grid"></div></div>
-        </div>
-
         <!-- L'ESCALIER : 3 mois → 5 ans -->
-        <div class="card">
+        <div class="card" style="margin-bottom:18px;">
           <div class="card-header">
             <span class="card-title">L'escalier — petits paliers, grande destination 🏔️</span>
             <span class="muted" style="font-size:11px;" id="goals-ladder-progress">—</span>
@@ -4838,6 +4811,15 @@
             </div>
             <div id="goals-ladder"></div>
           </div>
+        </div>
+
+        <!-- BADGES -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Mes badges 🏅</span>
+            <span class="muted" style="font-size:11px;" id="badges-count">—</span>
+          </div>
+          <div class="card-body"><div id="badges-grid" class="badges-grid"></div></div>
         </div>
       </section>
 
@@ -4896,6 +4878,9 @@
           </div>
         </div>
 
+        <!-- Réglages avancés (repliés — rarement utiles) -->
+        <details class="dash-collapse" style="margin:14px 16px;">
+        <summary><span class="dash-collapse-chevron">▸</span> Réglages avancés — devise, formats, fuseau horaire…</summary>
         <!-- Devise et formatage -->
         <div class="modal-section">
           <div class="section-label">Devise et formatage</div>
@@ -4982,6 +4967,7 @@
             </div>
           </div>
         </div>
+        </details>
 
         <!-- Couleurs et accessibilité -->
         <div class="modal-section">
@@ -5623,6 +5609,16 @@
               <option value="evaluation">Évaluation</option>
               <option value="paused">En pause</option>
             </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-field">
+            <label>Début du cycle (abonnement / éval)</label>
+            <input type="date" id="am-cycleStart">
+          </div>
+          <div class="form-field">
+            <label>Durée du cycle (jours)</label>
+            <input type="number" min="0" id="am-cycleDays" placeholder="30">
           </div>
         </div>
       </div>
@@ -6368,7 +6364,6 @@
     _safe(() => renderDisciplineDeviation(s), 'renderDisciplineDeviation');
     _safe(() => renderRRDeviation(s), 'renderRRDeviation');
     _safe(() => renderKPIs(s), 'renderKPIs');
-    _safe(() => renderHeatmapWeek(), 'renderHeatmapWeek');
     _safe(() => renderHealthGauges(), 'renderHealthGauges');
     _safe(() => rebuildCharts(filtered), 'rebuildCharts');
     _safe(() => renderStatsPage(s), 'renderStatsPage');
@@ -10176,6 +10171,30 @@
               </div>
             </div>` : ''}
 
+            <!-- Barre de VIE du cycle (abonnement / éval — se réinitialise tous les N jours) -->
+            ${(function () {
+              if (!acc.cycleStart) return '';
+              const cd = acc.cycleDays || 30;
+              const start = new Date(acc.cycleStart + 'T00:00:00');
+              if (isNaN(start.getTime())) return '';
+              const elapsed = Math.floor((Date.now() - start.getTime()) / 86400000);
+              if (elapsed < 0) return '';
+              const dayInCycle = (elapsed % cd) + 1;
+              const remaining = cd - dayInCycle;
+              const lifePct = Math.max(0, Math.min(100, (remaining / cd) * 100));
+              const lifeCls = lifePct > 50 ? 'green' : lifePct > 20 ? 'gold' : 'red';
+              return `
+              <div class="acc-bar-block">
+                <div class="acc-bar-label">
+                  <span>⏳ Vie du cycle</span>
+                  <span class="mono ${remaining <= 5 ? 'neg' : ''}">J ${dayInCycle} / ${cd} · reste ${remaining} j</span>
+                </div>
+                <div class="acc-bar-track">
+                  <div class="acc-bar-fill ${lifeCls}" style="width:${lifePct}%;"></div>
+                </div>
+              </div>`;
+            })()}
+
             <!-- 3 boxes : DLL aujourd'hui / Jours tradés / P&L total -->
             <div class="acc-boxes">
               <div class="acc-box">
@@ -11114,16 +11133,29 @@
   function filteredTrades() {
     var period = window.DASHBOARD_PERIOD || 'all';
     if (period === 'all') return TRADES;
-    var daysMap = { '7d': 7, '30d': 30, '60d': 60, '180d': 180, '365d': 365 };
-    var days = daysMap[period];
-    if (!days) return TRADES;
-    var cutoff = new Date();
-    cutoff.setHours(0, 0, 0, 0);
-    cutoff.setDate(cutoff.getDate() - days);
+    var from = null, to = null;
+    var now = new Date();
+    if (period === '7d') {
+      from = new Date(now); from.setHours(0, 0, 0, 0); from.setDate(from.getDate() - 7);
+    } else if (period === 'last-week') {
+      // Lundi → dimanche de la semaine PRÉCÉDENTE
+      var dayOff = (now.getDay() + 6) % 7;
+      var thisMonday = new Date(now); thisMonday.setHours(0, 0, 0, 0); thisMonday.setDate(now.getDate() - dayOff);
+      from = new Date(thisMonday); from.setDate(thisMonday.getDate() - 7);
+      to = new Date(thisMonday); to.setMilliseconds(-1); // dimanche 23:59:59
+    } else if (period === 'this-month') {
+      from = new Date(now.getFullYear(), now.getMonth(), 1);
+    } else {
+      // Anciennes valeurs sauvegardées ('30d', '60d'…) → fallback Tout
+      return TRADES;
+    }
     return TRADES.filter(function (t) {
       if (!t || !t.date || typeof parseTradeDate !== 'function') return true;
       var d = parseTradeDate(t.date);
-      return d && d >= cutoff;
+      if (!d) return false;
+      if (from && d < from) return false;
+      if (to && d > to) return false;
+      return true;
     });
   }
 
@@ -11695,6 +11727,10 @@
       document.getElementById('am-trailing').value = a.trailing || 0;
       document.getElementById('am-payoutTarget').value = a.payoutTarget || 0;
       document.getElementById('am-currentBalance').value = a.currentBalance || a.size;
+      const csEl = document.getElementById('am-cycleStart');
+      if (csEl) csEl.value = a.cycleStart || '';
+      const cdEl = document.getElementById('am-cycleDays');
+      if (cdEl) cdEl.value = a.cycleDays || 30;
     } else {
       title.textContent = 'Nouveau compte';
       delBtn.style.display = 'none';
@@ -11731,6 +11767,8 @@
       trailing: parseFloat(document.getElementById('am-trailing').value) || 0,
       payoutTarget: parseFloat(document.getElementById('am-payoutTarget').value) || 0,
       currentBalance: parseFloat(document.getElementById('am-currentBalance').value) || 0,
+      cycleStart: (document.getElementById('am-cycleStart') || { value: '' }).value || '',
+      cycleDays: parseInt((document.getElementById('am-cycleDays') || { value: 30 }).value) || 30,
     };
     if (EDITING_ACCOUNT_ID) {
       const idx = ACCOUNTS.findIndex(a => a.id === EDITING_ACCOUNT_ID);
