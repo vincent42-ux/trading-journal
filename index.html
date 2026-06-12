@@ -2828,17 +2828,41 @@
       gap: 6px;
     }
 
-    /* Modal : full screen sur mobile */
+    /* Modal : full screen sur mobile — en-tête FIXE en haut, seul le corps défile */
+    .modal-backdrop {
+      padding: 0;
+      align-items: stretch !important;
+      justify-content: stretch !important;
+    }
     .modal {
       width: 100% !important;
       max-width: 100% !important;
-      max-height: 100vh !important;
       height: 100vh;
+      height: 100dvh !important;     /* hauteur RÉELLE visible (gère la barre Safari iOS) */
+      max-height: 100dvh !important;
       border-radius: 0 !important;
       animation: slideUp 0.3s ease;
+      display: flex !important;
+      flex-direction: column !important;
+      margin: 0 !important;
     }
-    .modal-backdrop { padding: 0; }
-    .modal-body { max-height: calc(100vh - 130px) !important; }
+    .modal-header {
+      flex-shrink: 0;
+      padding-top: calc(16px + env(safe-area-inset-top));
+      background: var(--bg-1);
+      z-index: 5;
+    }
+    .modal-body {
+      flex: 1 1 auto !important;
+      max-height: none !important;
+      overflow-y: auto !important;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: 30px;
+    }
+    .modal-footer {
+      flex-shrink: 0;
+      padding-bottom: calc(12px + env(safe-area-inset-bottom));
+    }
     .modal-section { padding: 14px 16px; }
     .modal-header { padding: 16px; }
     .modal-footer { padding: 12px 16px; }
