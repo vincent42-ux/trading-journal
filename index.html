@@ -11276,7 +11276,7 @@
   }
 
   // ========== BIBLIOTHÈQUE D'ERREURS ==========
-  const MISTAKE_TAGS = ['Entrée anticipée', 'Arc incomplet', 'Stop déplacé', 'Hors horaires', 'Revenge trade', 'Taille trop grosse', 'FOMO', 'Sortie paniquée'];
+  const MISTAKE_TAGS = ['Entrée anticipée', 'Arc incomplet', 'Trop de mèches', 'Stop déplacé', 'Hors horaires', 'Revenge trade', 'Taille trop grosse', 'FOMO', 'Sortie paniquée'];
   let TM_MISTAKES = [];
   function renderTmMistakes() {
     const box = document.getElementById('tm-mistakes');
@@ -12073,8 +12073,10 @@
           const incoming = new Map(data.trades.filter(t => t && t.id).map(t => [t.id, t]));
           const localOnly = TRADES.filter(t => t && t.id && !incoming.has(t.id));
           TRADES = data.trades.concat(localOnly);
+          window.__lastMergeLocalOnly = localOnly.length; // trades locaux absents du cloud
         } else {
           TRADES = data.trades;
+          window.__lastMergeLocalOnly = 0;
         }
       }
       if (Array.isArray(data.accounts)) ACCOUNTS = data.accounts;
@@ -12190,6 +12192,12 @@
         saveSyncConfig();
         setSyncStatus('☁️ Synchronisé (données récupérées du cloud)', 'ok');
         if (!silent && typeof showToast === 'function') showToast('☁️ Données synchronisées depuis le cloud', 'success');
+        // Si la fusion a révélé des trades locaux absents du cloud → on les renvoie immédiatement
+        if (window.__lastMergeLocalOnly > 0) {
+          console.log('[sync] ' + window.__lastMergeLocalOnly + ' trades locaux manquants dans le cloud → push');
+          window.__lastMergeLocalOnly = 0;
+          await syncPush();
+        }
       } else if (localTs > remoteTs) {
         syncPush(); // le local est plus récent → on pousse
       } else {
