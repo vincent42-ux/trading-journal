@@ -4563,7 +4563,7 @@
 
         <div class="row-3col" style="margin-bottom: 18px;">
           <div class="card">
-            <div class="card-header"><span class="card-title">Après une perte</span></div>
+            <div class="card-header"><span class="card-title">Tilt check — après pertes & gains</span></div>
             <div class="card-body" id="stats-after-loss"></div>
           </div>
           <div class="card">
@@ -4759,8 +4759,12 @@
       <!-- ============ RAPPORT HEBDO ============ -->
       <section class="view" id="view-weekly">
         <div class="card">
-          <div class="card-header">
-            <span class="card-title">Rapport hebdomadaire</span>
+          <div class="card-header" style="flex-wrap:wrap; gap:10px;">
+            <span class="card-title">Rapport</span>
+            <div class="mode-toggle">
+              <button class="mode-btn active" id="report-mode-week" onclick="setReportMode('week')">Semaine</button>
+              <button class="mode-btn" id="report-mode-month" onclick="setReportMode('month')">Mois</button>
+            </div>
             <div style="display:flex; align-items:center; gap:10px;">
               <button class="btn-icon" onclick="changeWeeklyReport(-1)" style="width:30px; height:30px; font-size:13px;">‹</button>
               <span class="mono" id="weekly-week-label" style="font-weight:600; min-width:160px; text-align:center;">—</span>
@@ -7103,7 +7107,11 @@
       } else {
         wrEl.textContent = s.winrate.toFixed(0) + '%';
         wrEl.className = 'hero-kpi-value ' + (s.winrate >= 50 ? 'pos' : s.winrate >= 35 ? '' : 'neg');
-        if (wrSub) wrSub.innerHTML = `<span class="pos">${s.wins} W</span> · <span class="neg">${s.losses} L</span> · ${s.total} trades`;
+        if (wrSub) {
+          // Expectancy = R moyen espéré par trade — LA stat qui dit si le système est rentable
+          const expR = logical.length ? logical.reduce((sum, t) => sum + tradeRValue(t, masterRisk), 0) / logical.length : 0;
+          wrSub.innerHTML = `<span class="pos">${s.wins} W</span> · <span class="neg">${s.losses} L</span> · Exp <strong class="mono ${expR >= 0 ? 'pos' : 'neg'}">${(expR >= 0 ? '+' : '') + expR.toFixed(2)}R</strong>/trade`;
+        }
       }
     }
 
@@ -7164,7 +7172,13 @@
         return cum;
       });
       const labels = s.logical.map((t, i) => t.date ? `${t.date}` : `#${i + 1}`);
-      totalDisplay = `<span class="${cum >= 0 ? 'pos' : 'neg'}" style="font-weight:700;">${cum >= 0 ? '+' : ''}${cum.toFixed(1)}R cumulés</span> sur ${s.logical.length} trade${s.logical.length > 1 ? 's' : ''}`;
+      // Drawdown max en R (profondeur depuis le plus haut de la courbe)
+      let ddPeak = 0, ddMax = 0;
+      for (const v of data) {
+        if (v > ddPeak) ddPeak = v;
+        if (ddPeak - v > ddMax) ddMax = ddPeak - v;
+      }
+      totalDisplay = `<span class="${cum >= 0 ? 'pos' : 'neg'}" style="font-weight:700;">${cum >= 0 ? '+' : ''}${cum.toFixed(1)}R cumulés</span> sur ${s.logical.length} trade${s.logical.length > 1 ? 's' : ''}${ddMax > 0 ? ` · <span style="color:var(--red);">DD max −${ddMax.toFixed(1)}R</span>` : ''}`;
       const ctx = canvas.getContext('2d');
       const grad = ctx.createLinearGradient(0, 0, 0, 280);
       const color = cum >= 0 ? c.green : c.red;
@@ -7896,23 +7910,43 @@
       const wrAfter = afterLoss.n ? (afterLoss.wins / afterLoss.n * 100) : 0;
       const wrGen = general.n ? (general.wins / general.n * 100) : 0;
       const expAfter = afterLoss.n ? afterLoss.totalPnl / afterLoss.n : 0;
-      const expGen = general.n ? general.totalPnl / general.n : 0;
       const diff = wrAfter - wrGen;
       const verdict = diff < -10 ? '<span class="neg">⚠ Revenge trading détecté</span>' : diff < -5 ? '<span class="" style="color:var(--amber);">⚠ Légère baisse</span>' : '<span class="pos">✓ Discipline OK</span>';
+      // Tilt inversé : surconfiance après 2 TP d'affilée
+      const afterWins = { n: 0, wins: 0, totalPnl: 0 };
+      for (let i = 2; i < logical.length; i++) {
+        if (logical[i - 1].pnl > 0 && logical[i - 2].pnl > 0) {
+          afterWins.n++;
+          afterWins.totalPnl += logical[i].pnl;
+          if (logical[i].pnl > 0) afterWins.wins++;
+        }
+      }
+      const wrAfterWins = afterWins.n ? (afterWins.wins / afterWins.n * 100) : 0;
+      const diffWins = wrAfterWins - wrGen;
+      const verdictWins = afterWins.n < 3
+        ? '<span class="muted">— pas assez de données</span>'
+        : diffWins < -12 ? '<span class="neg">⚠ Surconfiance après les gains — reste carré</span>'
+        : '<span class="pos">✓ Tête froide même en série de gains</span>';
       alContainer.innerHTML = `
         <div style="display:flex; gap:14px; justify-content:space-between;">
           <div>
             <div class="muted" style="font-size:11px;">Après une perte</div>
-            <div style="font-size:24px; font-weight:700;" class="${expAfter >= 0 ? 'pos' : 'neg'}">${wrAfter.toFixed(0)}%</div>
-            <div class="muted" style="font-size:11px;">${afterLoss.n} trade${afterLoss.n > 1 ? 's' : ''} · ${fmt$(expAfter)} moy</div>
+            <div style="font-size:22px; font-weight:700;" class="${expAfter >= 0 ? 'pos' : 'neg'}">${afterLoss.n ? wrAfter.toFixed(0) + '%' : '—'}</div>
+            <div class="muted" style="font-size:11px;">${afterLoss.n} trade${afterLoss.n > 1 ? 's' : ''}</div>
+          </div>
+          <div>
+            <div class="muted" style="font-size:11px;">Après 2 TP d'affilée</div>
+            <div style="font-size:22px; font-weight:700;">${afterWins.n ? wrAfterWins.toFixed(0) + '%' : '—'}</div>
+            <div class="muted" style="font-size:11px;">${afterWins.n} trade${afterWins.n > 1 ? 's' : ''}</div>
           </div>
           <div>
             <div class="muted" style="font-size:11px;">Général</div>
-            <div style="font-size:24px; font-weight:700;">${wrGen.toFixed(0)}%</div>
+            <div style="font-size:22px; font-weight:700;">${wrGen.toFixed(0)}%</div>
             <div class="muted" style="font-size:11px;">${general.n} trades</div>
           </div>
         </div>
-        <div style="margin-top:14px; font-size:12px;">${verdict}</div>
+        <div style="margin-top:12px; font-size:12px;">${verdict}</div>
+        <div style="margin-top:5px; font-size:12px;">${verdictWins}</div>
       `;
     }
 
@@ -8601,9 +8635,71 @@
     if (typeof pushNotif === 'function') {
       pushNotif('info', '⏹', `<strong>Session terminée</strong> — ${count} trade${count > 1 ? 's' : ''} enregistré${count > 1 ? 's' : ''}.`, null);
     }
+    render();
+    showSessionRecap(count);
+  }
+
+  // ========== BILAN DE FIN DE SESSION ==========
+  // Affiché à CHAQUE fin de session — le message juge la DISCIPLINE d'abord, le R ensuite.
+  function showSessionRecap(count) {
+    const overlay = document.getElementById('session-lock-overlay');
+    const box = document.getElementById('session-lock-content');
+    if (!overlay || !box) {
+      const dashBtn = document.querySelector('.nav-item[data-view="dashboard"]');
+      if (dashBtn) dashBtn.click();
+      return;
+    }
+    const { totalR } = computeTodayR();
+    // Discipline moyenne du jour
+    const d = new Date();
+    const full = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+    const todays = uniqueLogicalTrades(TRADES.filter(t => t.date === full || t.date === full.slice(0, 5)));
+    const withRules = todays.filter(t => t.rules && Object.keys(t.rules).length);
+    const avgDisc = withRules.length
+      ? withRules.reduce((s, t) => s + disciplineCountForRules(t.rules), 0) / withRules.length
+      : null;
+    const discGood = avgDisc == null || avgDisc >= 4;
+    const rStr = (totalR >= 0 ? '+' : '') + totalR.toFixed(1) + 'R';
+    const discStr = avgDisc != null ? avgDisc.toFixed(1) + '/5' : '—';
+
+    let icon, title, msg, cls;
+    if (totalR > 0 && discGood) {
+      icon = '🎉'; cls = 'win';
+      title = 'BRAVO — SESSION GAGNANTE !';
+      msg = `<span class="lock-r pos">${rStr}</span> aujourd'hui · discipline <strong>${discStr}</strong>.<br>Tu as fait exactement ce qu'il fallait : le plan, rien que le plan. C'est comme ça qu'on sort de l'usine. 🏭→🏠`;
+    } else if (totalR > 0) {
+      icon = '🟡'; cls = 'neutral';
+      title = 'SESSION POSITIVE… MAIS';
+      msg = `<span class="lock-r pos">${rStr}</span> — bien joué pour le résultat, mais la discipline est à <strong>${discStr}</strong>.<br>Gagner hors plan, c'est le piège le plus dangereux : le marché te le fera payer un jour. Regarde ce qui a manqué dans le journal.`;
+    } else if (totalR === 0) {
+      icon = '😌'; cls = 'neutral';
+      title = 'JOURNÉE NEUTRE';
+      msg = `<strong>0.0R</strong> · ${count} trade${count > 1 ? 's' : ''} · discipline <strong>${discStr}</strong>.<br>Capital protégé, expérience engrangée. Une journée plate vaut mieux qu'une journée rouge.`;
+    } else if (discGood) {
+      icon = '💪'; cls = 'neutral';
+      title = 'BONNE SESSION — MÊME EN ROUGE';
+      msg = `<span class="lock-r neg">${rStr}</span> · discipline <strong>${discStr}</strong>.<br>Tu as respecté ton plan : c'est une <strong>bonne journée de trading</strong>, le marché n'a juste pas payé aujourd'hui. Avec ton 2RR, les maths sont de ton côté — continue exactement pareil.`;
+    } else {
+      icon = '📚'; cls = 'loss';
+      title = 'JOURNÉE D\'APPRENTISSAGE';
+      msg = `<span class="lock-r neg">${rStr}</span> · discipline <strong>${discStr}</strong>.<br>Le rouge n'est pas le problème — les dérives, si. Tague tes erreurs dans le journal, relis ton plan ce soir, et demain tu reviens carré. Un palier à la fois.`;
+    }
+    box.className = 'session-lock-box ' + cls;
+    box.innerHTML = `
+      <div class="lock-icon">${icon}</div>
+      <div class="lock-title">${title}</div>
+      <div class="lock-msg">${msg}</div>
+      <div class="lock-actions">
+        <button class="btn btn-primary lock-end-btn" onclick="closeSessionRecap()">✓ À demain</button>
+      </div>
+    `;
+    overlay.classList.add('show');
+  }
+  function closeSessionRecap() {
+    const overlay = document.getElementById('session-lock-overlay');
+    if (overlay) overlay.classList.remove('show');
     const dashBtn = document.querySelector('.nav-item[data-view="dashboard"]');
     if (dashBtn) dashBtn.click();
-    render();
   }
   function toggleSessionCheck(i) {
     SESSION.checks[i] = !SESSION.checks[i];
@@ -9105,21 +9201,45 @@
 
   // ========== RAPPORT HEBDO ==========
   let WEEKLY_OFFSET = 0;
+  let REPORT_MODE = 'week'; // 'week' | 'month'
   function changeWeeklyReport(delta) {
     WEEKLY_OFFSET += delta;
+    renderWeeklyReport();
+  }
+  function setReportMode(m) {
+    REPORT_MODE = m;
+    WEEKLY_OFFSET = 0;
+    const w = document.getElementById('report-mode-week');
+    const mo = document.getElementById('report-mode-month');
+    if (w) w.classList.toggle('active', m === 'week');
+    if (mo) mo.classList.toggle('active', m === 'month');
     renderWeeklyReport();
   }
   function renderWeeklyReport() {
     const c = document.getElementById('weekly-report-body');
     if (!c) return;
-    const today = new Date();
-    today.setDate(today.getDate() + WEEKLY_OFFSET * 7);
-    const dayWeek = (today.getDay() + 6) % 7;
-    const monday = new Date(today); monday.setDate(today.getDate() - dayWeek);
-    const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
-    const fmt = d => `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`;
+    // Période : semaine (lun→dim) ou mois complet, navigable avec ‹ ›
+    let monday, sunday;
     const labelEl = document.getElementById('weekly-week-label');
-    if (labelEl) labelEl.textContent = `${fmt(monday)} → ${fmt(sunday)}`;
+    if (REPORT_MODE === 'month') {
+      const base = new Date();
+      base.setDate(1);
+      base.setMonth(base.getMonth() + WEEKLY_OFFSET);
+      monday = new Date(base.getFullYear(), base.getMonth(), 1);
+      sunday = new Date(base.getFullYear(), base.getMonth() + 1, 0);
+      const mn = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+      if (labelEl) labelEl.textContent = mn[monday.getMonth()] + ' ' + monday.getFullYear();
+    } else {
+      const today = new Date();
+      today.setDate(today.getDate() + WEEKLY_OFFSET * 7);
+      const dayWeek = (today.getDay() + 6) % 7;
+      monday = new Date(today); monday.setDate(today.getDate() - dayWeek);
+      sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
+      const fmt = d => `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`;
+      if (labelEl) labelEl.textContent = `${fmt(monday)} → ${fmt(sunday)}`;
+    }
+    const periodWord = REPORT_MODE === 'month' ? 'Mois' : 'Semaine';
+    const periodWordLow = REPORT_MODE === 'month' ? 'ce mois-ci' : 'cette semaine';
 
     const filtered = filteredTrades();
     const logical = (computeStats(filtered) || {logical:[]}).logical;
@@ -9131,7 +9251,7 @@
     });
 
     if (!weekTrades.length) {
-      c.innerHTML = '<div class="empty-state" style="padding:40px;">Aucun trade cette semaine.<br><span style="font-size:11px;">Navigue avec ‹ › pour voir les semaines passées.</span></div>';
+      c.innerHTML = `<div class="empty-state" style="padding:40px;">Aucun trade ${periodWordLow}.<br><span style="font-size:11px;">Navigue avec ‹ › pour voir les périodes passées.</span></div>`;
       return;
     }
 
@@ -9201,7 +9321,7 @@
     const negatives = [];
 
     // === CE QUI A MARCHÉ ===
-    if (totalPnl > 0) positives.push({ icon: '💰', title: `Semaine profitable +${fmt$(totalPnl).replace(/^\+/,'').replace('$','$')}`, detail: `${totalR >= 0 ? '+' : ''}${totalR.toFixed(1)}R cumulés sur ${weekTrades.length} trade${weekTrades.length>1?'s':''}` });
+    if (totalPnl > 0) positives.push({ icon: '💰', title: `${periodWord} profitable +${fmt$(totalPnl).replace(/^\+/,'').replace('$','$')}`, detail: `${totalR >= 0 ? '+' : ''}${totalR.toFixed(1)}R cumulés sur ${weekTrades.length} trade${weekTrades.length>1?'s':''}` });
     if (wr >= 60) positives.push({ icon: '🎯', title: `Win rate excellent ${wr.toFixed(0)}%`, detail: `${wins.length} TP sur ${weekTrades.length} trades` });
     else if (wr >= 50) positives.push({ icon: '✓', title: `Win rate solide ${wr.toFixed(0)}%`, detail: `${wins.length} TP sur ${weekTrades.length} trades` });
     if (avgDiscScore >= 4.5) positives.push({ icon: '⭐', title: `Discipline exemplaire (${avgDiscScore.toFixed(1)}/5)`, detail: `${tradesPerfect} trades parfaits sur ${tradesWithRules.length}` });
@@ -9222,7 +9342,7 @@
     }
 
     // === CE QUI N'A PAS MARCHÉ ===
-    if (totalPnl < 0) negatives.push({ icon: '📉', title: `Semaine en perte ${fmt$(totalPnl)}`, detail: `${totalR.toFixed(1)}R sur ${weekTrades.length} trade${weekTrades.length>1?'s':''}` });
+    if (totalPnl < 0) negatives.push({ icon: '📉', title: `${periodWord} en perte ${fmt$(totalPnl)}`, detail: `${totalR.toFixed(1)}R sur ${weekTrades.length} trade${weekTrades.length>1?'s':''}` });
     if (wr < 40) negatives.push({ icon: '⚠', title: `Win rate faible ${wr.toFixed(0)}%`, detail: `Revoir la qualification des entrées` });
     if (avgDiscScore < 3 && tradesWithRules.length > 0) {
       negatives.push({ icon: '⚠', title: `Discipline insuffisante (${avgDiscScore.toFixed(1)}/5)`, detail: `${tradesDerive} trades en dérive sur ${tradesWithRules.length}` });
@@ -9261,7 +9381,7 @@
       <!-- 4 KPIs hero (blocs premium, même style que le journal) -->
       <div class="journal-summary" style="margin-bottom:20px;">
         <div class="js-stat">
-          <span class="js-label">P&L semaine</span>
+          <span class="js-label">P&L ${REPORT_MODE === 'month' ? 'du mois' : 'semaine'}</span>
           <span class="js-value ${totalPnl >= 0 ? 'pos' : 'neg'}">${fmt$(totalPnl)}</span>
           <span class="muted" style="font-size:11px;">${totalR >= 0 ? '+' : ''}${totalR.toFixed(1)}R cumulés</span>
         </div>
@@ -9320,7 +9440,7 @@
                   </div>
                 </div>
               `).join('')
-              : '<div style="padding:30px; text-align:center; background:var(--green-soft); color:var(--green); font-weight:500;">✓ Semaine propre, rien à signaler. Continue comme ça.</div>'
+              : `<div style="padding:30px; text-align:center; background:var(--green-soft); color:var(--green); font-weight:500;">✓ ${periodWord} propre, rien à signaler. Continue comme ça.</div>`
             }
           </div>
         </div>
