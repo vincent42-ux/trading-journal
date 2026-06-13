@@ -3527,6 +3527,21 @@
   }
   .acc-mult-btn:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
   .acc-mult-btn:active { transform: scale(0.9); }
+  /* Barre copy-trading */
+  .acc-copy-row {
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+    background: rgba(167,139,250,0.08); border: 1px solid rgba(167,139,250,0.25);
+    border-radius: 10px; padding: 8px 12px; margin-bottom: 12px; font-size: 12px;
+  }
+  .acc-copy-master { color: var(--accent); font-weight: 700; }
+  .acc-copy-mult { display: flex; align-items: center; gap: 6px; color: var(--text-2); }
+  .acc-copy-mult strong { color: var(--text-0); }
+  .btn-mini {
+    padding: 5px 11px; border-radius: 8px; cursor: pointer; font-size: 11.5px; font-weight: 700;
+    background: var(--accent); border: 1px solid var(--accent); color: #fff; transition: all 0.15s ease;
+  }
+  .btn-mini:hover { filter: brightness(1.1); }
+  .btn-mini:active { transform: scale(0.96); }
   /* Distances clés payout / blow */
   .acc-dist {
     display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 2px 0 13px;
@@ -10156,11 +10171,25 @@
     saveAccountsAndRotation();
     renderAccounts();
   }
-  // P&L d'un compte : le P&L réel saisi prime, sinon somme des trades
+  // P&L d'un compte. En mode multi-comptes (copie live) → toujours la somme des trades
+  // (la copie master→followers alimente tout). Sinon → P&L réel saisi s'il existe, sinon trades.
   function accountPnl(acc) {
-    const hasReal = (acc.realPnl != null && acc.realPnl !== '' && !isNaN(Number(acc.realPnl)));
-    if (hasReal) return Number(acc.realPnl);
+    const liveMode = (typeof PREFS !== 'undefined' && PREFS.multiAccount);
+    if (!liveMode) {
+      const hasReal = (acc.realPnl != null && acc.realPnl !== '' && !isNaN(Number(acc.realPnl)));
+      if (hasReal) return Number(acc.realPnl);
+    }
     return TRADES.filter(t => t.account === acc.name).reduce((sum, t) => sum + (t.pnl || 0), 0);
+  }
+  // Désigner ce compte comme master (les autres deviennent followers). Le badge master se déplace ici.
+  function setMaster(id) {
+    ACCOUNTS.forEach(a => { a.role = (a.id === id) ? 'master' : 'follower'; });
+    saveAccountsAndRotation();
+    if (typeof render === 'function') render(); else renderAccounts();
+    if (typeof pushNotif === 'function') {
+      const m = ACCOUNTS.find(a => a.id === id);
+      if (m) pushNotif('info', '👑', `<strong>${m.name}</strong> est maintenant le master — tu saisis tes trades ici, les autres comptes copient ×leur multiplicateur.`, null);
+    }
   }
   // Objectif courant selon la phase : challenge → cible d'éval ; funded → objectif payout
   function accountObjTarget(acc) {
@@ -10398,6 +10427,19 @@
                 <div class="acc-box-value mono ${pnl >= 0 ? 'pos' : 'neg'}">${fmt$(pnl)}</div>
               </div>
             </div>`}
+
+            <!-- Copy-trading (visible en mode multi-comptes) : master déplaçable + multiplicateur -->
+            ${(typeof PREFS !== 'undefined' && PREFS.multiAccount) ? `
+            <div class="acc-copy-row">
+              ${isMaster
+                ? `<span class="acc-copy-master">👑 Master — tu saisis tes trades ici</span>`
+                : `<button class="btn-mini" onclick="event.stopPropagation(); setMaster('${acc.id}')">👑 Définir master</button>
+                   <span class="acc-copy-mult">Copie
+                     <button class="acc-mult-btn" onclick="event.stopPropagation(); bumpMultiplier('${acc.id}', -1)">−</button>
+                     <strong class="mono">×${acc.multiplier || 1}</strong>
+                     <button class="acc-mult-btn" onclick="event.stopPropagation(); bumpMultiplier('${acc.id}', 1)">+</button>
+                   </span>`}
+            </div>` : ''}
 
             <!-- Actions -->
             <div class="account-actions">
@@ -11836,13 +11878,13 @@
   let EDITING_ACCOUNT_ID = null;
   let EDITING_WEEK_ISO = null;
 
-  // Config réelle des comptes MFFU de Vincent (MyFundedFutures — Evaluation)
-  // 50K : trailing DD $2 000 (4%), objectif $3 000 · 25K : trailing DD $1 000 (4%), objectif $1 500
-  // Pas de DLL pendant l'évaluation MFFU (dll: 0). Les deux sont indépendants (role master).
+  // Config réelle des comptes MFFU de Vincent (MyFundedFutures)
+  // 50K : trailing DD $2 000 (4%), cible $3 000 · 25K : trailing DD $1 000 (4%), cible $1 500
+  // Pas de DLL pendant l'éval (dll: 0). Copy-trading : 25K = master, 50K = follower ×2.
   function mffuRealAccounts() {
     return [
       { id: 'mffu-25k', name: 'MFFU 25K', firm: 'MFFU', role: 'master', size: 25000, risk: 62.80, multiplier: 1, status: 'challenge', dll: 0, trailing: 1000, payoutTarget: 1500, currentBalance: 25000, realPnl: 154.88 },
-      { id: 'mffu-50k', name: 'MFFU 50K', firm: 'MFFU', role: 'master', size: 50000, risk: 125.60, multiplier: 1, status: 'challenge', dll: 0, trailing: 2000, payoutTarget: 3000, currentBalance: 50000, realPnl: 1190.04 },
+      { id: 'mffu-50k', name: 'MFFU 50K', firm: 'MFFU', role: 'follower', size: 50000, risk: 125.60, multiplier: 2, status: 'challenge', dll: 0, trailing: 2000, payoutTarget: 3000, currentBalance: 50000, realPnl: 1190.04 },
     ];
   }
   // Defaults if nothing saved
@@ -11851,13 +11893,15 @@
   }
   // Bouton Paramètres → recharge la vraie config MFFU sans toucher aux trades
   function loadMffuRealAccounts() {
-    if (!confirm('Recharger tes 2 comptes MFFU réels (50K + 25K) ?\n\nÇa remplace la config des comptes (taille, drawdown, objectif).\nTes trades ne sont PAS touchés.')) return;
+    if (!confirm('Recharger tes 2 comptes MFFU (50K + 25K) en mode copie auto ?\n\n• 25K = master, 50K = follower ×2\n• Mode multi-comptes activé (tes trades sur le master se copient)\n• P&L calculé en live depuis tes trades\n\nTes trades ne sont PAS touchés.')) return;
     ACCOUNTS = mffuRealAccounts();
     ROTATION_WEEKS = [];
     saveAccountsAndRotation();
+    PREFS.multiAccount = true; savePrefs();
+    const cb = document.getElementById('pref-multiAccount'); if (cb) cb.checked = true;
     render();
-    if (typeof pushNotif === 'function') pushNotif('info', '📥', 'Comptes MFFU rechargés : 50K (DD $2 000 · obj $3 000) + 25K (DD $1 000 · obj $1 500).', null);
-    alert('✅ Tes comptes MFFU sont à jour : 50K et 25K.');
+    if (typeof pushNotif === 'function') pushNotif('info', '📥', 'Comptes MFFU rechargés en copie auto : 25K master · 50K follower ×2. Saisis tes trades sur le 25K, le 50K suit.', null);
+    alert('✅ Comptes MFFU à jour en mode copie auto : 25K master + 50K follower ×2.');
   }
 
   function loadAccountsAndRotation() {
