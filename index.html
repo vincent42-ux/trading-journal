@@ -5239,7 +5239,7 @@
           <button class="btn" onclick="loadMffuRealAccounts()" style="width:100%; margin-top:10px; border-color:var(--accent); color:var(--accent);">📥 Recharger ma config MFFU réelle (50K + 25K)</button>
           <button class="btn" onclick="runIntegrityCheck()" style="width:100%; margin-top:10px;">Vérifier l'intégrité des données</button>
           <div id="integrity-result" style="margin-top:10px;"></div>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-14 · r11</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-14 · r12</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -5730,6 +5730,13 @@
             <input type="number" min="0" id="am-cycleDays" placeholder="30">
           </div>
         </div>
+      </div>
+
+      <!-- SECTION : NETTOYAGE TRADES -->
+      <div class="modal-section" id="amf-clearTrades" style="display:none;">
+        <div class="section-label">Trades de ce compte</div>
+        <div id="am-trades-count" style="font-size:12px; color:var(--text-2); margin-bottom:8px;"></div>
+        <button type="button" class="btn" onclick="clearAccountTrades()" style="width:100%; border-color:var(--red); color:var(--red);">🗑 Effacer tous les trades de ce compte (revenir à la base)</button>
       </div>
     </div>
     <div class="modal-footer">
@@ -12053,6 +12060,19 @@
       const sz = String(parseInt(document.getElementById('am-size').value) || '');
       tmplEl.value = ACCOUNT_TEMPLATES[sz] ? sz : '';
     }
+    // Section "effacer les trades" : seulement en édition d'un compte existant
+    const clearSec = document.getElementById('amf-clearTrades');
+    if (clearSec) {
+      if (id) {
+        const a = ACCOUNTS.find(x => x.id === id);
+        const n = a ? tradesLinkedToAccount(a.name).length : 0;
+        const cnt = document.getElementById('am-trades-count');
+        if (cnt) cnt.textContent = n + ' trade(s) saisis sur ce compte (hors P&L réel de base).';
+        clearSec.style.display = '';
+      } else {
+        clearSec.style.display = 'none';
+      }
+    }
     updateAccountFormMode();
     document.getElementById('account-modal-backdrop').classList.add('show');
   }
@@ -12120,6 +12140,29 @@
     saveAccountsAndRotation();
     closeAccountModal();
     render();
+  }
+  // Liste les trades liés à un compte (le compte lui-même + les copies par linkId)
+  function tradesLinkedToAccount(name) {
+    const linkIds = new Set(TRADES.filter(t => t.account === name).map(t => t.linkId).filter(Boolean));
+    return TRADES.filter(t => t.account === name || (t.linkId && linkIds.has(t.linkId)));
+  }
+  // Efface tous les trades d'un compte (et leurs copies liées) → le compte revient à sa base
+  function clearAccountTrades() {
+    const acc = ACCOUNTS.find(a => a.id === EDITING_ACCOUNT_ID);
+    if (!acc) return;
+    const linked = tradesLinkedToAccount(acc.name);
+    if (!linked.length) { alert('Aucun trade sur ce compte.'); return; }
+    if (!confirm('Effacer ' + linked.length + ' trade(s) liés à ' + acc.name + ' ?\nLe compte revient à sa base. Les copies sur les comptes liés partent aussi.')) return;
+    const linkIds = new Set(TRADES.filter(t => t.account === acc.name).map(t => t.linkId).filter(Boolean));
+    for (let i = TRADES.length - 1; i >= 0; i--) {
+      const t = TRADES[i];
+      if (t.account === acc.name || (t.linkId && linkIds.has(t.linkId))) TRADES.splice(i, 1);
+    }
+    saveTrades();
+    const cnt = document.getElementById('am-trades-count');
+    if (cnt) cnt.textContent = 'Aucun trade sur ce compte.';
+    render();
+    alert('✅ ' + linked.length + ' trade(s) effacés. ' + acc.name + ' est revenu à sa base.');
   }
   function deleteCurrentAccount() {
     if (!EDITING_ACCOUNT_ID) return;
