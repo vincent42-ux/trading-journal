@@ -3517,6 +3517,16 @@
   .acc-box-bar-fill { height: 100%; border-radius: 99px; }
   .acc-box-bar-fill.red { background: var(--red); }
   .acc-box-bar-fill.neutral { background: var(--accent); opacity: 0.6; }
+  .acc-mult-ctrl { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+  .acc-mult-btn {
+    width: 24px; height: 24px; flex-shrink: 0; border-radius: 7px;
+    background: var(--bg-1); border: 1px solid var(--border); color: var(--accent);
+    font-size: 16px; font-weight: 700; line-height: 1; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s ease;
+  }
+  .acc-mult-btn:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .acc-mult-btn:active { transform: scale(0.9); }
   @media (max-width: 768px) {
     .acc-boxes { grid-template-columns: 1fr 1fr; }
     .acc-info-line { font-size: 11px; }
@@ -5594,8 +5604,8 @@
           </div>
         </div>
         <div class="form-row">
-          <div class="form-field">
-            <label>Multiplicateur vs master</label>
+          <div class="form-field" style="flex:1; background:rgba(167,139,250,0.08); border:1px solid rgba(167,139,250,0.3); border-radius:10px; padding:10px 12px;">
+            <label style="color:var(--accent);">✖️ Multiplicateur de copie <span style="opacity:.6; font-weight:400; text-transform:none;">— combien de fois ce compte copie le master (×1, ×2, ×4…). Modifiable aussi en direct sur la carte.</span></label>
             <input type="number" id="am-multiplier" step="0.1" placeholder="1 ou 4" value="1" />
           </div>
         </div>
@@ -10105,6 +10115,16 @@
   // ----- Filtre des comptes (onglets Tous / Actifs / Validés / Cramés) -----
   let ACCT_TAB_FILTER = 'all';
   function setAccountFilter(f) { ACCT_TAB_FILTER = f; renderAccounts(); }
+  // Modifier le multiplicateur directement depuis la carte du compte
+  function bumpMultiplier(id, delta) {
+    const acc = ACCOUNTS.find(a => a.id === id);
+    if (!acc) return;
+    let m = (acc.multiplier || 1) + delta;
+    if (m < 1) m = 1;
+    acc.multiplier = Math.round(m * 10) / 10;
+    saveAccountsAndRotation();
+    renderAccounts();
+  }
   function accountCategory(acc) {
     if (acc.status === 'blown') return 'blown';
     const hasRealPnl = (acc.realPnl != null && acc.realPnl !== '' && !isNaN(Number(acc.realPnl)));
@@ -10275,7 +10295,7 @@
               </div>`;
             })()}
 
-            <!-- 3 boxes : DLL aujourd'hui / Jours tradés / P&L total -->
+            <!-- 3 boxes : DLL aujourd'hui / Multiplicateur (éditable) / P&L total -->
             <div class="acc-boxes">
               <div class="acc-box">
                 <div class="acc-box-label">DLL aujourd'hui</div>
@@ -10283,8 +10303,12 @@
                 ${acc.dll > 0 ? `<div class="acc-box-bar"><div class="acc-box-bar-fill ${dllPct >= 60 ? 'red' : 'neutral'}" style="width:${dllPct}%;"></div></div>` : ''}
               </div>
               <div class="acc-box">
-                <div class="acc-box-label">Jours tradés</div>
-                <div class="acc-box-value mono">${daysTraded}${daysTraded > 0 ? ' <span class="pos" style="font-size:11px;">✓</span>' : ''}</div>
+                <div class="acc-box-label">Multiplicateur</div>
+                <div class="acc-mult-ctrl">
+                  <button class="acc-mult-btn" onclick="event.stopPropagation(); bumpMultiplier('${acc.id}', -1)" title="Diminuer">−</button>
+                  <span class="acc-box-value mono" style="margin:0;">×${acc.multiplier || 1}</span>
+                  <button class="acc-mult-btn" onclick="event.stopPropagation(); bumpMultiplier('${acc.id}', 1)" title="Augmenter">+</button>
+                </div>
               </div>
               <div class="acc-box">
                 <div class="acc-box-label">P&L total</div>
