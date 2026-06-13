@@ -5187,6 +5187,7 @@
             </label>
           </div>
           <button class="btn" onclick="switchToMonoAccount()" style="width:100%; margin-top:10px; border-color:var(--amber); color:var(--amber);">🧹 Passer en mono-compte (supprime les lignes & comptes followers)</button>
+          <button class="btn" onclick="loadMffuRealAccounts()" style="width:100%; margin-top:10px; border-color:var(--accent); color:var(--accent);">📥 Recharger ma config MFFU réelle (50K + 25K)</button>
           <button class="btn" onclick="runIntegrityCheck()" style="width:100%; margin-top:10px;">Vérifier l'intégrité des données</button>
           <div id="integrity-result" style="margin-top:10px;"></div>
         </div>
@@ -11719,13 +11720,28 @@
   let EDITING_ACCOUNT_ID = null;
   let EDITING_WEEK_ISO = null;
 
+  // Config réelle des comptes MFFU de Vincent (MyFundedFutures — Evaluation)
+  // 50K : trailing DD $2 000 (4%), objectif $3 000 · 25K : trailing DD $1 000 (4%), objectif $1 500
+  // Pas de DLL pendant l'évaluation MFFU (dll: 0). Les deux sont indépendants (role master).
+  function mffuRealAccounts() {
+    return [
+      { id: 'mffu-25k', name: 'MFFU 25K', firm: 'MFFU', role: 'master', size: 25000, risk: 62.80, multiplier: 1, status: 'evaluation', dll: 0, trailing: 1000, payoutTarget: 1500, currentBalance: 25000 },
+      { id: 'mffu-50k', name: 'MFFU 50K', firm: 'MFFU', role: 'master', size: 50000, risk: 125.60, multiplier: 1, status: 'evaluation', dll: 0, trailing: 2000, payoutTarget: 3000, currentBalance: 50000 },
+    ];
+  }
   // Defaults if nothing saved
   function defaultAccounts() {
-    return [
-      { id: 'mffu-25k', name: 'MFFU 25K', firm: 'MFFU', role: 'master', size: 25000, risk: 62.80, multiplier: 1, status: 'challenge', dll: 500, trailing: 1000, payoutTarget: 1500, currentBalance: 25000 },
-      { id: 'apex-1', name: 'Apex 50K #1', firm: 'Apex', role: 'follower', size: 50000, risk: 250, multiplier: 4, status: 'challenge', dll: 1000, trailing: 2500, payoutTarget: 3000, currentBalance: 50000 },
-      { id: 'apex-2', name: 'Apex 50K #2', firm: 'Apex', role: 'follower', size: 50000, risk: 250, multiplier: 4, status: 'challenge', dll: 1000, trailing: 2500, payoutTarget: 3000, currentBalance: 50000 },
-    ];
+    return mffuRealAccounts();
+  }
+  // Bouton Paramètres → recharge la vraie config MFFU sans toucher aux trades
+  function loadMffuRealAccounts() {
+    if (!confirm('Recharger tes 2 comptes MFFU réels (50K + 25K) ?\n\nÇa remplace la config des comptes (taille, drawdown, objectif).\nTes trades ne sont PAS touchés.')) return;
+    ACCOUNTS = mffuRealAccounts();
+    ROTATION_WEEKS = [];
+    saveAccountsAndRotation();
+    render();
+    if (typeof pushNotif === 'function') pushNotif('info', '📥', 'Comptes MFFU rechargés : 50K (DD $2 000 · obj $3 000) + 25K (DD $1 000 · obj $1 500).', null);
+    alert('✅ Tes comptes MFFU sont à jour : 50K et 25K.');
   }
 
   function loadAccountsAndRotation() {
