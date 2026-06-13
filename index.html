@@ -5239,7 +5239,7 @@
           <button class="btn" onclick="loadMffuRealAccounts()" style="width:100%; margin-top:10px; border-color:var(--accent); color:var(--accent);">📥 Recharger ma config MFFU réelle (50K + 25K)</button>
           <button class="btn" onclick="runIntegrityCheck()" style="width:100%; margin-top:10px;">Vérifier l'intégrité des données</button>
           <div id="integrity-result" style="margin-top:10px;"></div>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-13 · r10</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-14 · r11</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -10196,12 +10196,8 @@
   function accountPnl(acc) {
     const tradesSum = accountTradesSum(acc);
     const hasReal = (acc.realPnl != null && acc.realPnl !== '' && !isNaN(Number(acc.realPnl)));
-    if (hasReal) {
-      // base = somme des trades au moment où le P&L réel a été saisi (0 par défaut → realPnl = base, les trades s'ajoutent)
-      const base = (typeof acc.realPnlAtTrades === 'number') ? acc.realPnlAtTrades : 0;
-      return Number(acc.realPnl) + (tradesSum - base);
-    }
-    return tradesSum;
+    // P&L réel = base de départ, à laquelle TOUS les trades s'ajoutent. Simple et prévisible.
+    return (hasReal ? Number(acc.realPnl) : 0) + tradesSum;
   }
   // Copie active si le mode multi-comptes est coché OU s'il existe au moins un compte follower
   function copyTradingOn() {
@@ -10232,15 +10228,16 @@
   function editRealPnl(id) {
     const acc = ACCOUNTS.find(a => a.id === id);
     if (!acc) return;
-    const cur = (acc.realPnl != null && acc.realPnl !== '') ? acc.realPnl : '';
-    const v = prompt('P&L réel actuel de ' + acc.name + ' (en $, ex. 1190.04).\nC\'est ta base : tes prochains trades s\'ajoutent par-dessus.\nLaisse vide pour calculer uniquement depuis tes trades :', cur);
+    const cur = accountPnl(acc); // valeur actuellement affichée
+    const v = prompt('P&L réel actuel de ' + acc.name + ' (en $, ex. 1190.04).\nTes prochains trades s\'ajouteront par-dessus.\nLaisse vide pour calculer uniquement depuis tes trades :', cur.toFixed(2));
     if (v === null) return;
     if (String(v).trim() === '') {
-      acc.realPnl = null; delete acc.realPnlAtTrades;
+      acc.realPnl = null;
     } else {
-      acc.realPnl = parseFloat(String(v).replace(',', '.')) || 0;
-      acc.realPnlAtTrades = accountTradesSum(acc); // repère : les trades suivants s'ajoutent
+      const x = parseFloat(String(v).replace(',', '.')) || 0;
+      acc.realPnl = +(x - accountTradesSum(acc)).toFixed(2); // stocké en décalage → affichage = x, trades ajoutés ensuite
     }
+    delete acc.realPnlAtTrades;
     saveAccountsAndRotation();
     render();
   }
@@ -12028,7 +12025,7 @@
       document.getElementById('am-payoutTarget').value = a.payoutTarget || 0;
       document.getElementById('am-payoutGoal').value = a.payoutGoal || '';
       document.getElementById('am-currentBalance').value = a.currentBalance || a.size;
-      document.getElementById('am-realPnl').value = (a.realPnl != null && a.realPnl !== '') ? a.realPnl : '';
+      document.getElementById('am-realPnl').value = (a.realPnl != null && a.realPnl !== '') ? accountPnl(a).toFixed(2) : '';
       const csEl = document.getElementById('am-cycleStart');
       if (csEl) csEl.value = a.cycleStart || '';
       const cdEl = document.getElementById('am-cycleDays');
@@ -12110,21 +12107,14 @@
           TRADES.forEach(t => { if (t.account === prev.name) { t.account = data.name; moved++; } });
           if (moved > 0) saveTrades();
         }
-        // Base du P&L réel : recalculée UNIQUEMENT si tu changes le chiffre du P&L réel.
-        // Sinon on garde la base existante (ou 0 par défaut) → éditer un compte n'avale plus les trades déjà saisis.
-        if (data.realPnl == null) {
-          data.realPnlAtTrades = undefined;
-        } else if (prev.realPnl !== data.realPnl) {
-          data.realPnlAtTrades = accountTradesSum({ name: data.name });
-        } else {
-          data.realPnlAtTrades = (typeof prev.realPnlAtTrades === 'number') ? prev.realPnlAtTrades : 0;
-        }
+        // Le champ P&L réel = valeur affichée voulue → on stocke le décalage (les trades s'ajoutent ensuite)
+        if (data.realPnl != null) data.realPnl = +(data.realPnl - accountTradesSum({ name: data.name })).toFixed(2);
         ACCOUNTS[idx] = { ...prev, ...data };
-        if (data.realPnl == null) delete ACCOUNTS[idx].realPnlAtTrades;
+        delete ACCOUNTS[idx].realPnlAtTrades; // champ obsolète
       }
     } else {
       const id = name.toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + Date.now().toString(36).slice(-4);
-      if (data.realPnl != null) data.realPnlAtTrades = accountTradesSum({ name: data.name });
+      if (data.realPnl != null) data.realPnl = +(data.realPnl - accountTradesSum({ name: data.name })).toFixed(2);
       ACCOUNTS.push({ id, ...data });
     }
     saveAccountsAndRotation();
