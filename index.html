@@ -10171,15 +10171,20 @@
     saveAccountsAndRotation();
     renderAccounts();
   }
-  // P&L d'un compte. En mode multi-comptes (copie live) → toujours la somme des trades
-  // (la copie master→followers alimente tout). Sinon → P&L réel saisi s'il existe, sinon trades.
-  function accountPnl(acc) {
-    const liveMode = (typeof PREFS !== 'undefined' && PREFS.multiAccount);
-    if (!liveMode) {
-      const hasReal = (acc.realPnl != null && acc.realPnl !== '' && !isNaN(Number(acc.realPnl)));
-      if (hasReal) return Number(acc.realPnl);
-    }
+  // P&L d'un compte = base (P&L réel saisi, optionnel) + les trades ajoutés depuis cette base.
+  // Sans P&L réel saisi → simple somme des trades. Avec → realPnl + (trades actuels − trades au moment de la saisie).
+  function accountTradesSum(acc) {
     return TRADES.filter(t => t.account === acc.name).reduce((sum, t) => sum + (t.pnl || 0), 0);
+  }
+  function accountPnl(acc) {
+    const tradesSum = accountTradesSum(acc);
+    const hasReal = (acc.realPnl != null && acc.realPnl !== '' && !isNaN(Number(acc.realPnl)));
+    if (hasReal) {
+      // base = somme des trades au moment où le P&L réel a été saisi (0 par défaut → realPnl = base, les trades s'ajoutent)
+      const base = (typeof acc.realPnlAtTrades === 'number') ? acc.realPnlAtTrades : 0;
+      return Number(acc.realPnl) + (tradesSum - base);
+    }
+    return tradesSum;
   }
   // Désigner ce compte comme master (les autres deviennent followers). Le badge master se déplace ici.
   function setMaster(id) {
@@ -10207,11 +10212,16 @@
     const acc = ACCOUNTS.find(a => a.id === id);
     if (!acc) return;
     const cur = (acc.realPnl != null && acc.realPnl !== '') ? acc.realPnl : '';
-    const v = prompt('P&L réel actuel de ' + acc.name + ' (en $, ex. 1190.04).\nLaisse vide pour revenir au calcul depuis tes trades :', cur);
+    const v = prompt('P&L réel actuel de ' + acc.name + ' (en $, ex. 1190.04).\nC\'est ta base : tes prochains trades s\'ajoutent par-dessus.\nLaisse vide pour calculer uniquement depuis tes trades :', cur);
     if (v === null) return;
-    acc.realPnl = (String(v).trim() === '') ? null : (parseFloat(String(v).replace(',', '.')) || 0);
+    if (String(v).trim() === '') {
+      acc.realPnl = null; delete acc.realPnlAtTrades;
+    } else {
+      acc.realPnl = parseFloat(String(v).replace(',', '.')) || 0;
+      acc.realPnlAtTrades = accountTradesSum(acc); // repère : les trades suivants s'ajoutent
+    }
     saveAccountsAndRotation();
-    renderAccounts();
+    render();
   }
 
   function renderAccounts(s) {
@@ -12040,15 +12050,27 @@
     };
     if (EDITING_ACCOUNT_ID) {
       const idx = ACCOUNTS.findIndex(a => a.id === EDITING_ACCOUNT_ID);
-      if (idx >= 0) ACCOUNTS[idx] = { ...ACCOUNTS[idx], ...data };
+      if (idx >= 0) {
+        const prev = ACCOUNTS[idx];
+        // Base du P&L réel : on ne la recalcule que si la valeur a changé (sinon on perd le delta des trades ajoutés)
+        if (data.realPnl == null) {
+          data.realPnlAtTrades = undefined;
+        } else if (prev.realPnl !== data.realPnl || typeof prev.realPnlAtTrades !== 'number') {
+          data.realPnlAtTrades = accountTradesSum({ name: data.name });
+        } else {
+          data.realPnlAtTrades = prev.realPnlAtTrades;
+        }
+        ACCOUNTS[idx] = { ...prev, ...data };
+        if (data.realPnl == null) delete ACCOUNTS[idx].realPnlAtTrades;
+      }
     } else {
       const id = name.toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + Date.now().toString(36).slice(-4);
+      if (data.realPnl != null) data.realPnlAtTrades = accountTradesSum({ name: data.name });
       ACCOUNTS.push({ id, ...data });
     }
     saveAccountsAndRotation();
     closeAccountModal();
-    renderRotation();
-    renderJournal();
+    render();
   }
   function deleteCurrentAccount() {
     if (!EDITING_ACCOUNT_ID) return;
