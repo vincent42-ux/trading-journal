@@ -1,7 +1,7 @@
 // Service worker — Trading Journal
 // Stratégie "réseau d'abord, cache en secours" : toujours la dernière version
 // quand il y a du réseau, et le site complet disponible hors-ligne sinon.
-const CACHE = 'tj-cache-v2';
+const CACHE = 'tj-cache-v3';
 
 self.addEventListener('install', () => {
   self.skipWaiting();

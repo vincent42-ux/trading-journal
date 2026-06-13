@@ -3439,6 +3439,9 @@
     background: rgba(255, 255, 255, 0.16); color: #fff;
     font-family: 'JetBrains Mono', monospace;
   }
+  .acc-role-badge.clickable { cursor: pointer; transition: background 0.15s ease; }
+  .acc-role-badge.clickable:hover { background: rgba(255, 255, 255, 0.32); }
+  .acc-copy-hint { color: var(--text-2); font-size: 11px; }
   .account-banner-status.validated { background: rgba(34, 211, 154, 0.25); color: #22d39a; border: 1px solid rgba(34, 211, 154, 0.5); }
   .account-banner-status.st-funded { background: rgba(34, 211, 154, 0.22); color: #22d39a; border: 1px solid rgba(34, 211, 154, 0.45); }
   .account-banner-status.st-challenge { background: rgba(167, 139, 250, 0.25); color: #c4b5fd; border: 1px solid rgba(167, 139, 250, 0.5); }
@@ -5236,6 +5239,7 @@
           <button class="btn" onclick="loadMffuRealAccounts()" style="width:100%; margin-top:10px; border-color:var(--accent); color:var(--accent);">📥 Recharger ma config MFFU réelle (50K + 25K)</button>
           <button class="btn" onclick="runIntegrityCheck()" style="width:100%; margin-top:10px;">Vérifier l'intégrité des données</button>
           <div id="integrity-result" style="margin-top:10px;"></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-13 · r10</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -10354,7 +10358,7 @@
               </div>
               <div style="display:flex; flex-direction:column; gap:5px; align-items:flex-end;">
                 <span class="account-banner-status ${statusClass}">${statusLabel}</span>
-                <span class="acc-role-badge">${isMaster ? '👑 MASTER' : '↳ FOLLOWER ×' + (acc.multiplier || 1)}</span>
+                <span class="acc-role-badge${!isMaster ? ' clickable' : ''}"${!isMaster ? ` onclick="event.stopPropagation(); setMaster('${acc.id}')" title="Cliquer pour définir ce compte comme master"` : ''}>${isMaster ? '👑 MASTER' : '↳ FOLLOWER ×' + (acc.multiplier || 1)}</span>
               </div>
             </div>
           </div>
@@ -10460,8 +10464,8 @@
             <div class="acc-copy-row">
               ${isMaster
                 ? `<span class="acc-copy-master">👑 Master — tu saisis tes trades ici</span>`
-                : `<button class="btn-mini" onclick="event.stopPropagation(); setMaster('${acc.id}')">👑 Définir master</button>
-                   <span class="acc-copy-mult">Copie
+                : `<span class="acc-copy-hint">↳ copie le master</span>
+                   <span class="acc-copy-mult">Multiplicateur
                      <button class="acc-mult-btn" onclick="event.stopPropagation(); bumpMultiplier('${acc.id}', -1)">−</button>
                      <strong class="mono">×${acc.multiplier || 1}</strong>
                      <button class="acc-mult-btn" onclick="event.stopPropagation(); bumpMultiplier('${acc.id}', 1)">+</button>
@@ -12106,13 +12110,14 @@
           TRADES.forEach(t => { if (t.account === prev.name) { t.account = data.name; moved++; } });
           if (moved > 0) saveTrades();
         }
-        // Base du P&L réel : on ne la recalcule que si la valeur a changé (sinon on perd le delta des trades ajoutés)
+        // Base du P&L réel : recalculée UNIQUEMENT si tu changes le chiffre du P&L réel.
+        // Sinon on garde la base existante (ou 0 par défaut) → éditer un compte n'avale plus les trades déjà saisis.
         if (data.realPnl == null) {
           data.realPnlAtTrades = undefined;
-        } else if (prev.realPnl !== data.realPnl || typeof prev.realPnlAtTrades !== 'number') {
+        } else if (prev.realPnl !== data.realPnl) {
           data.realPnlAtTrades = accountTradesSum({ name: data.name });
         } else {
-          data.realPnlAtTrades = prev.realPnlAtTrades;
+          data.realPnlAtTrades = (typeof prev.realPnlAtTrades === 'number') ? prev.realPnlAtTrades : 0;
         }
         ACCOUNTS[idx] = { ...prev, ...data };
         if (data.realPnl == null) delete ACCOUNTS[idx].realPnlAtTrades;
