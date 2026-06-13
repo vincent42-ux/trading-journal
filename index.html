@@ -9154,8 +9154,8 @@
     };
     TRADES.push(trade);
     SESSION.tradeIds.push(trade.id);
-    // Propagation automatique vers les followers actifs (coupée en mode mono-compte)
-    const activeFollowers = PREFS.multiAccount
+    // Propagation automatique vers les followers actifs (active dès qu'un follower existe)
+    const activeFollowers = copyTradingOn()
       ? getActiveAccountsThisWeek().filter(a => a.role !== 'master' && a.name !== account)
       : [];
     for (const accObj of activeFollowers) {
@@ -10186,6 +10186,10 @@
     }
     return tradesSum;
   }
+  // Copie active si le mode multi-comptes est coché OU s'il existe au moins un compte follower
+  function copyTradingOn() {
+    return (typeof PREFS !== 'undefined' && PREFS.multiAccount) || ACCOUNTS.some(a => a.role === 'follower');
+  }
   // Désigner ce compte comme master (les autres deviennent followers). Le badge master se déplace ici.
   function setMaster(id) {
     ACCOUNTS.forEach(a => { a.role = (a.id === id) ? 'master' : 'follower'; });
@@ -10438,8 +10442,8 @@
               </div>
             </div>`}
 
-            <!-- Copy-trading (visible en mode multi-comptes) : master déplaçable + multiplicateur -->
-            ${(typeof PREFS !== 'undefined' && PREFS.multiAccount) ? `
+            <!-- Copy-trading (visible dès qu'un follower existe) : master déplaçable + multiplicateur -->
+            ${copyTradingOn() ? `
             <div class="acc-copy-row">
               ${isMaster
                 ? `<span class="acc-copy-master">👑 Master — tu saisis tes trades ici</span>`
@@ -11817,7 +11821,7 @@
     // Coupée en mode mono-compte (PREFS.multiAccount = false)
     const _ea = ACCOUNTS.find(a => a.name === editedTrade.account);
     const isMaster = _ea ? _ea.role === 'master' : !!editedTrade.isMaster;
-    if (PREFS.multiAccount && isMaster && editedTrade.linkId) {
+    if (copyTradingOn() && isMaster && editedTrade.linkId) {
       let propagated = 0;
       for (const t of TRADES) {
         if (t === editedTrade) continue;
@@ -12050,6 +12054,8 @@
       cycleStart: (document.getElementById('am-cycleStart') || { value: '' }).value || '',
       cycleDays: parseInt((document.getElementById('am-cycleDays') || { value: 30 }).value) || 30,
     };
+    // En challenge/éval (champ Solde courant masqué), le solde de départ = la taille du compte
+    if (data.status !== 'funded' || !data.currentBalance) data.currentBalance = data.size;
     if (EDITING_ACCOUNT_ID) {
       const idx = ACCOUNTS.findIndex(a => a.id === EDITING_ACCOUNT_ID);
       if (idx >= 0) {
