@@ -10364,7 +10364,7 @@
             <div class="acc-bar-block ${inDrawdown ? 'inactive' : ''}">
               <div class="acc-bar-label">
                 <span>${objLabel}</span>
-                <span class="mono ${validated ? 'pos' : ''}" onclick="event.stopPropagation(); editRealPnl('${acc.id}')" style="cursor:pointer;" title="Cliquer pour saisir ton P&L réel">${fmt$(Math.max(0, pnl)).replace(/^\+/, '$')} / $${targetPnl.toLocaleString()} ✏️</span>
+                <span class="mono ${validated ? 'pos' : ''}" onclick="event.stopPropagation(); editRealPnl('${acc.id}')" style="cursor:pointer;" title="Cliquer pour saisir ton P&L réel">${fmt$(Math.max(0, pnl)).replace(/^\+/, '')} / $${targetPnl.toLocaleString()} ✏️</span>
               </div>
               <div class="acc-bar-track">
                 <div class="acc-bar-fill ${validated ? 'gold' : 'green'}" style="width:${progPct}%;"></div>
