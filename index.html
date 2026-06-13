@@ -5646,6 +5646,19 @@
       <div class="modal-section">
         <div class="section-label">Capital et risque</div>
         <div class="form-row">
+          <div class="form-field" style="flex:1; background:rgba(167,139,250,0.08); border:1px solid rgba(167,139,250,0.3); border-radius:10px; padding:10px 12px;">
+            <label style="color:var(--accent);">⚡ Modèle MFFU <span style="opacity:.6; font-weight:400; text-transform:none;">— choisis la taille, tout se remplit (taille, drawdown, cible, risque)</span></label>
+            <select id="am-template" onchange="applyAccountTemplate(this.value)">
+              <option value="">Personnalisé</option>
+              <option value="25000">MFFU 25K</option>
+              <option value="50000">MFFU 50K</option>
+              <option value="100000">MFFU 100K</option>
+              <option value="150000">MFFU 150K</option>
+              <option value="300000">MFFU 300K</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
           <div class="form-field">
             <label>Taille ($)</label>
             <input type="number" id="am-size" placeholder="25000" />
@@ -11968,6 +11981,27 @@
     return ACCOUNTS.filter(a => week.accountIds.includes(a.id));
   }
 
+  // ========== MODÈLES DE COMPTE (MFFU) ==========
+  // Drawdown 4% · cible 6% · risque ≈ 0,25% de la taille (cohérent avec le 25K à $62,80)
+  const ACCOUNT_TEMPLATES = {
+    '25000':  { size: 25000,  trailing: 1000,  payoutTarget: 1500,  dll: 0, risk: 62.80 },
+    '50000':  { size: 50000,  trailing: 2000,  payoutTarget: 3000,  dll: 0, risk: 125.60 },
+    '100000': { size: 100000, trailing: 4000,  payoutTarget: 6000,  dll: 0, risk: 251.20 },
+    '150000': { size: 150000, trailing: 6000,  payoutTarget: 9000,  dll: 0, risk: 376.80 },
+    '300000': { size: 300000, trailing: 12000, payoutTarget: 18000, dll: 0, risk: 753.60 },
+  };
+  function applyAccountTemplate(v) {
+    const t = ACCOUNT_TEMPLATES[v];
+    if (!t) return;
+    document.getElementById('am-size').value = t.size;
+    document.getElementById('am-trailing').value = t.trailing;
+    document.getElementById('am-payoutTarget').value = t.payoutTarget;
+    document.getElementById('am-dll').value = t.dll;
+    document.getElementById('am-risk').value = t.risk;
+    const nameEl = document.getElementById('am-name');
+    if (nameEl && !nameEl.value.trim()) nameEl.value = 'MFFU ' + (t.size / 1000) + 'K';
+  }
+
   // ========== ACCOUNT MODAL ==========
   function openAccountModal(id) {
     EDITING_ACCOUNT_ID = id || null;
@@ -12011,6 +12045,12 @@
       document.getElementById('am-payoutGoal').value = '';
       document.getElementById('am-currentBalance').value = 50000;
       document.getElementById('am-realPnl').value = '';
+    }
+    // Pré-sélectionne le modèle si la taille correspond à un modèle MFFU connu
+    const tmplEl = document.getElementById('am-template');
+    if (tmplEl) {
+      const sz = String(parseInt(document.getElementById('am-size').value) || '');
+      tmplEl.value = ACCOUNT_TEMPLATES[sz] ? sz : '';
     }
     updateAccountFormMode();
     document.getElementById('account-modal-backdrop').classList.add('show');
