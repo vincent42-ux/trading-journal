@@ -10147,24 +10147,26 @@
               <span style="margin-left:auto;" class="mono">Solde <strong>$${balance.toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong></span>
             </div>
 
-            <!-- Barre OBJECTIF -->
+            <!-- Barre OBJECTIF (P&L net réel — descend quand tu perds) -->
             ${targetPnl > 0 ? `
             <div class="acc-bar-block">
               <div class="acc-bar-label">
                 <span>Objectif</span>
-                <span class="mono ${validated ? 'pos' : ''}">${fmt$(Math.max(0, pnl)).replace(/^\+/, '$')} / $${targetPnl.toLocaleString()}</span>
+                <span class="mono ${pnl < 0 ? 'neg' : validated ? 'pos' : ''}">${fmt$(pnl).replace(/^\+/, '$')} / $${targetPnl.toLocaleString()}</span>
               </div>
               <div class="acc-bar-track">
-                <div class="acc-bar-fill ${validated ? 'gold' : 'green'}" style="width:${progPct}%;"></div>
+                ${pnl < 0
+                  ? `<div class="acc-bar-fill red" style="width:${Math.min(100, (Math.abs(pnl) / targetPnl) * 100)}%; opacity:.5;"></div>`
+                  : `<div class="acc-bar-fill ${validated ? 'gold' : 'green'}" style="width:${progPct}%;"></div>`}
               </div>
             </div>` : ''}
 
-            <!-- Barre DRAWDOWN -->
+            <!-- Barre DRAWDOWN (sécurité — buffer avant de cramer le compte) -->
             ${ddLimit > 0 ? `
             <div class="acc-bar-block">
               <div class="acc-bar-label">
-                <span>Drawdown</span>
-                <span class="mono ${ddDanger ? 'neg' : ''}">$${maxDD.toLocaleString('en-US', { maximumFractionDigits: 0 })} / $${ddLimit.toLocaleString()}</span>
+                <span>Drawdown <span style="opacity:.6; font-weight:400;">· sécurité</span></span>
+                <span class="mono ${ddDanger ? 'neg' : ''}">$${maxDD.toLocaleString('en-US', { maximumFractionDigits: 0 })} / $${ddLimit.toLocaleString()} <span style="opacity:.6;">· reste $${Math.max(0, ddLimit - maxDD).toLocaleString('en-US', { maximumFractionDigits: 0 })}</span></span>
               </div>
               <div class="acc-bar-track">
                 <div class="acc-bar-fill ${ddDanger ? 'red' : 'neutral'}" style="width:${ddPct}%;"></div>
