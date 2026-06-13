@@ -11806,7 +11806,8 @@
       const newLinkId = Math.max(0, ...TRADES.map(t => t.linkId || 0)) + 1;
       trade.id = makeTradeId();
       trade.linkId = newLinkId;
-      trade.isMaster = /mffu|master/i.test(account);
+      const _accObj = ACCOUNTS.find(a => a.name === account);
+      trade.isMaster = _accObj ? _accObj.role === 'master' : false;
       TRADES.push(trade);
       editedTrade = TRADES[TRADES.length - 1];
       isNew = true;
@@ -11814,7 +11815,8 @@
 
     // Propagation auto: if we edited/created a master, sync linked followers
     // Coupée en mode mono-compte (PREFS.multiAccount = false)
-    const isMaster = editedTrade.isMaster || /mffu|master/i.test(editedTrade.account);
+    const _ea = ACCOUNTS.find(a => a.name === editedTrade.account);
+    const isMaster = _ea ? _ea.role === 'master' : !!editedTrade.isMaster;
     if (PREFS.multiAccount && isMaster && editedTrade.linkId) {
       let propagated = 0;
       for (const t of TRADES) {
@@ -12052,6 +12054,12 @@
       const idx = ACCOUNTS.findIndex(a => a.id === EDITING_ACCOUNT_ID);
       if (idx >= 0) {
         const prev = ACCOUNTS[idx];
+        // Renommage : les trades existants suivent le nouveau nom (sinon ils deviennent orphelins)
+        if (prev.name && prev.name !== data.name) {
+          let moved = 0;
+          TRADES.forEach(t => { if (t.account === prev.name) { t.account = data.name; moved++; } });
+          if (moved > 0) saveTrades();
+        }
         // Base du P&L réel : on ne la recalcule que si la valeur a changé (sinon on perd le delta des trades ajoutés)
         if (data.realPnl == null) {
           data.realPnlAtTrades = undefined;
