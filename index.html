@@ -3527,6 +3527,25 @@
   }
   .acc-mult-btn:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
   .acc-mult-btn:active { transform: scale(0.9); }
+  /* Distances clés payout / blow */
+  .acc-dist {
+    display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 2px 0 13px;
+    font-size: 11.5px; color: var(--text-2);
+  }
+  .acc-dist strong { color: var(--text-0); font-variant-numeric: tabular-nums; }
+  .acc-dist .neg strong { color: var(--red); }
+  /* Bandeau récap portfolio */
+  .accounts-summary-bar {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+    background: var(--bg-2); border: 1px solid var(--border);
+    border-radius: 14px; padding: 14px 18px; margin-bottom: 16px;
+  }
+  .asum-item { display: flex; flex-direction: column; gap: 4px; }
+  .asum-label { font-size: 10px; color: var(--text-3); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+  .asum-val { font-size: 16px; font-weight: 700; color: var(--text-0); }
+  @media (max-width: 768px) {
+    .accounts-summary-bar { grid-template-columns: 1fr 1fr; }
+  }
   @media (max-width: 768px) {
     .acc-boxes { grid-template-columns: 1fr 1fr; }
     .acc-info-line { font-size: 11px; }
@@ -4308,6 +4327,7 @@
           </div>
           <button class="btn btn-primary" onclick="openAccountModal()">+ Nouveau compte</button>
         </div>
+        <div id="accounts-summary"></div>
         <div class="account-tabs" id="account-tabs"></div>
         <div id="accounts-grid-dyn"></div>
       </section>
@@ -10125,13 +10145,28 @@
     saveAccountsAndRotation();
     renderAccounts();
   }
+  // P&L d'un compte : le P&L réel saisi prime, sinon somme des trades
+  function accountPnl(acc) {
+    const hasReal = (acc.realPnl != null && acc.realPnl !== '' && !isNaN(Number(acc.realPnl)));
+    if (hasReal) return Number(acc.realPnl);
+    return TRADES.filter(t => t.account === acc.name).reduce((sum, t) => sum + (t.pnl || 0), 0);
+  }
   function accountCategory(acc) {
     if (acc.status === 'blown') return 'blown';
-    const hasRealPnl = (acc.realPnl != null && acc.realPnl !== '' && !isNaN(Number(acc.realPnl)));
-    const pnl = hasRealPnl ? Number(acc.realPnl) : TRADES.filter(t => t.account === acc.name).reduce((sum, t) => sum + (t.pnl || 0), 0);
     const target = acc.payoutTarget || 0;
-    if (target > 0 && pnl >= target) return 'validated';
+    if (target > 0 && accountPnl(acc) >= target) return 'validated';
     return 'active';
+  }
+  // Édition rapide du P&L réel depuis la carte
+  function editRealPnl(id) {
+    const acc = ACCOUNTS.find(a => a.id === id);
+    if (!acc) return;
+    const cur = (acc.realPnl != null && acc.realPnl !== '') ? acc.realPnl : '';
+    const v = prompt('P&L réel actuel de ' + acc.name + ' (en $, ex. 1190.04).\nLaisse vide pour revenir au calcul depuis tes trades :', cur);
+    if (v === null) return;
+    acc.realPnl = (String(v).trim() === '') ? null : (parseFloat(String(v).replace(',', '.')) || 0);
+    saveAccountsAndRotation();
+    renderAccounts();
   }
 
   function renderAccounts(s) {
@@ -10163,6 +10198,21 @@
         { key: 'blown', label: '💀 Cramés' }
       ].map(t => `<div class="account-tab ${ACCT_TAB_FILTER === t.key ? 'active' : ''}" onclick="setAccountFilter('${t.key}')">${t.label}<span class="tab-count">${_counts[t.key] || 0}</span></div>`).join('');
     }
+    // Bandeau récap portfolio (tous comptes, hors cramés pour le P&L)
+    const _sumEl = document.getElementById('accounts-summary');
+    if (_sumEl) {
+      const live = ACCOUNTS_SORTED.filter(a => a.status !== 'blown');
+      const totalPnl = live.reduce((s, a) => s + accountPnl(a), 0);
+      const totalTarget = live.reduce((s, a) => s + (a.payoutTarget || 0), 0);
+      const totalDDused = live.reduce((s, a) => s + Math.max(0, -accountPnl(a)), 0);
+      _sumEl.innerHTML = (ACCOUNTS_SORTED.length <= 1) ? '' : `
+        <div class="accounts-summary-bar">
+          <div class="asum-item"><div class="asum-label">P&L total</div><div class="asum-val mono ${totalPnl >= 0 ? 'pos' : 'neg'}">${fmt$(totalPnl)}</div></div>
+          <div class="asum-item"><div class="asum-label">Objectifs cumulés</div><div class="asum-val mono">$${totalTarget.toLocaleString('en-US')}</div></div>
+          <div class="asum-item"><div class="asum-label">Comptes</div><div class="asum-val mono">${_counts.active} 🟢 · ${_counts.validated} 🏆 · ${_counts.blown} 💀</div></div>
+          <div class="asum-item"><div class="asum-label">Drawdown utilisé</div><div class="asum-val mono ${totalDDused > 0 ? 'neg' : ''}">$${totalDDused.toLocaleString('en-US', { maximumFractionDigits: 0 })}</div></div>
+        </div>`;
+    }
     // Application du filtre
     let _visible = ACCOUNTS_SORTED;
     if (ACCT_TAB_FILTER !== 'all') _visible = ACCOUNTS_SORTED.filter(a => accountCategory(a) === ACCT_TAB_FILTER);
@@ -10178,9 +10228,7 @@
 
     container.innerHTML = _visible.map(acc => {
       const accTrades = TRADES.filter(t => t.account === acc.name);
-      const tradesPnl = accTrades.reduce((sum, t) => sum + (t.pnl || 0), 0);
-      const hasRealPnl = (acc.realPnl != null && acc.realPnl !== '' && !isNaN(Number(acc.realPnl)));
-      const pnl = hasRealPnl ? Number(acc.realPnl) : tradesPnl;
+      const pnl = accountPnl(acc);
       const balance = (acc.currentBalance || acc.size) + pnl;
       const targetPnl = acc.payoutTarget || 0;
       const progPct = targetPnl > 0 ? Math.max(0, Math.min(100, (pnl / targetPnl) * 100)) : 0;
@@ -10295,7 +10343,16 @@
               </div>`;
             })()}
 
-            <!-- 3 boxes : DLL aujourd'hui / Multiplicateur (éditable) / P&L total -->
+            <!-- Distances clés : marge avant payout / avant blow -->
+            ${(targetPnl > 0 || ddLimit > 0) ? `
+            <div class="acc-dist">
+              ${targetPnl > 0 ? (validated
+                ? `<span class="pos">🏆 Payout atteint</span>`
+                : `<span>🎯 à <strong>$${Math.max(0, targetPnl - pnl).toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong> du payout</span>`) : ''}
+              ${ddLimit > 0 ? `<span class="${ddDanger ? 'neg' : ''}">🛡️ <strong>$${Math.max(0, ddLimit - underwater).toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong> avant le blow</span>` : ''}
+            </div>` : ''}
+
+            <!-- 3 boxes : DLL aujourd'hui / Multiplicateur (éditable) / P&L (éditable) -->
             <div class="acc-boxes">
               <div class="acc-box">
                 <div class="acc-box-label">DLL aujourd'hui</div>
@@ -10310,8 +10367,8 @@
                   <button class="acc-mult-btn" onclick="event.stopPropagation(); bumpMultiplier('${acc.id}', 1)" title="Augmenter">+</button>
                 </div>
               </div>
-              <div class="acc-box">
-                <div class="acc-box-label">P&L total</div>
+              <div class="acc-box" onclick="event.stopPropagation(); editRealPnl('${acc.id}')" style="cursor:pointer;" title="Cliquer pour saisir ton P&L réel">
+                <div class="acc-box-label">P&L ✏️</div>
                 <div class="acc-box-value mono ${pnl >= 0 ? 'pos' : 'neg'}">${fmt$(pnl)}</div>
               </div>
             </div>
