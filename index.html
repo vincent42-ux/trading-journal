@@ -5646,10 +5646,16 @@
         </div>
         <div class="form-row">
           <div class="form-field">
-            <label>Objectif payout ($)</label>
-            <input type="number" id="am-payoutTarget" step="1" placeholder="1500" />
+            <label>🎯 Cible challenge ($) <span style="opacity:.6; font-weight:400; text-transform:none;">— à atteindre pour passer l'éval</span></label>
+            <input type="number" id="am-payoutTarget" step="1" placeholder="3000" />
           </div>
           <div class="form-field">
+            <label>💰 Objectif payout ($) <span style="opacity:.6; font-weight:400; text-transform:none;">— une fois funded</span></label>
+            <input type="number" id="am-payoutGoal" step="1" placeholder="2000" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-field" style="flex:1;">
             <label>Solde courant ($)</label>
             <input type="number" id="am-currentBalance" step="0.01" placeholder="25000" />
           </div>
@@ -10151,9 +10157,14 @@
     if (hasReal) return Number(acc.realPnl);
     return TRADES.filter(t => t.account === acc.name).reduce((sum, t) => sum + (t.pnl || 0), 0);
   }
+  // Objectif courant selon la phase : challenge → cible d'éval ; funded → objectif payout
+  function accountObjTarget(acc) {
+    if (acc.status === 'funded') return (acc.payoutGoal != null && acc.payoutGoal !== '') ? Number(acc.payoutGoal) : (acc.payoutTarget || 0);
+    return acc.payoutTarget || 0;
+  }
   function accountCategory(acc) {
     if (acc.status === 'blown') return 'blown';
-    const target = acc.payoutTarget || 0;
+    const target = accountObjTarget(acc);
     if (target > 0 && accountPnl(acc) >= target) return 'validated';
     return 'active';
   }
@@ -10203,7 +10214,7 @@
     if (_sumEl) {
       const live = ACCOUNTS_SORTED.filter(a => a.status !== 'blown');
       const totalPnl = live.reduce((s, a) => s + accountPnl(a), 0);
-      const totalTarget = live.reduce((s, a) => s + (a.payoutTarget || 0), 0);
+      const totalTarget = live.reduce((s, a) => s + accountObjTarget(a), 0);
       const totalDDused = live.reduce((s, a) => s + Math.max(0, -accountPnl(a)), 0);
       _sumEl.innerHTML = (ACCOUNTS_SORTED.length <= 1) ? '' : `
         <div class="accounts-summary-bar">
@@ -10230,11 +10241,17 @@
       const accTrades = TRADES.filter(t => t.account === acc.name);
       const pnl = accountPnl(acc);
       const balance = (acc.currentBalance || acc.size) + pnl;
-      const targetPnl = acc.payoutTarget || 0;
+      // Phase du compte : challenge (passer l'éval) ou payout (funded)
+      const isFunded = acc.status === 'funded';
+      const phase = acc.status === 'blown' ? 'blown' : (isFunded ? 'payout' : 'challenge');
+      const targetPnl = accountObjTarget(acc);
+      const objLabel = isFunded ? '💰 Objectif payout' : '🎯 Objectif challenge';
+      const passWord = isFunded ? 'du payout' : 'de passer l\'éval';
       const progPct = targetPnl > 0 ? Math.max(0, Math.min(100, (pnl / targetPnl) * 100)) : 0;
       const isMaster = acc.role === 'master';
       const slug = getFirmSlug(acc.firm);
       const validated = targetPnl > 0 && pnl >= targetPnl;
+      const isChallenge = (phase === 'challenge');
 
       const wins = accTrades.filter(t => t.pnl > 0);
       const wr = accTrades.length ? (wins.length / accTrades.length * 100) : 0;
@@ -10295,12 +10312,12 @@
               ${inDrawdown ? '📉 Dans le drawdown' : '🎯 Sur l\'objectif'}
             </div>` : ''}
 
-            <!-- Barre OBJECTIF (active seulement au-dessus du solde de départ) -->
+            <!-- Barre OBJECTIF (libellé selon la phase ; valeur cliquable pour saisir le P&L réel) -->
             ${targetPnl > 0 ? `
             <div class="acc-bar-block ${inDrawdown ? 'inactive' : ''}">
               <div class="acc-bar-label">
-                <span>Objectif</span>
-                <span class="mono ${validated ? 'pos' : ''}">${fmt$(Math.max(0, pnl)).replace(/^\+/, '$')} / $${targetPnl.toLocaleString()}</span>
+                <span>${objLabel}</span>
+                <span class="mono ${validated ? 'pos' : ''}" onclick="event.stopPropagation(); editRealPnl('${acc.id}')" style="cursor:pointer;" title="Cliquer pour saisir ton P&L réel">${fmt$(Math.max(0, pnl)).replace(/^\+/, '$')} / $${targetPnl.toLocaleString()} ✏️</span>
               </div>
               <div class="acc-bar-track">
                 <div class="acc-bar-fill ${validated ? 'gold' : 'green'}" style="width:${progPct}%;"></div>
@@ -10347,12 +10364,13 @@
             ${(targetPnl > 0 || ddLimit > 0) ? `
             <div class="acc-dist">
               ${targetPnl > 0 ? (validated
-                ? `<span class="pos">🏆 Payout atteint</span>`
-                : `<span>🎯 à <strong>$${Math.max(0, targetPnl - pnl).toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong> du payout</span>`) : ''}
+                ? `<span class="pos">🏆 ${isFunded ? 'Payout atteint' : 'Challenge passé'}</span>`
+                : `<span>🎯 à <strong>$${Math.max(0, targetPnl - pnl).toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong> ${passWord}</span>`) : ''}
               ${ddLimit > 0 ? `<span class="${ddDanger ? 'neg' : ''}">🛡️ <strong>$${Math.max(0, ddLimit - underwater).toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong> avant le blow</span>` : ''}
             </div>` : ''}
 
-            <!-- 3 boxes : DLL aujourd'hui / Multiplicateur (éditable) / P&L (éditable) -->
+            <!-- Cases (DLL / Multiplicateur / P&L) — masquées en phase challenge pour épurer -->
+            ${isChallenge ? '' : `
             <div class="acc-boxes">
               <div class="acc-box">
                 <div class="acc-box-label">DLL aujourd'hui</div>
@@ -10371,7 +10389,7 @@
                 <div class="acc-box-label">P&L ✏️</div>
                 <div class="acc-box-value mono ${pnl >= 0 ? 'pos' : 'neg'}">${fmt$(pnl)}</div>
               </div>
-            </div>
+            </div>`}
 
             <!-- Actions -->
             <div class="account-actions">
@@ -11902,6 +11920,7 @@
       document.getElementById('am-dll').value = a.dll || 0;
       document.getElementById('am-trailing').value = a.trailing || 0;
       document.getElementById('am-payoutTarget').value = a.payoutTarget || 0;
+      document.getElementById('am-payoutGoal').value = a.payoutGoal || '';
       document.getElementById('am-currentBalance').value = a.currentBalance || a.size;
       document.getElementById('am-realPnl').value = (a.realPnl != null && a.realPnl !== '') ? a.realPnl : '';
       const csEl = document.getElementById('am-cycleStart');
@@ -11921,6 +11940,7 @@
       document.getElementById('am-dll').value = 1000;
       document.getElementById('am-trailing').value = 2500;
       document.getElementById('am-payoutTarget').value = 3000;
+      document.getElementById('am-payoutGoal').value = '';
       document.getElementById('am-currentBalance').value = 50000;
       document.getElementById('am-realPnl').value = '';
     }
@@ -11944,6 +11964,7 @@
       dll: parseFloat(document.getElementById('am-dll').value) || 0,
       trailing: parseFloat(document.getElementById('am-trailing').value) || 0,
       payoutTarget: parseFloat(document.getElementById('am-payoutTarget').value) || 0,
+      payoutGoal: (document.getElementById('am-payoutGoal').value.trim() === '' ? null : parseFloat(document.getElementById('am-payoutGoal').value)),
       currentBalance: parseFloat(document.getElementById('am-currentBalance').value) || 0,
       realPnl: (document.getElementById('am-realPnl').value.trim() === '' ? null : parseFloat(document.getElementById('am-realPnl').value)),
       cycleStart: (document.getElementById('am-cycleStart') || { value: '' }).value || '',
