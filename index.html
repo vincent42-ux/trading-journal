@@ -3534,17 +3534,18 @@
   }
   .acc-dist strong { color: var(--text-0); font-variant-numeric: tabular-nums; }
   .acc-dist .neg strong { color: var(--red); }
-  /* Bandeau récap portfolio */
-  .accounts-summary-bar {
-    display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+  /* Carré capital cumulé */
+  .accounts-capital {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 4px; text-align: center;
     background: var(--bg-2); border: 1px solid var(--border);
-    border-radius: 14px; padding: 14px 18px; margin-bottom: 16px;
+    border-radius: 16px; padding: 18px 22px; margin-bottom: 16px;
   }
-  .asum-item { display: flex; flex-direction: column; gap: 4px; }
-  .asum-label { font-size: 10px; color: var(--text-3); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
-  .asum-val { font-size: 16px; font-weight: 700; color: var(--text-0); }
-  @media (max-width: 768px) {
-    .accounts-summary-bar { grid-template-columns: 1fr 1fr; }
+  .acap-label { font-size: 11px; color: var(--text-3); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+  .acap-val {
+    font-size: 34px; font-weight: 800; letter-spacing: -0.02em;
+    background: linear-gradient(90deg, var(--accent), #d946ef);
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
   }
   @media (max-width: 768px) {
     .acc-boxes { grid-template-columns: 1fr 1fr; }
@@ -5580,6 +5581,22 @@
       <button class="btn-icon" onclick="closeAccountModal()" style="background:transparent; border:none;">✕</button>
     </div>
     <div class="modal-body">
+      <!-- SECTION : PHASE (choix en premier) -->
+      <div class="modal-section">
+        <div class="section-label">1. Phase du compte</div>
+        <div class="form-row">
+          <div class="form-field" style="flex:1;">
+            <label>État actuel <span style="opacity:.6; font-weight:400; text-transform:none;">— en challenge le formulaire est minimal ; en funded il s'ouvre en entier</span></label>
+            <select id="am-status" onchange="updateAccountFormMode()">
+              <option value="challenge">🎯 Challenge / Éval</option>
+              <option value="funded">💰 Funded</option>
+              <option value="paused">⏸ En pause</option>
+              <option value="blown">💀 Cramé / Échoué</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
       <!-- SECTION : IDENTITÉ -->
       <div class="modal-section">
         <div class="section-label">Identité</div>
@@ -5600,7 +5617,7 @@
               <option value="Autre">Autre</option>
             </select>
           </div>
-          <div class="form-field">
+          <div class="form-field" id="amf-role">
             <label>Rôle</label>
             <select id="am-role">
               <option value="master">Master</option>
@@ -5618,12 +5635,12 @@
             <label>Taille ($)</label>
             <input type="number" id="am-size" placeholder="25000" />
           </div>
-          <div class="form-field">
+          <div class="form-field" id="amf-risk">
             <label>Risque/trade ($)</label>
             <input type="number" id="am-risk" step="0.01" placeholder="62.80" />
           </div>
         </div>
-        <div class="form-row">
+        <div class="form-row" id="amf-mult">
           <div class="form-field" style="flex:1; background:rgba(167,139,250,0.08); border:1px solid rgba(167,139,250,0.3); border-radius:10px; padding:10px 12px;">
             <label style="color:var(--accent);">✖️ Multiplicateur de copie <span style="opacity:.6; font-weight:400; text-transform:none;">— combien de fois ce compte copie le master (×1, ×2, ×4…). Modifiable aussi en direct sur la carte.</span></label>
             <input type="number" id="am-multiplier" step="0.1" placeholder="1 ou 4" value="1" />
@@ -5645,16 +5662,16 @@
           </div>
         </div>
         <div class="form-row">
-          <div class="form-field">
+          <div class="form-field" id="amf-challengeTarget">
             <label>🎯 Cible challenge ($) <span style="opacity:.6; font-weight:400; text-transform:none;">— à atteindre pour passer l'éval</span></label>
             <input type="number" id="am-payoutTarget" step="1" placeholder="3000" />
           </div>
-          <div class="form-field">
-            <label>💰 Objectif payout ($) <span style="opacity:.6; font-weight:400; text-transform:none;">— une fois funded</span></label>
+          <div class="form-field" id="amf-payoutGoal">
+            <label>💰 Objectif payout ($) <span style="opacity:.6; font-weight:400; text-transform:none;">— une fois funded (déclenche la notif payout)</span></label>
             <input type="number" id="am-payoutGoal" step="1" placeholder="2000" />
           </div>
         </div>
-        <div class="form-row">
+        <div class="form-row" id="amf-currentBalance">
           <div class="form-field" style="flex:1;">
             <label>Solde courant ($)</label>
             <input type="number" id="am-currentBalance" step="0.01" placeholder="25000" />
@@ -5668,21 +5685,9 @@
         </div>
       </div>
 
-      <!-- SECTION : STATUT -->
-      <div class="modal-section">
-        <div class="section-label">Statut du compte</div>
-        <div class="form-row">
-          <div class="form-field" style="flex:1;">
-            <label>État actuel</label>
-            <select id="am-status">
-              <option value="challenge">Challenge</option>
-              <option value="funded">Funded</option>
-              <option value="evaluation">Évaluation</option>
-              <option value="paused">En pause</option>
-              <option value="blown">💀 Cramé / Échoué</option>
-            </select>
-          </div>
-        </div>
+      <!-- SECTION : CYCLE -->
+      <div class="modal-section" id="amf-cycle">
+        <div class="section-label">Cycle (abonnement / éval)</div>
         <div class="form-row">
           <div class="form-field">
             <label>Début du cycle (abonnement / éval)</label>
@@ -10209,19 +10214,18 @@
         { key: 'blown', label: '💀 Cramés' }
       ].map(t => `<div class="account-tab ${ACCT_TAB_FILTER === t.key ? 'active' : ''}" onclick="setAccountFilter('${t.key}')">${t.label}<span class="tab-count">${_counts[t.key] || 0}</span></div>`).join('');
     }
-    // Bandeau récap portfolio (tous comptes, hors cramés pour le P&L)
+    // Bandeau : capital cumulé des comptes actifs (ex. 50K + 25K = 75K)
     const _sumEl = document.getElementById('accounts-summary');
     if (_sumEl) {
       const live = ACCOUNTS_SORTED.filter(a => a.status !== 'blown');
-      const totalPnl = live.reduce((s, a) => s + accountPnl(a), 0);
-      const totalTarget = live.reduce((s, a) => s + accountObjTarget(a), 0);
-      const totalDDused = live.reduce((s, a) => s + Math.max(0, -accountPnl(a)), 0);
-      _sumEl.innerHTML = (ACCOUNTS_SORTED.length <= 1) ? '' : `
-        <div class="accounts-summary-bar">
-          <div class="asum-item"><div class="asum-label">P&L total</div><div class="asum-val mono ${totalPnl >= 0 ? 'pos' : 'neg'}">${fmt$(totalPnl)}</div></div>
-          <div class="asum-item"><div class="asum-label">Objectifs cumulés</div><div class="asum-val mono">$${totalTarget.toLocaleString('en-US')}</div></div>
-          <div class="asum-item"><div class="asum-label">Comptes</div><div class="asum-val mono">${_counts.active} 🟢 · ${_counts.validated} 🏆 · ${_counts.blown} 💀</div></div>
-          <div class="asum-item"><div class="asum-label">Drawdown utilisé</div><div class="asum-val mono ${totalDDused > 0 ? 'neg' : ''}">$${totalDDused.toLocaleString('en-US', { maximumFractionDigits: 0 })}</div></div>
+      const totalCapital = live.reduce((s, a) => s + (a.size || 0), 0);
+      const capK = totalCapital >= 1000
+        ? (Math.round(totalCapital / 100) / 10).toString().replace(/\.0$/, '') + 'K'
+        : '$' + totalCapital;
+      _sumEl.innerHTML = (live.length === 0) ? '' : `
+        <div class="accounts-capital">
+          <div class="acap-label">Capital cumulé · ${live.length} compte${live.length > 1 ? 's' : ''} actif${live.length > 1 ? 's' : ''}</div>
+          <div class="acap-val mono">${capK}</div>
         </div>`;
     }
     // Application du filtre
@@ -10277,7 +10281,11 @@
       const statusLabel = isBlown ? 'CRAMÉ 💀' : validated ? 'VALIDÉ ✓' : acc.status === 'funded' ? 'FUNDED' : acc.status === 'challenge' ? 'CHALLENGE' : acc.status === 'paused' ? 'PAUSE' : 'ÉVAL';
       const statusClass = isBlown ? 'st-blown' : validated ? 'validated' : acc.status === 'funded' ? 'st-funded' : acc.status === 'challenge' ? 'st-challenge' : acc.status === 'paused' ? 'st-paused' : 'st-eval';
       if (validated && !isBlown && typeof pushNotif === 'function') {
-        pushNotif('info', '🏆', `<strong>${acc.name} VALIDÉ !</strong> Objectif de $${targetPnl.toLocaleString()} atteint (${fmt$(pnl)}) — bravo !`, 'validated-' + acc.id);
+        if (isFunded) {
+          pushNotif('info', '💸', `<strong>${acc.name} — tu peux demander un PAYOUT !</strong> Objectif de $${targetPnl.toLocaleString()} atteint (${fmt$(pnl)}). Pense à déclencher ton retrait.`, 'payout-ready-' + acc.id);
+        } else {
+          pushNotif('info', '🏆', `<strong>${acc.name} VALIDÉ !</strong> Cible du challenge $${targetPnl.toLocaleString()} atteinte (${fmt$(pnl)}) — éval passée, bravo !`, 'validated-' + acc.id);
+        }
       }
 
       return `
@@ -11833,8 +11841,8 @@
   // Pas de DLL pendant l'évaluation MFFU (dll: 0). Les deux sont indépendants (role master).
   function mffuRealAccounts() {
     return [
-      { id: 'mffu-25k', name: 'MFFU 25K', firm: 'MFFU', role: 'master', size: 25000, risk: 62.80, multiplier: 1, status: 'evaluation', dll: 0, trailing: 1000, payoutTarget: 1500, currentBalance: 25000, realPnl: 154.88 },
-      { id: 'mffu-50k', name: 'MFFU 50K', firm: 'MFFU', role: 'master', size: 50000, risk: 125.60, multiplier: 1, status: 'evaluation', dll: 0, trailing: 2000, payoutTarget: 3000, currentBalance: 50000, realPnl: 1190.04 },
+      { id: 'mffu-25k', name: 'MFFU 25K', firm: 'MFFU', role: 'master', size: 25000, risk: 62.80, multiplier: 1, status: 'challenge', dll: 0, trailing: 1000, payoutTarget: 1500, currentBalance: 25000, realPnl: 154.88 },
+      { id: 'mffu-50k', name: 'MFFU 50K', firm: 'MFFU', role: 'master', size: 50000, risk: 125.60, multiplier: 1, status: 'challenge', dll: 0, trailing: 2000, payoutTarget: 3000, currentBalance: 50000, realPnl: 1190.04 },
     ];
   }
   // Defaults if nothing saved
@@ -11916,7 +11924,7 @@
       document.getElementById('am-size').value = a.size;
       document.getElementById('am-risk').value = a.risk;
       document.getElementById('am-multiplier').value = a.multiplier;
-      document.getElementById('am-status').value = a.status;
+      document.getElementById('am-status').value = (a.status === 'evaluation') ? 'challenge' : a.status;
       document.getElementById('am-dll').value = a.dll || 0;
       document.getElementById('am-trailing').value = a.trailing || 0;
       document.getElementById('am-payoutTarget').value = a.payoutTarget || 0;
@@ -11944,7 +11952,23 @@
       document.getElementById('am-currentBalance').value = 50000;
       document.getElementById('am-realPnl').value = '';
     }
+    updateAccountFormMode();
     document.getElementById('account-modal-backdrop').classList.add('show');
+  }
+  // Affiche le formulaire minimal en challenge, complet en funded
+  function updateAccountFormMode() {
+    const stEl = document.getElementById('am-status');
+    if (!stEl) return;
+    const funded = (stEl.value === 'funded');
+    const show = (id, on) => { const el = document.getElementById(id); if (el) el.style.display = on ? '' : 'none'; };
+    // Funded only : rôle, risque, multiplicateur, objectif payout, solde courant
+    show('amf-role', funded);
+    show('amf-risk', funded);
+    show('amf-mult', funded);
+    show('amf-payoutGoal', funded);
+    show('amf-currentBalance', funded);
+    // Challenge only : cible du challenge
+    show('amf-challengeTarget', !funded);
   }
   function closeAccountModal() {
     document.getElementById('account-modal-backdrop').classList.remove('show');
