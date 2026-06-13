@@ -5236,10 +5236,10 @@
             </label>
           </div>
           <button class="btn" onclick="switchToMonoAccount()" style="width:100%; margin-top:10px; border-color:var(--amber); color:var(--amber);">🧹 Passer en mono-compte (supprime les lignes & comptes followers)</button>
-          <button class="btn" onclick="loadMffuRealAccounts()" style="width:100%; margin-top:10px; border-color:var(--accent); color:var(--accent);">🔄 Repartir propre (50K + 25K, manuel, sans copie auto)</button>
+          <button class="btn" onclick="loadMffuRealAccounts()" style="width:100%; margin-top:10px; border-color:var(--accent); color:var(--accent);">🔄 Repartir propre (50K master + 25K follower)</button>
           <button class="btn" onclick="runIntegrityCheck()" style="width:100%; margin-top:10px;">Vérifier l'intégrité des données</button>
           <div id="integrity-result" style="margin-top:10px;"></div>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-14 · r13</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-14 · r14</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -9178,25 +9178,7 @@
     };
     TRADES.push(trade);
     SESSION.tradeIds.push(trade.id);
-    // Propagation automatique vers les followers actifs (active dès qu'un follower existe)
-    const activeFollowers = copyTradingOn()
-      ? getActiveAccountsThisWeek().filter(a => a.role !== 'master' && a.name !== account)
-      : [];
-    for (const accObj of activeFollowers) {
-      const mult = accObj.multiplier || FOLLOWER_MULTIPLIER;
-      const followerPnl = +(pnl * mult).toFixed(2);
-      const fTrade = {
-        id: makeTradeId(),
-        date, time, account: accObj.name, symbol: 'MNQ', side: QT_SIDE,
-        qty: mult, entry: 0, exit: 0,
-        pnl: followerPnl,
-        result: followerPnl > 0.01 ? 'TP' : followerPnl < -0.01 ? 'SL' : 'BE',
-        linkId: newLinkId, isMaster: false,
-        comment: '', photo: null, rules: {}
-      };
-      TRADES.push(fTrade);
-      SESSION.tradeIds.push(fTrade.id);
-    }
+    // Plus de copies stockées : les followers calculent leur P&L en direct (master × multiplicateur)
     saveSession();
     saveTrades();
     // Reset partiel du formulaire (on garde sens + setup pour enchaîner)
@@ -10201,10 +10183,17 @@
     return TRADES.filter(t => t.account === acc.name).reduce((sum, t) => sum + (t.pnl || 0), 0);
   }
   function accountPnl(acc) {
-    const tradesSum = accountTradesSum(acc);
     const hasReal = (acc.realPnl != null && acc.realPnl !== '' && !isNaN(Number(acc.realPnl)));
-    // P&L réel = base de départ, à laquelle TOUS les trades s'ajoutent. Simple et prévisible.
-    return (hasReal ? Number(acc.realPnl) : 0) + tradesSum;
+    const base = hasReal ? Number(acc.realPnl) : 0;
+    if (acc.role === 'follower') {
+      // Le follower SUIT le master : P&L = (somme des trades du master) × son multiplicateur, en dollars.
+      // Aucun trade n'est stocké sur le follower → zéro doublon possible.
+      const master = ACCOUNTS.find(a => a.role === 'master');
+      const masterTrades = master ? accountTradesSum(master) : 0;
+      return base + masterTrades * (acc.multiplier || 1);
+    }
+    // Master (ou compte indépendant) : base + ses propres trades.
+    return base + accountTradesSum(acc);
   }
   // Copie active si le mode multi-comptes est coché OU s'il existe au moins un compte follower
   function copyTradingOn() {
@@ -11796,7 +11785,13 @@
   function saveTradeFromModal() {
     const date = document.getElementById('tm-date').value.trim();
     const time = document.getElementById('tm-time').value.trim();
-    const account = document.getElementById('tm-account').value;
+    let account = document.getElementById('tm-account').value;
+    // On ne trade que sur le master : un trade saisi sur un follower est redirigé vers le master
+    const _selAcc = ACCOUNTS.find(a => a.name === account);
+    if (_selAcc && _selAcc.role === 'follower') {
+      const _m = ACCOUNTS.find(a => a.role === 'master');
+      if (_m) account = _m.name;
+    }
     const symbol = document.getElementById('tm-symbol').value.trim() || 'MNQ';
     const side = document.getElementById('tm-side').value;
     const qty = parseFloat(document.getElementById('tm-qty').value) || 1;
@@ -11838,50 +11833,7 @@
       isNew = true;
     }
 
-    // Propagation auto: if we edited/created a master, sync linked followers
-    // Coupée en mode mono-compte (PREFS.multiAccount = false)
-    const _ea = ACCOUNTS.find(a => a.name === editedTrade.account);
-    const isMaster = _ea ? _ea.role === 'master' : !!editedTrade.isMaster;
-    if (copyTradingOn() && isMaster && editedTrade.linkId) {
-      let propagated = 0;
-      for (const t of TRADES) {
-        if (t === editedTrade) continue;
-        if (t.linkId !== editedTrade.linkId) continue;
-        // Multiplicateur propre au compte follower (pas le ×4 générique)
-        const fAcc = ACCOUNTS.find(a => a.name === t.account);
-        const fMult = (fAcc && fAcc.multiplier) || FOLLOWER_MULTIPLIER;
-        t.pnl = +(pnl * fMult).toFixed(2);
-        t.result = t.pnl > 0.01 ? 'TP' : t.pnl < -0.01 ? 'SL' : 'BE';
-        t.side = side;
-        t.date = date;
-        t.time = time;
-        t.symbol = symbol;
-        propagated++;
-      }
-
-      // On new master trade, auto-create followers from active accounts (excluding the master itself)
-      if (isNew && propagated === 0) {
-        const activeFollowers = getActiveAccountsThisWeek().filter(a => a.role !== 'master' && a.name !== account);
-        for (const accObj of activeFollowers) {
-          const mult = accObj.multiplier || FOLLOWER_MULTIPLIER;
-          const followerPnl = +(pnl * mult).toFixed(2);
-          TRADES.push({
-            id: makeTradeId(),
-            date, time, account: accObj.name, symbol, side,
-            qty: qty * mult,
-            entry, exit,
-            pnl: followerPnl,
-            result: followerPnl > 0.01 ? 'TP' : followerPnl < -0.01 ? 'SL' : 'BE',
-            linkId: editedTrade.linkId,
-            isMaster: false,
-            comment: '',
-            photo: null,
-            rules: {},
-          });
-        }
-      }
-    }
-
+    // Plus de propagation stockée : les followers calculent leur P&L en direct (trades du master × multiplicateur)
     saveTrades();
 
     // Notification discipline sur le trade saisi (nouveaux trades uniquement)
@@ -11921,7 +11873,7 @@
   function mffuRealAccounts() {
     return [
       { id: 'mffu-50k', name: 'MFFU 50K', firm: 'MFFU', role: 'master', size: 50000, risk: 125.60, multiplier: 1, status: 'challenge', dll: 0, trailing: 2000, payoutTarget: 3000, currentBalance: 50000, realPnl: 1190.04 },
-      { id: 'mffu-25k', name: 'MFFU 25K', firm: 'MFFU', role: 'master', size: 25000, risk: 62.80, multiplier: 1, status: 'challenge', dll: 0, trailing: 1000, payoutTarget: 1500, currentBalance: 25000, realPnl: 154.88 },
+      { id: 'mffu-25k', name: 'MFFU 25K', firm: 'MFFU', role: 'follower', size: 25000, risk: 62.80, multiplier: 1, status: 'challenge', dll: 0, trailing: 1000, payoutTarget: 1500, currentBalance: 25000, realPnl: 154.88 },
     ];
   }
   // Defaults if nothing saved
@@ -11930,17 +11882,15 @@
   }
   // Bouton Paramètres → recharge la vraie config MFFU sans toucher aux trades
   function loadMffuRealAccounts() {
-    if (!confirm('Repartir propre sur tes 2 comptes MFFU ?\n\n• 50K et 25K aux bons chiffres (taille, drawdown, cible)\n• P&L réel de base : 50K $1190.04 · 25K $154.88\n• Comptes INDÉPENDANTS — AUCUNE copie auto, saisie 100% manuelle\n\n(les trades ne sont pas effacés à cette étape)')) return;
+    if (!confirm('Repartir propre sur tes 2 comptes MFFU ?\n\n• 50K = MASTER (tu saisis tes trades dessus)\n• 25K = FOLLOWER ×1 (copie le master, ajuste le multiplicateur)\n• Bases : 50K $1190.04 · 25K $154.88\n\n(les trades ne sont pas effacés à cette étape)')) return;
     ACCOUNTS = mffuRealAccounts();
     ROTATION_WEEKS = [];
-    PREFS.multiAccount = false; savePrefs();
-    const cb = document.getElementById('pref-multiAccount'); if (cb) cb.checked = false;
     saveAccountsAndRotation();
     if (TRADES.length && confirm('Tu as ' + TRADES.length + ' trade(s) enregistrés.\nLes EFFACER pour repartir totalement à zéro ?\n\nOK = tout effacer · Annuler = je les garde')) {
       TRADES.length = 0; saveTrades();
     }
     render();
-    alert('✅ Comptes remis propre : 50K à $1 190,04 · 25K à $154,88. Saisie manuelle, pas de copie auto.');
+    alert('✅ Comptes remis propre : 50K master ($1 190,04) · 25K follower ×1 ($154,88). Saisis sur le 50K, le 25K suit.');
   }
 
   function loadAccountsAndRotation() {
