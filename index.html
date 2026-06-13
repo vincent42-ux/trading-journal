@@ -5236,10 +5236,10 @@
             </label>
           </div>
           <button class="btn" onclick="switchToMonoAccount()" style="width:100%; margin-top:10px; border-color:var(--amber); color:var(--amber);">🧹 Passer en mono-compte (supprime les lignes & comptes followers)</button>
-          <button class="btn" onclick="loadMffuRealAccounts()" style="width:100%; margin-top:10px; border-color:var(--accent); color:var(--accent);">📥 Recharger ma config MFFU réelle (50K + 25K)</button>
+          <button class="btn" onclick="loadMffuRealAccounts()" style="width:100%; margin-top:10px; border-color:var(--accent); color:var(--accent);">🔄 Repartir propre (50K + 25K, manuel, sans copie auto)</button>
           <button class="btn" onclick="runIntegrityCheck()" style="width:100%; margin-top:10px;">Vérifier l'intégrité des données</button>
           <div id="integrity-result" style="margin-top:10px;"></div>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-14 · r12</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-14 · r13</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -11920,8 +11920,8 @@
   // Pas de DLL pendant l'éval (dll: 0). Copy-trading : 25K = master, 50K = follower ×2.
   function mffuRealAccounts() {
     return [
+      { id: 'mffu-50k', name: 'MFFU 50K', firm: 'MFFU', role: 'master', size: 50000, risk: 125.60, multiplier: 1, status: 'challenge', dll: 0, trailing: 2000, payoutTarget: 3000, currentBalance: 50000, realPnl: 1190.04 },
       { id: 'mffu-25k', name: 'MFFU 25K', firm: 'MFFU', role: 'master', size: 25000, risk: 62.80, multiplier: 1, status: 'challenge', dll: 0, trailing: 1000, payoutTarget: 1500, currentBalance: 25000, realPnl: 154.88 },
-      { id: 'mffu-50k', name: 'MFFU 50K', firm: 'MFFU', role: 'follower', size: 50000, risk: 125.60, multiplier: 2, status: 'challenge', dll: 0, trailing: 2000, payoutTarget: 3000, currentBalance: 50000, realPnl: 1190.04 },
     ];
   }
   // Defaults if nothing saved
@@ -11930,15 +11930,17 @@
   }
   // Bouton Paramètres → recharge la vraie config MFFU sans toucher aux trades
   function loadMffuRealAccounts() {
-    if (!confirm('Recharger tes 2 comptes MFFU (50K + 25K) en mode copie auto ?\n\n• 25K = master, 50K = follower ×2\n• Mode multi-comptes activé (tes trades sur le master se copient)\n• P&L calculé en live depuis tes trades\n\nTes trades ne sont PAS touchés.')) return;
+    if (!confirm('Repartir propre sur tes 2 comptes MFFU ?\n\n• 50K et 25K aux bons chiffres (taille, drawdown, cible)\n• P&L réel de base : 50K $1190.04 · 25K $154.88\n• Comptes INDÉPENDANTS — AUCUNE copie auto, saisie 100% manuelle\n\n(les trades ne sont pas effacés à cette étape)')) return;
     ACCOUNTS = mffuRealAccounts();
     ROTATION_WEEKS = [];
+    PREFS.multiAccount = false; savePrefs();
+    const cb = document.getElementById('pref-multiAccount'); if (cb) cb.checked = false;
     saveAccountsAndRotation();
-    PREFS.multiAccount = true; savePrefs();
-    const cb = document.getElementById('pref-multiAccount'); if (cb) cb.checked = true;
+    if (TRADES.length && confirm('Tu as ' + TRADES.length + ' trade(s) enregistrés.\nLes EFFACER pour repartir totalement à zéro ?\n\nOK = tout effacer · Annuler = je les garde')) {
+      TRADES.length = 0; saveTrades();
+    }
     render();
-    if (typeof pushNotif === 'function') pushNotif('info', '📥', 'Comptes MFFU rechargés en copie auto : 25K master · 50K follower ×2. Saisis tes trades sur le 25K, le 50K suit.', null);
-    alert('✅ Comptes MFFU à jour en mode copie auto : 25K master + 50K follower ×2.');
+    alert('✅ Comptes remis propre : 50K à $1 190,04 · 25K à $154,88. Saisie manuelle, pas de copie auto.');
   }
 
   function loadAccountsAndRotation() {
