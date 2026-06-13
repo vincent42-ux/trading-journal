@@ -3439,11 +3439,28 @@
     background: rgba(255, 255, 255, 0.16); color: #fff;
     font-family: 'JetBrains Mono', monospace;
   }
-  .account-banner-status.validated {
-    background: rgba(34, 211, 154, 0.25);
-    color: #22d39a;
-    border: 1px solid rgba(34, 211, 154, 0.5);
+  .account-banner-status.validated { background: rgba(34, 211, 154, 0.25); color: #22d39a; border: 1px solid rgba(34, 211, 154, 0.5); }
+  .account-banner-status.st-funded { background: rgba(34, 211, 154, 0.22); color: #22d39a; border: 1px solid rgba(34, 211, 154, 0.45); }
+  .account-banner-status.st-challenge { background: rgba(167, 139, 250, 0.25); color: #c4b5fd; border: 1px solid rgba(167, 139, 250, 0.5); }
+  .account-banner-status.st-eval { background: rgba(56, 189, 248, 0.22); color: #7dd3fc; border: 1px solid rgba(56, 189, 248, 0.45); }
+  .account-banner-status.st-paused { background: rgba(148, 163, 184, 0.22); color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.4); }
+  .account-banner-status.st-blown { background: rgba(255, 77, 107, 0.25); color: #ff8fa3; border: 1px solid rgba(255, 77, 107, 0.55); }
+  /* Carte d'un compte cramé : grisée et barrée d'un voile rouge */
+  .account-card.is-blown { opacity: 0.62; filter: grayscale(0.45); }
+  .account-card.is-blown .account-card-banner { filter: saturate(0.5); }
+  /* Onglets de filtre des comptes */
+  .account-tabs {
+    display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;
   }
+  .account-tab {
+    padding: 7px 14px; border-radius: 99px; cursor: pointer;
+    font-size: 12px; font-weight: 600; letter-spacing: 0.02em;
+    background: var(--bg-2); border: 1px solid var(--border); color: var(--text-2);
+    transition: all 0.18s ease; user-select: none;
+  }
+  .account-tab:hover { color: var(--text-1); border-color: var(--accent); }
+  .account-tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .account-tab .tab-count { opacity: 0.7; font-weight: 700; margin-left: 4px; }
   .acc-info-line {
     display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
     font-size: 12px; color: var(--text-2);
@@ -4281,6 +4298,7 @@
           </div>
           <button class="btn btn-primary" onclick="openAccountModal()">+ Nouveau compte</button>
         </div>
+        <div class="account-tabs" id="account-tabs"></div>
         <div id="accounts-grid-dyn"></div>
       </section>
 
@@ -5618,6 +5636,7 @@
               <option value="funded">Funded</option>
               <option value="evaluation">Évaluation</option>
               <option value="paused">En pause</option>
+              <option value="blown">💀 Cramé / Échoué</option>
             </select>
           </div>
         </div>
@@ -10076,6 +10095,17 @@
     document.getElementById('firm-rules-modal-backdrop').classList.remove('show');
   }
 
+  // ----- Filtre des comptes (onglets Tous / Actifs / Validés / Cramés) -----
+  let ACCT_TAB_FILTER = 'all';
+  function setAccountFilter(f) { ACCT_TAB_FILTER = f; renderAccounts(); }
+  function accountCategory(acc) {
+    if (acc.status === 'blown') return 'blown';
+    const pnl = TRADES.filter(t => t.account === acc.name).reduce((sum, t) => sum + (t.pnl || 0), 0);
+    const target = acc.payoutTarget || 0;
+    if (target > 0 && pnl >= target) return 'validated';
+    return 'active';
+  }
+
   function renderAccounts(s) {
     const container = document.getElementById('accounts-grid-dyn');
     if (!container) return;
@@ -10088,12 +10118,37 @@
     // Master toujours en premier — c'est lui qui compte
     const ACCOUNTS_SORTED = ACCOUNTS.slice().sort((a, b) => (a.role === 'master' ? -1 : 1) - (b.role === 'master' ? -1 : 1));
 
+    // Onglets de filtre + comptage par catégorie
+    const _cats = ACCOUNTS_SORTED.map(accountCategory);
+    const _counts = {
+      all: ACCOUNTS_SORTED.length,
+      active: _cats.filter(c => c === 'active').length,
+      validated: _cats.filter(c => c === 'validated').length,
+      blown: _cats.filter(c => c === 'blown').length
+    };
+    const _tabsEl = document.getElementById('account-tabs');
+    if (_tabsEl) {
+      _tabsEl.innerHTML = (ACCOUNTS_SORTED.length <= 1) ? '' : [
+        { key: 'all', label: 'Tous' },
+        { key: 'active', label: '🟢 Actifs' },
+        { key: 'validated', label: '🏆 Validés' },
+        { key: 'blown', label: '💀 Cramés' }
+      ].map(t => `<div class="account-tab ${ACCT_TAB_FILTER === t.key ? 'active' : ''}" onclick="setAccountFilter('${t.key}')">${t.label}<span class="tab-count">${_counts[t.key] || 0}</span></div>`).join('');
+    }
+    // Application du filtre
+    let _visible = ACCOUNTS_SORTED;
+    if (ACCT_TAB_FILTER !== 'all') _visible = ACCOUNTS_SORTED.filter(a => accountCategory(a) === ACCT_TAB_FILTER);
+    if (!_visible.length) {
+      container.innerHTML = '<div class="empty-state" style="padding:40px;">Aucun compte dans cette catégorie.</div>';
+      return;
+    }
+
     // Clé du jour (format JJ/MM/AAAA + legacy JJ/MM)
     const _d = new Date();
     const _todayFull = `${String(_d.getDate()).padStart(2,'0')}/${String(_d.getMonth()+1).padStart(2,'0')}/${_d.getFullYear()}`;
     const _todayShort = _todayFull.slice(0, 5);
 
-    container.innerHTML = ACCOUNTS_SORTED.map(acc => {
+    container.innerHTML = _visible.map(acc => {
       const accTrades = TRADES.filter(t => t.account === acc.name);
       const pnl = accTrades.reduce((sum, t) => sum + (t.pnl || 0), 0);
       const balance = (acc.currentBalance || acc.size) + pnl;
@@ -10123,13 +10178,15 @@
       // Jours tradés (dates distinctes)
       const daysTraded = new Set(accTrades.map(t => t.date).filter(Boolean)).size;
 
-      const statusLabel = validated ? 'VALIDÉ ✓' : acc.status === 'funded' ? 'FUNDED' : acc.status === 'challenge' ? 'CHALLENGE' : acc.status === 'paused' ? 'PAUSE' : 'ÉVAL';
-      if (validated && typeof pushNotif === 'function') {
+      const isBlown = acc.status === 'blown';
+      const statusLabel = isBlown ? 'CRAMÉ 💀' : validated ? 'VALIDÉ ✓' : acc.status === 'funded' ? 'FUNDED' : acc.status === 'challenge' ? 'CHALLENGE' : acc.status === 'paused' ? 'PAUSE' : 'ÉVAL';
+      const statusClass = isBlown ? 'st-blown' : validated ? 'validated' : acc.status === 'funded' ? 'st-funded' : acc.status === 'challenge' ? 'st-challenge' : acc.status === 'paused' ? 'st-paused' : 'st-eval';
+      if (validated && !isBlown && typeof pushNotif === 'function') {
         pushNotif('info', '🏆', `<strong>${acc.name} VALIDÉ !</strong> Objectif de $${targetPnl.toLocaleString()} atteint (${fmt$(pnl)}) — bravo !`, 'validated-' + acc.id);
       }
 
       return `
-        <div class="account-card firm-${slug}">
+        <div class="account-card firm-${slug}${isBlown ? ' is-blown' : ''}">
           <div class="account-card-banner">
             <div class="account-banner-content">
               <div>
@@ -10137,7 +10194,7 @@
                 <div class="account-banner-name">${acc.name}</div>
               </div>
               <div style="display:flex; flex-direction:column; gap:5px; align-items:flex-end;">
-                <span class="account-banner-status ${validated ? 'validated' : ''}">${statusLabel}</span>
+                <span class="account-banner-status ${statusClass}">${statusLabel}</span>
                 <span class="acc-role-badge">${isMaster ? '👑 MASTER' : '↳ FOLLOWER ×' + (acc.multiplier || 1)}</span>
               </div>
             </div>
@@ -11714,7 +11771,7 @@
     const week = ROTATION_WEEKS.find(w => w.mondayISO === cur);
     if (!week) {
       // No rotation defined → all accounts active by default
-      return ACCOUNTS.filter(a => a.status !== 'paused');
+      return ACCOUNTS.filter(a => a.status !== 'paused' && a.status !== 'blown');
     }
     return ACCOUNTS.filter(a => week.accountIds.includes(a.id));
   }
