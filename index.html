@@ -5233,7 +5233,7 @@
           <button class="btn" onclick="loadMffuRealAccounts()" style="width:100%; margin-top:10px; border-color:var(--accent); color:var(--accent);">🔄 Repartir propre (50K master + 25K follower)</button>
           <button class="btn" onclick="runIntegrityCheck()" style="width:100%; margin-top:10px;">Vérifier l'intégrité des données</button>
           <div id="integrity-result" style="margin-top:10px;"></div>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-14 · r15</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-14 · r16</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -5249,6 +5249,8 @@
               <button class="btn" onclick="resetSingleAccount()" style="width:100%; color:var(--amber); border-color:var(--amber);">Vider ce compte</button>
             </div>
           </div>
+          <button class="btn" onclick="wipeAllTrades()" style="width:100%; margin-top:12px; color:var(--red); border-color:var(--red);">🧹 Tout remettre à zéro (efface tous les trades, local + cloud)</button>
+          <p style="font-size:11px; color:var(--text-3); margin-top:8px;">Repart propre pour la semaine. Tes comptes et leurs bases sont conservés. Les trades ne reviendront pas du cloud.</p>
         </div>
 
         <!-- Zone de danger -->
@@ -12289,6 +12291,21 @@
   }
 
   // ========== DEMO TRADES (15 trades pour tester le dashboard) + RESET ==========
+  // Tout remettre à zéro : efface les trades en local ET dans le cloud (marqueur de wipe → pas de résurrection)
+  function wipeAllTrades() {
+    if (!confirm('Tout remettre à ZÉRO pour repartir propre cette semaine ?\n\n• Efface TOUS tes trades (local + cloud)\n• Stats, R, P&L des trades repartent à zéro\n• Tes comptes et leurs bases sont CONSERVÉS\n\nLes trades ne reviendront pas du cloud. Irréversible.')) return;
+    TRADES.length = 0;
+    if (typeof SESSION !== 'undefined' && SESSION) { SESSION.tradeIds = []; if (typeof saveSession === 'function') saveSession(); }
+    const now = Date.now();
+    try { localStorage.setItem('wipe_token', String(now)); } catch (e) {}
+    try { localStorage.setItem('last_local_change', String(now)); } catch (e) {}
+    saveTrades();
+    render();
+    if (typeof syncEnabled === 'function' && syncEnabled() && typeof syncPush === 'function') {
+      syncPush(); // pousse l'état vide + le marqueur de wipe vers le cloud immédiatement
+    }
+    alert('✅ Tout est à zéro. Site propre pour la semaine — les trades ne reviendront pas.');
+  }
   function loadDemoTrades() {
     if (TRADES.length > 0) {
       if (!confirm(`${TRADES.length} trade(s) déjà présents. Les remplacer par les 15 trades démo ?`)) return;
@@ -12595,6 +12612,7 @@
       version: 2,
       kind: 'tj_full_backup',
       exportedAt: new Date().toISOString(),
+      wipeToken: parseInt(localStorage.getItem('wipe_token') || '0'),
       trades: TRADES,
       accounts: ACCOUNTS,
       rotationWeeks: ROTATION_WEEKS,
@@ -12732,6 +12750,18 @@
       const remote = JSON.parse(content);
       const remoteTs = remote.exportedAt ? new Date(remote.exportedAt).getTime() : 0;
       const localTs = parseInt(localStorage.getItem('last_local_change') || '0');
+      // Un « tout remettre à zéro » distant plus récent → on REMPLACE (pas de fusion), les trades effacés le restent
+      const remoteWipe = parseInt(remote.wipeToken || 0);
+      const localWipe = parseInt(localStorage.getItem('wipe_token') || '0');
+      if (remoteWipe > localWipe) {
+        applyBackupData(remote, false);
+        try { localStorage.setItem('wipe_token', String(remoteWipe)); } catch (e2) {}
+        try { localStorage.setItem('last_local_change', String(remoteTs || Date.now())); } catch (e2) {}
+        SYNC.lastSync = Date.now(); saveSyncConfig();
+        if (typeof render === 'function') render();
+        setSyncStatus('☁️ Synchronisé (remise à zéro appliquée)', 'ok');
+        return;
+      }
       if (remoteTs > localTs) {
         applyBackupData(remote, true); // fusion des trades par id : on ne perd jamais rien
         try { localStorage.setItem('last_local_change', String(remoteTs)); } catch (e2) {}
