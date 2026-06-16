@@ -5238,7 +5238,7 @@
           <button class="btn" onclick="runIntegrityCheck()" style="width:100%; margin-top:10px;">Vérifier l'intégrité des données</button>
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-14 · r18</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-14 · r19</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -6376,12 +6376,23 @@
     return [...primary.values()];
   }
 
+  // Résultat d'un trade : le résultat saisi (TP/SL/BE) prime, sinon dérivé du P&L.
+  // Permet de compter correctement les gagnants même quand le trade est saisi en R sans dollars.
+  function tradeOutcome(t) {
+    if (!t) return 'BE';
+    if (t.result === 'TP' || t.result === 'SL' || t.result === 'BE') return t.result;
+    const p = t.pnl || 0;
+    return p > 0.01 ? 'TP' : p < -0.01 ? 'SL' : 'BE';
+  }
+  function isWinTrade(t) { return tradeOutcome(t) === 'TP'; }
+  function isLossTrade(t) { return tradeOutcome(t) === 'SL'; }
+
   function computeStats(trades) {
     if (!trades.length) return null;
     // Count logical trades (1 master+followers group = 1 trade)
     const logical = uniqueLogicalTrades(trades);
-    const wins = logical.filter(t => t.pnl > 0);
-    const losses = logical.filter(t => t.pnl < 0);
+    const wins = logical.filter(isWinTrade);
+    const losses = logical.filter(isLossTrade);
     // Total P&L sums all filtered trades (so the multi-account total is shown)
     const totalPnl = trades.reduce((s, t) => s + (t.pnl || 0), 0);
     // Win/loss aggregates use logical trades only (representative P&L)
@@ -6397,16 +6408,16 @@
     // Streaks (logical)
     let maxWS = 0, maxLS = 0, curWS = 0, curLS = 0, curStreak = 0;
     for (const t of logical) {
-      if (t.pnl > 0) { curWS++; curLS = 0; maxWS = Math.max(maxWS, curWS); }
-      else if (t.pnl < 0) { curLS++; curWS = 0; maxLS = Math.max(maxLS, curLS); }
+      if (isWinTrade(t)) { curWS++; curLS = 0; maxWS = Math.max(maxWS, curWS); }
+      else if (isLossTrade(t)) { curLS++; curWS = 0; maxLS = Math.max(maxLS, curLS); }
     }
     for (let i = logical.length - 1; i >= 0; i--) {
       if (i === logical.length - 1) {
-        curStreak = logical[i].pnl > 0 ? 1 : logical[i].pnl < 0 ? -1 : 0;
+        curStreak = isWinTrade(logical[i]) ? 1 : isLossTrade(logical[i]) ? -1 : 0;
         continue;
       }
-      if (curStreak > 0 && logical[i].pnl > 0) curStreak++;
-      else if (curStreak < 0 && logical[i].pnl < 0) curStreak--;
+      if (curStreak > 0 && isWinTrade(logical[i])) curStreak++;
+      else if (curStreak < 0 && isLossTrade(logical[i])) curStreak--;
       else break;
     }
 
@@ -6684,8 +6695,8 @@
     if (biasContainer) {
       const longs = logical.filter(t => t.side === 'LONG');
       const shorts = logical.filter(t => t.side === 'SHORT');
-      const lWR = longs.length ? (longs.filter(t => t.pnl > 0).length / longs.length * 100).toFixed(0) : '—';
-      const sWR = shorts.length ? (shorts.filter(t => t.pnl > 0).length / shorts.length * 100).toFixed(0) : '—';
+      const lWR = longs.length ? (longs.filter(isWinTrade).length / longs.length * 100).toFixed(0) : '—';
+      const sWR = shorts.length ? (shorts.filter(isWinTrade).length / shorts.length * 100).toFixed(0) : '—';
       const lP = longs.reduce((s, t) => s + t.pnl, 0);
       const sP = shorts.reduce((s, t) => s + t.pnl, 0);
       biasContainer.innerHTML = `<table style="width:100%; font-size:13px;">
@@ -6801,8 +6812,8 @@
     const calme = logical.filter(t => t.rules && t.rules.mental === 'calme');
     const pasCalme = logical.filter(t => t.rules && t.rules.mental && t.rules.mental !== 'calme');
     if (calme.length >= 3 && pasCalme.length >= 3) {
-      const wrCalme = calme.filter(t => t.pnl > 0).length / calme.length * 100;
-      const wrPas = pasCalme.filter(t => t.pnl > 0).length / pasCalme.length * 100;
+      const wrCalme = calme.filter(isWinTrade).length / calme.length * 100;
+      const wrPas = pasCalme.filter(isWinTrade).length / pasCalme.length * 100;
       if (wrCalme - wrPas > 10) {
         insights.push({ cls: 'positive', icon: '🧠', html: `Calme tu gagnes <strong>${wrCalme.toFixed(0)}%</strong> du temps vs ${wrPas.toFixed(0)}% sinon — ne trade que reposé` });
       }
@@ -6852,7 +6863,7 @@
     const statsFor = (y, m) => {
       const ts = logical.filter(t => { const d = parseTradeDate(t.date); return d && d.getFullYear() === y && d.getMonth() === m; });
       const risk = PLAN.riskPerTrade > 0 ? PLAN.riskPerTrade : 62.80;
-      const wins = ts.filter(t => t.pnl > 0).length;
+      const wins = ts.filter(isWinTrade).length;
       const r = ts.reduce((s, t) => s + tradeRValue(t, risk), 0);
       const pnl = ts.reduce((s, t) => s + (t.pnl || 0), 0);
       const withRules = ts.filter(t => t.rules);
@@ -8111,7 +8122,7 @@
       const labels = [];
       for (let i = window10 - 1; i < logical.length; i++) {
         const slice = logical.slice(i - window10 + 1, i + 1);
-        const wins = slice.filter(t => t.pnl > 0).length;
+        const wins = slice.filter(isWinTrade).length;
         data.push((wins / slice.length) * 100);
         labels.push(`#${i + 1}`);
       }
@@ -8232,7 +8243,7 @@
       const rows = Object.entries(buckets).map(([k, arr]) => {
         if (!arr.length) return `<tr><td class="text muted">${k}</td><td colspan="2" style="text-align:right;" class="muted">—</td></tr>`;
         const total = arr.reduce((s, t) => s + (t.pnl || 0), 0);
-        const wr = arr.filter(t => t.pnl > 0).length / arr.length * 100;
+        const wr = arr.filter(isWinTrade).length / arr.length * 100;
         return `<tr><td class="text muted">${k}</td><td style="text-align:right;">${arr.length} t · WR ${wr.toFixed(0)}%</td><td style="text-align:right;" class="${total>=0?'pos':'neg'} mono">${fmt$(total)}</td></tr>`;
       }).join('');
       sleepContainer.innerHTML = `<table style="width:100%; font-size:13px;"><tbody>${rows}</tbody></table>`;
@@ -9355,9 +9366,9 @@
 
     // === MÉTRIQUES DE BASE ===
     const totalPnl = weekTrades.reduce((s, t) => s + (t.pnl || 0), 0);
-    const wins = weekTrades.filter(t => t.pnl > 0);
-    const losses = weekTrades.filter(t => t.pnl < 0);
-    const be = weekTrades.filter(t => t.pnl === 0);
+    const wins = weekTrades.filter(isWinTrade);
+    const losses = weekTrades.filter(isLossTrade);
+    const be = weekTrades.filter(t => tradeOutcome(t) === 'BE');
     const wr = wins.length / weekTrades.length * 100;
     const best = weekTrades.reduce((b, t) => t.pnl > b.pnl ? t : b);
     const worst = weekTrades.reduce((w, t) => t.pnl < w.pnl ? t : w);
@@ -9382,7 +9393,7 @@
       const k = r.setup === 'absorption' ? 'Absorption' : r.setup === 'exhaustion' ? 'Exhaustion' : r.setup === 'divergence' ? 'Divergence' : 'Sans setup';
       if (!setupStats[k]) setupStats[k] = { n: 0, wins: 0, pnl: 0 };
       setupStats[k].n++; setupStats[k].pnl += (t.pnl || 0);
-      if (t.pnl > 0) setupStats[k].wins++;
+      if (isWinTrade(t)) setupStats[k].wins++;
     }
     const setupRanked = Object.entries(setupStats).sort((a, b) => b[1].pnl - a[1].pnl);
     const bestSetup = setupRanked[0];
@@ -10320,7 +10331,7 @@
       const validated = targetPnl > 0 && pnl >= targetPnl;
       const isChallenge = (phase === 'challenge');
 
-      const wins = accTrades.filter(t => t.pnl > 0);
+      const wins = accTrades.filter(isWinTrade);
       const wr = accTrades.length ? (wins.length / accTrades.length * 100) : 0;
       // Modèle de Vincent : sous le solde de départ → on suit le DRAWDOWN (droit donné) ;
       // au-dessus → on suit l'OBJECTIF. Jamais les deux en même temps.
@@ -13094,7 +13105,7 @@
     const bySetup = {}, byHour = {};
     const bump = (obj, key, t) => {
       const o = (obj[key] = obj[key] || { n: 0, wins: 0, pnl: 0, r: 0 });
-      o.n++; o.pnl += (t.pnl || 0); o.r += tradeRValue(t, masterRisk); if ((t.pnl || 0) > 0) o.wins++;
+      o.n++; o.pnl += (t.pnl || 0); o.r += tradeRValue(t, masterRisk); if (isWinTrade(t)) o.wins++;
     };
     for (const t of trades) {
       const r = t.rules || {};
