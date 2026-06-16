@@ -5226,7 +5226,7 @@
           <button class="btn" onclick="runIntegrityCheck()" style="width:100%; margin-top:10px;">Vérifier l'intégrité des données</button>
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-14 · r21</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-14 · r22</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -6626,7 +6626,7 @@
       if (!bySetup[k]) bySetup[k] = { n: 0, wins: 0, pnl: 0 };
       bySetup[k].n++;
       bySetup[k].pnl += (t.pnl || 0);
-      if (t.pnl > 0) bySetup[k].wins++;
+      if (isWinTrade(t)) bySetup[k].wins++;
     }
     const setupContainer = document.getElementById('stats-by-setup');
     if (setupContainer) {
@@ -6654,7 +6654,7 @@
       if (!byMental[k]) byMental[k] = { n: 0, wins: 0, pnl: 0 };
       byMental[k].n++;
       byMental[k].pnl += (t.pnl || 0);
-      if (t.pnl > 0) byMental[k].wins++;
+      if (isWinTrade(t)) byMental[k].wins++;
     }
     const mentalContainer = document.getElementById('stats-by-mental');
     if (mentalContainer) {
@@ -6738,7 +6738,7 @@
       if (isNaN(h)) continue;
       if (!byHour[h]) byHour[h] = { n: 0, pnl: 0, wins: 0 };
       byHour[h].n++; byHour[h].pnl += (t.pnl || 0);
-      if (t.pnl > 0) byHour[h].wins++;
+      if (isWinTrade(t)) byHour[h].wins++;
     }
     let bestHour = null, worstHour = null;
     for (const [h, d] of Object.entries(byHour)) {
@@ -7316,13 +7316,14 @@
       const masterAcc = ACCOUNTS.find(a => a.role === 'master') || ACCOUNTS[0];
       const datasets = [{ data, borderColor: color, backgroundColor: grad, borderWidth: 2.5, fill: true, tension: 0.35, pointRadius: 0, pointHoverRadius: 5, pointHoverBackgroundColor: color, order: 1 }];
       const maxData = Math.max(...data, 0), minData = Math.min(...data, 0);
-      if (masterAcc && masterAcc.payoutTarget > 0 && masterRisk > 0) {
-        const targetR = masterAcc.payoutTarget / masterRisk;
-        // Affichée seulement si elle n'écrase pas la courbe (échelle raisonnable)
-        if (targetR <= Math.max(maxData * 4, 6)) {
-          datasets.push({ data: labels.map(() => targetR), borderColor: c.amber, borderDash: [6, 5], borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 0, fill: false, order: 2 });
-          totalDisplay += ` · <span style="color:var(--amber);">┅ objectif +${targetR.toFixed(0)}R</span>`;
-        }
+      // Ligne objectif calée sur la PÉRIODE (jour/semaine/mois) selon ton plan
+      const _plan = (typeof PLAN !== 'undefined' && PLAN) ? PLAN : {};
+      const targetR = R_MODE === 'day' ? (_plan.targetRDay || 0)
+                    : R_MODE === 'week' ? (_plan.targetRWeek || 0)
+                    : (_plan.targetRWeek || 0) * 4; // mois ≈ 4 semaines
+      if (targetR > 0) {
+        datasets.push({ data: labels.map(() => targetR), borderColor: c.amber, borderDash: [6, 5], borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 0, fill: false, order: 2 });
+        totalDisplay += ` · <span style="color:var(--amber);">┅ objectif ${_periodLbl} +${(targetR % 1 ? targetR.toFixed(1) : targetR.toFixed(0))}R</span>`;
       }
       if (masterAcc && masterAcc.trailing > 0 && masterRisk > 0) {
         const ddR = -(masterAcc.trailing / masterRisk);
@@ -7968,7 +7969,7 @@
       if (!expBySetup[k]) expBySetup[k] = { n: 0, totalPnl: 0, wins: 0 };
       expBySetup[k].n++;
       expBySetup[k].totalPnl += (t.pnl || 0);
-      if (t.pnl > 0) expBySetup[k].wins++;
+      if (isWinTrade(t)) expBySetup[k].wins++;
     }
     const expContainer = document.getElementById('stats-expectancy-setup');
     if (expContainer) {
@@ -8026,11 +8027,11 @@
     for (let i = 1; i < logical.length; i++) {
       general.n++;
       general.totalPnl += logical[i].pnl;
-      if (logical[i].pnl > 0) general.wins++;
-      if (logical[i - 1].pnl < 0) {
+      if (isWinTrade(logical[i])) general.wins++;
+      if (isLossTrade(logical[i - 1])) {
         afterLoss.n++;
         afterLoss.totalPnl += logical[i].pnl;
-        if (logical[i].pnl > 0) afterLoss.wins++;
+        if (isWinTrade(logical[i])) afterLoss.wins++;
       }
     }
     const alContainer = document.getElementById('stats-after-loss');
@@ -8043,10 +8044,10 @@
       // Tilt inversé : surconfiance après 2 TP d'affilée
       const afterWins = { n: 0, wins: 0, totalPnl: 0 };
       for (let i = 2; i < logical.length; i++) {
-        if (logical[i - 1].pnl > 0 && logical[i - 2].pnl > 0) {
+        if (isWinTrade(logical[i - 1]) && isWinTrade(logical[i - 2])) {
           afterWins.n++;
           afterWins.totalPnl += logical[i].pnl;
-          if (logical[i].pnl > 0) afterWins.wins++;
+          if (isWinTrade(logical[i])) afterWins.wins++;
         }
       }
       const wrAfterWins = afterWins.n ? (afterWins.wins / afterWins.n * 100) : 0;
@@ -9416,7 +9417,7 @@
       if (!m) continue;
       if (!mentalStats[m]) mentalStats[m] = { n: 0, wins: 0, pnl: 0 };
       mentalStats[m].n++; mentalStats[m].pnl += (t.pnl || 0);
-      if (t.pnl > 0) mentalStats[m].wins++;
+      if (isWinTrade(t)) mentalStats[m].wins++;
     }
     const mentalLabels = { calme: '🟢 Calme', stresse: '🟡 Stressé', fatigue: '🟠 Fatigué', surconfiance: '🔴 Sur-confiance' };
 
@@ -9427,7 +9428,7 @@
       if (!dayPnl[t.date]) dayPnl[t.date] = { pnl: 0, trades: 0, wins: 0 };
       dayPnl[t.date].pnl += (t.pnl || 0);
       dayPnl[t.date].trades++;
-      if (t.pnl > 0) dayPnl[t.date].wins++;
+      if (isWinTrade(t)) dayPnl[t.date].wins++;
     }
     const daysTraded = Object.keys(dayPnl).length;
     const winningDays = Object.values(dayPnl).filter(d => d.pnl > 0).length;
@@ -9899,7 +9900,7 @@
 
     // Stats résumé filtré
     const totalPnl = tradesWithIndex.reduce((s, { t }) => s + (t.pnl || 0), 0);
-    const wins = tradesWithIndex.filter(({ t }) => t.pnl > 0).length;
+    const wins = tradesWithIndex.filter(({ t }) => isWinTrade(t)).length;
     const winrate = tradesWithIndex.length ? (wins / tradesWithIndex.length * 100).toFixed(0) : '0';
     const masterRisk = (ACCOUNTS.find(a => a.role === 'master') || ACCOUNTS[0] || { risk: 62.80 }).risk;
     const totalR = tradesWithIndex.reduce((s, { t }) => {
