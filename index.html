@@ -3913,7 +3913,7 @@
         <div class="row-2col" style="margin-bottom: 16px;">
           <div class="card">
             <div class="card-header">
-              <span class="card-title">Évolution de mes gains</span>
+              <span class="card-title">Évolution de mes gains · cette semaine</span>
               <div class="mode-toggle">
                 <button class="mode-btn active" id="equity-mode-r" onclick="setEquityMode('r')">R cumulé</button>
                 <button class="mode-btn" id="equity-mode-day-pnl" onclick="setEquityMode('day-pnl')">$ par jour</button>
@@ -5238,7 +5238,7 @@
           <button class="btn" onclick="runIntegrityCheck()" style="width:100%; margin-top:10px;">Vérifier l'intégrité des données</button>
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-14 · r19</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-14 · r20</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -7280,10 +7280,20 @@
     if (window.allCharts.equity) window.allCharts.equity.destroy();
     const masterRisk = (ACCOUNTS.find(a => a.role === 'master') || ACCOUNTS[0] || { risk: 62.80 }).risk;
 
+    // Graphique limité à la SEMAINE EN COURS (lundi → dimanche)
+    const _now = new Date();
+    const _dow = (_now.getDay() + 6) % 7;
+    const _monday = new Date(_now); _monday.setDate(_now.getDate() - _dow); _monday.setHours(0, 0, 0, 0);
+    const _sunday = new Date(_monday); _sunday.setDate(_monday.getDate() + 6); _sunday.setHours(23, 59, 59, 999);
+    const logicalWeek = ((s && s.logical) || []).filter(t => {
+      const d = parseTradeDate(t.date);
+      return d && d >= _monday && d <= _sunday;
+    });
+
     let chartConfig;
     let totalDisplay = '';
 
-    if (!s || !s.logical || !s.logical.length) {
+    if (!logicalWeek.length) {
       // Empty state
       chartConfig = {
         type: 'line',
@@ -7293,19 +7303,19 @@
     } else if (EQUITY_MODE === 'r') {
       // R cumulé sur les trades
       let cum = 0;
-      const data = s.logical.map(t => {
+      const data = logicalWeek.map(t => {
         const r = tradeRValue(t, masterRisk);
         cum += r;
         return cum;
       });
-      const labels = s.logical.map((t, i) => t.date ? `${t.date}` : `#${i + 1}`);
+      const labels = logicalWeek.map((t, i) => t.date ? `${t.date}` : `#${i + 1}`);
       // Drawdown max en R (profondeur depuis le plus haut de la courbe)
       let ddPeak = 0, ddMax = 0;
       for (const v of data) {
         if (v > ddPeak) ddPeak = v;
         if (ddPeak - v > ddMax) ddMax = ddPeak - v;
       }
-      totalDisplay = `<span class="${cum >= 0 ? 'pos' : 'neg'}" style="font-weight:700;">${cum >= 0 ? '+' : ''}${cum.toFixed(1)}R cumulés</span> sur ${s.logical.length} trade${s.logical.length > 1 ? 's' : ''}${ddMax > 0 ? ` · <span style="color:var(--red);">DD max −${ddMax.toFixed(1)}R</span>` : ''}`;
+      totalDisplay = `<span class="${cum >= 0 ? 'pos' : 'neg'}" style="font-weight:700;">${cum >= 0 ? '+' : ''}${cum.toFixed(1)}R cette semaine</span> sur ${logicalWeek.length} trade${logicalWeek.length > 1 ? 's' : ''}${ddMax > 0 ? ` · <span style="color:var(--red);">DD max −${ddMax.toFixed(1)}R</span>` : ''}`;
       const ctx = canvas.getContext('2d');
       const grad = ctx.createLinearGradient(0, 0, 0, 280);
       const color = cum >= 0 ? c.green : c.red;
@@ -7343,9 +7353,9 @@
         }
       };
     } else {
-      // $ par jour (barres)
+      // $ par jour (barres) — semaine en cours
       const byDay = {};
-      for (const t of s.logical) {
+      for (const t of logicalWeek) {
         if (!t.date) continue;
         byDay[t.date] = (byDay[t.date] || 0) + (t.pnl || 0);
       }
@@ -7355,7 +7365,7 @@
       });
       const data = sortedDates.map(d => byDay[d]);
       const totalP = data.reduce((a, b) => a + b, 0);
-      totalDisplay = `<span class="${totalP >= 0 ? 'pos' : 'neg'}" style="font-weight:700;">${fmt$(totalP)}</span> sur ${sortedDates.length} jour${sortedDates.length > 1 ? 's' : ''} tradé${sortedDates.length > 1 ? 's' : ''}`;
+      totalDisplay = `<span class="${totalP >= 0 ? 'pos' : 'neg'}" style="font-weight:700;">${fmt$(totalP)}</span> cette semaine · ${sortedDates.length} jour${sortedDates.length > 1 ? 's' : ''} tradé${sortedDates.length > 1 ? 's' : ''}`;
       chartConfig = {
         type: 'bar',
         data: { labels: sortedDates, datasets: [{
