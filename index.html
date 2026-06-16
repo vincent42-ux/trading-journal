@@ -5238,7 +5238,7 @@
           <button class="btn" onclick="runIntegrityCheck()" style="width:100%; margin-top:10px;">Vérifier l'intégrité des données</button>
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-14 · r17</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-14 · r18</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -10189,16 +10189,16 @@
   }
   function accountPnl(acc) {
     const hasReal = (acc.realPnl != null && acc.realPnl !== '' && !isNaN(Number(acc.realPnl)));
-    const base = hasReal ? Number(acc.realPnl) : 0;
     if (acc.role === 'follower') {
-      // Le follower SUIT le master : P&L = (somme des trades du master) × son multiplicateur, en dollars.
-      // Aucun trade n'est stocké sur le follower → zéro doublon possible.
+      // Follower : si un P&L réel est saisi → OVERRIDE ABSOLU (ton vrai chiffre MFFU, ex. quand la copie a divergé).
+      // Sinon → il copie le master : (somme des trades du master) × son multiplicateur, en dollars.
+      if (hasReal) return Number(acc.realPnl);
       const master = ACCOUNTS.find(a => a.role === 'master');
       const masterTrades = master ? accountTradesSum(master) : 0;
-      return base + masterTrades * (acc.multiplier || 1);
+      return masterTrades * (acc.multiplier || 1);
     }
-    // Master (ou compte indépendant) : base + ses propres trades.
-    return base + accountTradesSum(acc);
+    // Master (ou compte indépendant) : base (P&L réel) + ses propres trades.
+    return (hasReal ? Number(acc.realPnl) : 0) + accountTradesSum(acc);
   }
   // Copie active si le mode multi-comptes est coché OU s'il existe au moins un compte follower
   function copyTradingOn() {
@@ -10230,13 +10230,18 @@
     const acc = ACCOUNTS.find(a => a.id === id);
     if (!acc) return;
     const cur = accountPnl(acc); // valeur actuellement affichée
-    const v = prompt('P&L réel actuel de ' + acc.name + ' (en $, ex. 1190.04).\nTes prochains trades s\'ajouteront par-dessus.\nLaisse vide pour calculer uniquement depuis tes trades :', cur.toFixed(2));
+    const isFollower = acc.role === 'follower';
+    const hint = isFollower
+      ? 'P&L réel du follower ' + acc.name + ' (ton vrai chiffre MFFU).\nÇa FORCE la valeur (utile quand la copie a divergé).\nLaisse vide pour qu\'il recopie le master automatiquement :'
+      : 'P&L réel actuel de ' + acc.name + ' (en $, ex. 1190.04).\nTes prochains trades s\'ajouteront par-dessus.\nLaisse vide pour calculer uniquement depuis tes trades :';
+    const v = prompt(hint, cur.toFixed(2));
     if (v === null) return;
     if (String(v).trim() === '') {
       acc.realPnl = null;
     } else {
       const x = parseFloat(String(v).replace(',', '.')) || 0;
-      acc.realPnl = +(x - accountTradesSum(acc)).toFixed(2); // stocké en décalage → affichage = x, trades ajoutés ensuite
+      // Follower → valeur absolue (override). Master → décalage (affichage = x, les trades s'ajoutent).
+      acc.realPnl = isFollower ? x : +(x - accountTradesSum(acc)).toFixed(2);
     }
     delete acc.realPnlAtTrades;
     saveAccountsAndRotation();
@@ -10356,7 +10361,7 @@
               </div>
               <div style="display:flex; flex-direction:column; gap:5px; align-items:flex-end;">
                 <span class="account-banner-status ${statusClass}">${statusLabel}</span>
-                <span class="acc-role-badge${!isMaster ? ' clickable' : ''}"${!isMaster ? ` onclick="event.stopPropagation(); setMaster('${acc.id}')" title="Cliquer pour définir ce compte comme master"` : ''}>${isMaster ? '👑 MASTER' : '↳ FOLLOWER ×' + (acc.multiplier || 1)}</span>
+                <span class="acc-role-badge clickable" onclick="event.stopPropagation(); setMaster('${acc.id}')" title="${isMaster ? 'Master : tu saisis tes trades ici. Clique le badge d\'un autre compte pour déplacer le master.' : 'Cliquer pour faire de ce compte le master (les autres deviennent followers)'}">${isMaster ? '👑 MASTER' : '↳ FOLLOWER ×' + (acc.multiplier || 1)}</span>
               </div>
             </div>
           </div>
@@ -12109,14 +12114,14 @@
           TRADES.forEach(t => { if (t.account === prev.name) { t.account = data.name; moved++; } });
           if (moved > 0) saveTrades();
         }
-        // Le champ P&L réel = valeur affichée voulue → on stocke le décalage (les trades s'ajoutent ensuite)
-        if (data.realPnl != null) data.realPnl = +(data.realPnl - accountTradesSum({ name: data.name })).toFixed(2);
+        // Follower → P&L réel = valeur absolue (override). Master → décalage (les trades s'ajoutent ensuite).
+        if (data.realPnl != null && data.role !== 'follower') data.realPnl = +(data.realPnl - accountTradesSum({ name: data.name })).toFixed(2);
         ACCOUNTS[idx] = { ...prev, ...data };
         delete ACCOUNTS[idx].realPnlAtTrades; // champ obsolète
       }
     } else {
       const id = name.toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + Date.now().toString(36).slice(-4);
-      if (data.realPnl != null) data.realPnl = +(data.realPnl - accountTradesSum({ name: data.name })).toFixed(2);
+      if (data.realPnl != null && data.role !== 'follower') data.realPnl = +(data.realPnl - accountTradesSum({ name: data.name })).toFixed(2);
       ACCOUNTS.push({ id, ...data });
     }
     saveAccountsAndRotation();
