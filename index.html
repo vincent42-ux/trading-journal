@@ -4524,6 +4524,10 @@
 
         <!-- ===== ONGLET PERFORMANCE ===== -->
         <div class="stats-tab-panel" id="stats-tab-performance">
+        <div class="stats-section-title">Ce qui marche — par setup &amp; par heure</div>
+        <div class="card" style="margin-bottom:18px;">
+          <div class="card-body" id="setup-analysis"></div>
+        </div>
         <div class="stats-section-title">Records personnels</div>
         <div class="row-4col" style="margin-bottom: 18px;">
           <div class="card record-card record-best">
@@ -5233,7 +5237,8 @@
           <button class="btn" onclick="loadMffuRealAccounts()" style="width:100%; margin-top:10px; border-color:var(--accent); color:var(--accent);">🔄 Repartir propre (50K master + 25K follower)</button>
           <button class="btn" onclick="runIntegrityCheck()" style="width:100%; margin-top:10px;">Vérifier l'intégrité des données</button>
           <div id="integrity-result" style="margin-top:10px;"></div>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-14 · r16</strong></div>
+          <div id="storage-gauge" style="margin-top:14px;"></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-14 · r17</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -6486,6 +6491,8 @@
     if (typeof renderReplayMental === 'function') _safe(() => renderReplayMental(), 'renderReplayMental');
     _safe(() => renderWeeklyReport(), 'renderWeeklyReport');
     if (typeof renderBacktest === 'function') _safe(() => renderBacktest(), 'renderBacktest');
+    if (typeof renderStorageGauge === 'function') _safe(() => renderStorageGauge(), 'renderStorageGauge');
+    if (typeof renderSetupAnalysis === 'function') _safe(() => renderSetupAnalysis(), 'renderSetupAnalysis');
   }
 
   // ========== STATS PAGE PREMIUM ==========
@@ -11086,9 +11093,15 @@
   // ========== PERSISTENCE — triple sauvegarde anti-perte ==========
   function saveTrades(silent) {
     try {
-      const payload = JSON.stringify(TRADES);
+      // Photos hors localStorage : stockées dans IndexedDB (clé photo_<id>), retirées du payload.
+      // → la capacité photos passe de ~30 à des milliers, et le localStorage/cloud restent légers.
+      const light = TRADES.map(t => (t && t.photo) ? { ...t, photo: null, hasPhoto: true } : t);
+      for (const t of TRADES) {
+        if (t && t.photo && t.id) idbSet('photo_' + t.id, t.photo).catch(() => {});
+      }
+      const payload = JSON.stringify(light);
       const n = TRADES.length;
-      // 1. Save principal (localStorage)
+      // 1. Save principal (localStorage, sans photos)
       localStorage.setItem('trades', payload);
       // 2. Backup miroir (localStorage, jamais écrasé par reset)
       localStorage.setItem('trades_backup', payload);
@@ -11099,7 +11112,7 @@
       idbSet('trades_ts', Date.now()).catch(() => {});
       // 4. window.name — survit aux refresh dans le MÊME ONGLET, sans dépendance origin
       try {
-        window.name = JSON.stringify({ kind: 'tj_trades', trades: TRADES, ts: Date.now() });
+        window.name = JSON.stringify({ kind: 'tj_trades', trades: light, ts: Date.now() });
       } catch (e) { console.warn('[window.name save]', e); }
       // 5. sessionStorage — couche supplémentaire pour le même onglet
       try { sessionStorage.setItem('trades', payload); } catch (e) {}
@@ -11345,6 +11358,23 @@
         }
       } catch (e) { console.error('Restore from archive failed:', e); }
     } catch (e) { console.error('Load failed:', e); }
+    rehydratePhotos();
+  }
+
+  // Recharge les photos depuis IndexedDB (elles ne sont plus dans localStorage) puis rafraîchit l'affichage
+  function rehydratePhotos() {
+    if (!Array.isArray(TRADES)) return;
+    const withPhotos = TRADES.filter(t => t && t.id && t.hasPhoto && !t.photo);
+    if (!withPhotos.length) return;
+    let done = 0;
+    withPhotos.forEach(t => {
+      idbGet('photo_' + t.id).then(p => {
+        if (p) t.photo = p;
+      }).catch(() => {}).then(() => {
+        done++;
+        if (done === withPhotos.length && typeof render === 'function') { try { render(); } catch (e) {} }
+      });
+    });
   }
 
   function resetChecklist() {
@@ -12613,7 +12643,8 @@
       kind: 'tj_full_backup',
       exportedAt: new Date().toISOString(),
       wipeToken: parseInt(localStorage.getItem('wipe_token') || '0'),
-      trades: TRADES,
+      // Photos exclues du backup cloud (elles vivent dans IndexedDB, propres à l'appareil) → coffre léger
+      trades: TRADES.map(t => (t && t.photo) ? { ...t, photo: null, hasPhoto: true } : t),
       accounts: ACCOUNTS,
       rotationWeeks: ROTATION_WEEKS,
       prefs: PREFS,
@@ -13019,6 +13050,75 @@
   }
 
   // ========== INTÉGRITÉ ==========
+  // Jauge de stockage : usage localStorage (Mo / ~5 Mo) + nombre de screenshots
+  function renderStorageGauge() {
+    const el = document.getElementById('storage-gauge');
+    if (!el) return;
+    let bytes = 0;
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        const v = localStorage.getItem(k) || '';
+        bytes += (k.length + v.length) * 2; // UTF-16 ≈ 2 octets/char
+      }
+    } catch (e) {}
+    const mb = bytes / (1024 * 1024);
+    const LIMIT = 5;
+    const pct = Math.min(100, (mb / LIMIT) * 100);
+    const shots = TRADES.filter(t => t.photo || t.hasPhoto).length;
+    const danger = pct >= 80;
+    const warn = pct >= 60;
+    const color = danger ? 'var(--red)' : warn ? 'var(--amber)' : 'var(--accent)';
+    el.innerHTML = `
+      <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-2); margin-bottom:6px;">
+        <span>Stockage local</span>
+        <span class="mono"><strong>${mb.toFixed(2)} Mo</strong> / ~${LIMIT} Mo · ${shots} screenshot${shots > 1 ? 's' : ''}</span>
+      </div>
+      <div style="height:8px; border-radius:99px; background:var(--bg-2); border:1px solid var(--border); overflow:hidden;">
+        <div style="height:100%; width:${pct}%; border-radius:99px; background:${color};"></div>
+      </div>
+      ${danger ? '<div style="font-size:11px; color:var(--red); margin-top:6px;">⚠ Stockage presque plein — pense à alléger (les screenshots vont désormais dans IndexedDB, ça aide).</div>' : ''}`;
+  }
+  // Analyse "ce qui marche" : groupe les trades du master par setup et par heure d'entrée
+  function renderSetupAnalysis() {
+    const el = document.getElementById('setup-analysis');
+    if (!el) return;
+    const trades = (computeStats(filteredTrades()) || { logical: [] }).logical;
+    if (!trades.length) { el.innerHTML = '<div class="empty-state" style="padding:24px;">Pas encore de trades à analyser.</div>'; return; }
+    const masterRisk = (ACCOUNTS.find(a => a.role === 'master') || ACCOUNTS[0] || { risk: 62.80 }).risk;
+    const bySetup = {}, byHour = {};
+    const bump = (obj, key, t) => {
+      const o = (obj[key] = obj[key] || { n: 0, wins: 0, pnl: 0, r: 0 });
+      o.n++; o.pnl += (t.pnl || 0); o.r += tradeRValue(t, masterRisk); if ((t.pnl || 0) > 0) o.wins++;
+    };
+    for (const t of trades) {
+      const r = t.rules || {};
+      const setup = r.setup === 'absorption' ? 'Absorption' : r.setup === 'exhaustion' ? 'Exhaustion' : r.setup === 'divergence' ? 'Divergence' : 'Sans setup';
+      bump(bySetup, setup, t);
+      const hr = (t.time || '').slice(0, 2);
+      if (/^\d\d$/.test(hr)) bump(byHour, hr, t);
+    }
+    const rows = (obj, labelFmt) => Object.entries(obj).sort((a, b) => b[1].pnl - a[1].pnl).map(([k, v]) => {
+      const wr = v.n ? (v.wins / v.n * 100) : 0;
+      return `<tr style="border-top:1px solid var(--border);">
+        <td style="padding:7px 0;">${labelFmt(k)}</td>
+        <td class="mono" style="text-align:center;">${v.n}</td>
+        <td class="mono ${wr >= 50 ? 'pos' : ''}" style="text-align:center;">${wr.toFixed(0)}%</td>
+        <td class="mono ${v.pnl >= 0 ? 'pos' : 'neg'}" style="text-align:right;">${fmt$(v.pnl)}</td>
+        <td class="mono ${v.r >= 0 ? 'pos' : 'neg'}" style="text-align:right;">${v.r >= 0 ? '+' : ''}${v.r.toFixed(1)}R</td>
+      </tr>`;
+    }).join('');
+    const table = (title, headLabel, body) => `
+      <div style="margin-bottom:6px; font-weight:600; font-size:13px;">${title}</div>
+      <table style="width:100%; border-collapse:collapse; margin-bottom:18px; font-size:12px;">
+        <thead><tr style="color:var(--text-3); font-size:10px; text-transform:uppercase; letter-spacing:0.04em;">
+          <th style="text-align:left; padding-bottom:4px;">${headLabel}</th>
+          <th style="text-align:center;">Trades</th><th style="text-align:center;">WR</th>
+          <th style="text-align:right;">P&amp;L</th><th style="text-align:right;">R</th>
+        </tr></thead><tbody>${body}</tbody></table>`;
+    el.innerHTML = table('Par setup', 'Setup', rows(bySetup, k => k)) +
+                   table('Par heure d\'entrée', 'Heure', rows(byHour, k => k + 'h'));
+  }
   function runIntegrityCheck() {
     const issues = [];
     TRADES.forEach((t, i) => {
