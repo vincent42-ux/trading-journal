@@ -5226,7 +5226,8 @@
           <button class="btn" onclick="runIntegrityCheck()" style="width:100%; margin-top:10px;">Vérifier l'intégrité des données</button>
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-17 · r23</strong></div>
+          <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-17 · r24</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -10043,7 +10044,15 @@
       </div>`;
     }
     html += '</div>';
-    wrapper.innerHTML = html;
+    // Garde-fou : trades sans résultat explicite TP/SL/BE → comptés comme BE (0R), faussent R & win rate.
+    const logicalAll = (typeof uniqueLogicalTrades === 'function') ? uniqueLogicalTrades(TRADES) : TRADES;
+    const noResult = logicalAll.filter(t => t && !['TP', 'SL', 'BE'].includes(t.result)).length;
+    const banner = noResult > 0
+      ? `<div style="margin-bottom:14px; padding:10px 14px; border-radius:10px; background:rgba(245,158,11,0.12); border:1px solid var(--amber); font-size:12px; color:var(--text); display:flex; align-items:center; gap:8px;">
+           <span>⚠️</span><span><strong>${noResult} trade${noResult > 1 ? 's' : ''} sans résultat</strong> (ni TP/SL/BE) — ils comptent comme BE et faussent ton R et ton win rate. Ouvre-les et choisis le bon résultat.</span>
+         </div>`
+      : '';
+    wrapper.innerHTML = banner + html;
   }
 
   // Base de données des règles prop firms
@@ -12987,19 +12996,62 @@
     try { return JSON.parse(localStorage.getItem('backups') || '[]'); } catch (e) { return []; }
   }
   function saveBackups(b) {
-    try { localStorage.setItem('backups', JSON.stringify(b)); } catch (e) {}
+    let arr = Array.isArray(b) ? b.slice() : [];
+    for (let attempt = 0; attempt < 12; attempt++) {
+      try { localStorage.setItem('backups', JSON.stringify(arr)); return; }
+      catch (e) {
+        // Quota dépassé → on sacrifie la plus vieille sauvegarde et on réessaie
+        if (arr.length > 1) { arr.shift(); continue; }
+        try { localStorage.removeItem('backups'); } catch (e2) {}
+        if (typeof showToast === 'function') showToast('⚠ Stockage plein — sauvegardes auto allégées. Pense à exporter (⚙ → Données).', 'error');
+        return;
+      }
+    }
   }
   function createBackup(reason) {
     if (!PREFS.autoBackup) return;
     const backups = loadBackups();
+    // Sauvegardes ALLÉGÉES : on retire les photos base64 (elles vivent déjà dans IndexedDB,
+    // réhydratées par id à la restauration). Sinon 10 backups = 10 copies de tous les screenshots → stockage saturé.
+    const lightTrades = TRADES.map(t => (t && t.photo) ? { ...t, photo: null, hasPhoto: true } : t);
     backups.push({
       timestamp: new Date().toISOString(),
       reason: reason || 'auto',
       tradesCount: TRADES.length,
-      data: { trades: TRADES, accounts: ACCOUNTS, rotationWeeks: ROTATION_WEEKS },
+      data: { trades: lightTrades, accounts: ACCOUNTS, rotationWeeks: ROTATION_WEEKS },
     });
     while (backups.length > (PREFS.keepBackups || 10)) backups.shift();
     saveBackups(backups);
+  }
+  // Réécrit les sauvegardes existantes en version allégée (sans photos base64).
+  // Corrige d'un coup un stockage saturé par d'anciens backups lourds. Retourne les octets libérés.
+  function compactStorage() {
+    let before = 0, after = 0;
+    try {
+      const raw = localStorage.getItem('backups') || '[]';
+      before = raw.length * 2;
+      const backups = JSON.parse(raw);
+      let changed = false;
+      for (const b of backups) {
+        if (b && b.data && Array.isArray(b.data.trades)) {
+          b.data.trades = b.data.trades.map(t => (t && t.photo) ? { ...t, photo: null, hasPhoto: true } : t);
+          changed = true;
+        }
+      }
+      const light = JSON.stringify(backups);
+      after = light.length * 2;
+      if (changed && after < before) localStorage.setItem('backups', light);
+    } catch (e) {}
+    return Math.max(0, before - after);
+  }
+  // Bouton manuel "Alléger maintenant"
+  function compactStorageManual() {
+    const freed = compactStorage();
+    if (typeof renderStorageGauge === 'function') renderStorageGauge();
+    const mb = (freed / (1024 * 1024)).toFixed(2);
+    if (typeof showToast === 'function') {
+      showToast(freed > 0 ? `🧹 ${mb} Mo libérés` : '✓ Déjà optimisé — rien à alléger', 'success');
+    }
   }
   function renderBackupHistory() {
     const container = document.getElementById('backup-history');
@@ -13036,6 +13088,7 @@
     if (b.data.accounts) ACCOUNTS = b.data.accounts;
     if (b.data.rotationWeeks) ROTATION_WEEKS = b.data.rotationWeeks;
     saveTrades(); saveAccountsAndRotation();
+    if (typeof rehydratePhotos === 'function') rehydratePhotos(); // récupère les screenshots depuis IndexedDB
     closeSettingsModal();
     render(); renderRotation();
     alert('Sauvegarde restaurée.');
@@ -13972,6 +14025,7 @@
   try { loadPrefs(); console.log('[init] loadPrefs OK'); } catch (e) { console.error('[init loadPrefs]', e); }
   try { loadAccountsAndRotation(); console.log('[init] loadAccountsAndRotation OK'); } catch (e) { console.error('[init loadAccounts]', e); }
   try { loadTrades(); console.log('[init] loadTrades OK — TRADES:', TRADES.length); } catch (e) { console.error('[init loadTrades]', e); }
+  try { const freed = compactStorage(); if (freed > 50000) console.log('[init] compactStorage —', (freed/1048576).toFixed(2), 'Mo libérés'); } catch (e) { console.error('[init compactStorage]', e); }
   try { if (typeof loadMarketNotes === 'function') loadMarketNotes(); } catch (e) { console.error('[init loadMarketNotes]', e); }
   try { loadPlan(); renderPlanView(); console.log('[init] loadPlan OK'); } catch (e) { console.error('[init loadPlan]', e); }
   try { loadGoalsLadder(); console.log('[init] loadGoalsLadder OK'); } catch (e) { console.error('[init loadGoalsLadder]', e); }
