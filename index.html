@@ -4646,6 +4646,13 @@
           <div class="card-header"><span class="card-title">Drawdown max par compte</span></div>
           <div class="card-body" id="stats-drawdown"></div>
         </div>
+        <div class="card" style="margin-bottom: 18px;">
+          <div class="card-header">
+            <span class="card-title">⚖️ Règle de consistance</span>
+            <span class="muted" id="consistency-rule-tag">—</span>
+          </div>
+          <div class="card-body" id="consistency-body"></div>
+        </div>
         </div>
       </section>
 
@@ -5227,7 +5234,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-17 · r24</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-17 · r25</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -6476,6 +6483,7 @@
     _safe(() => renderRRDeviation(s), 'renderRRDeviation');
     _safe(() => renderKPIs(s), 'renderKPIs');
     _safe(() => renderHealthGauges(), 'renderHealthGauges');
+    _safe(() => renderConsistency(s), 'renderConsistency');
     _safe(() => rebuildCharts(filtered), 'rebuildCharts');
     _safe(() => renderStatsPage(s), 'renderStatsPage');
     _safe(() => renderAdvancedStats(s), 'renderAdvancedStats');
@@ -7808,6 +7816,63 @@
       if (worstEl) worstEl.textContent = fmt$(worst.pnl);
       if (subEl) subEl.textContent = `${best.date} • ${worst.date}`;
     }
+  }
+
+  // Règle de consistance prop firm (MFFU) : un seul jour ne doit pas peser plus de X% du profit total.
+  // Seuil selon la phase du master : évaluation = 50% · funded (Core) = 40% par cycle de payout.
+  function renderConsistency(s) {
+    const el = document.getElementById('consistency-body');
+    if (!el) return;
+    const tag = document.getElementById('consistency-rule-tag');
+    const logical = (s && s.logical) || [];
+    const master = ACCOUNTS.find(a => a.role === 'master') || ACCOUNTS[0];
+    const funded = !!(master && master.status === 'funded');
+    const threshold = funded ? 40 : 50;
+    if (tag) tag.textContent = `Seuil ${threshold}% · ${funded ? 'funded' : 'évaluation'}`;
+    // P&L net par jour (trades du master / logiques)
+    const byDay = {};
+    for (const t of logical) { if (t && t.date) byDay[t.date] = (byDay[t.date] || 0) + (t.pnl || 0); }
+    const days = Object.entries(byDay);
+    const totalProfit = days.reduce((sum, d) => sum + d[1], 0);
+    const winDays = days.filter(d => d[1] > 0);
+    if (!winDays.length || totalProfit <= 0) {
+      el.innerHTML = `<div class="empty-state" style="padding:24px;">Pas encore de profit net — la règle de consistance s'activera dès que ton P&L cumulé sera positif.<br><span style="font-size:11px; color:var(--text-3);">Seuil ${threshold}% (${funded ? 'compte funded' : 'évaluation'}) : aucun jour ne doit dépasser ${threshold}% du profit total.</span></div>`;
+      return;
+    }
+    let best = winDays[0];
+    for (const d of winDays) if (d[1] > best[1]) best = d;
+    const bestPnl = best[1], bestDate = best[0];
+    const ratio = (bestPnl / totalProfit) * 100;
+    const ok = ratio <= threshold;
+    const neededTotal = bestPnl / (threshold / 100); // profit total min pour repasser sous le seuil
+    const missing = Math.max(0, neededTotal - totalProfit);
+    const barPct = Math.min(100, ratio);
+    const thrPct = Math.min(100, threshold);
+    const color = ok ? 'var(--green)' : 'var(--red)';
+    el.innerHTML = `
+      <div style="display:flex; align-items:baseline; gap:10px; margin-bottom:4px;">
+        <span class="mono" style="font-size:28px; font-weight:700; color:${color};">${ratio.toFixed(0)}%</span>
+        <span style="font-size:12px; color:var(--text-2);">ton meilleur jour pèse dans le profit total</span>
+      </div>
+      <div style="position:relative; height:10px; border-radius:99px; background:var(--bg-2); border:1px solid var(--border); overflow:hidden; margin:10px 0 6px;">
+        <div style="height:100%; width:${barPct}%; border-radius:99px; background:${color};"></div>
+        <div title="Seuil ${threshold}%" style="position:absolute; top:-3px; bottom:-3px; left:${thrPct}%; width:2px; background:var(--amber);"></div>
+      </div>
+      <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-3); margin-bottom:14px;">
+        <span>0%</span><span style="color:var(--amber);">seuil ${threshold}%</span><span>100%</span>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px 16px; font-size:13px;">
+        <div style="display:flex; justify-content:space-between;"><span class="muted">Statut</span><span style="font-weight:700; color:${color};">${ok ? '✅ Conforme' : '⚠️ Non conforme'}</span></div>
+        <div style="display:flex; justify-content:space-between;"><span class="muted">Meilleur jour</span><span class="mono pos">${fmt$(bestPnl)}</span></div>
+        <div style="display:flex; justify-content:space-between;"><span class="muted">Profit total net</span><span class="mono ${totalProfit >= 0 ? 'pos' : 'neg'}">${fmt$(totalProfit)}</span></div>
+        <div style="display:flex; justify-content:space-between;"><span class="muted">Date du gros jour</span><span class="mono">${bestDate}</span></div>
+      </div>
+      <div style="margin-top:14px; padding:10px 14px; border-radius:10px; background:${ok ? 'rgba(16,185,129,0.10)' : 'rgba(225,29,72,0.10)'}; border:1px solid ${color}; font-size:12px; color:var(--text);">
+        ${ok
+          ? `Tu es dans les clous. Pour rester conforme, garde un profit total d'au moins <strong class="mono">${fmt$(neededTotal)}</strong> tant que ce jour reste ton plus gros.`
+          : `Ce jour est trop gros. Pour devenir conforme, ton profit total doit atteindre <strong class="mono">${fmt$(neededTotal)}</strong> — il te manque <strong class="mono">${fmt$(missing)}</strong> à faire sur d'<strong>autres jours gagnants</strong> (ne refais pas un plus gros jour).`}
+      </div>
+      <div style="margin-top:8px; font-size:11px; color:var(--text-3);">Règle MyFundedFutures : ${funded ? '40% sur compte funded (Core), par cycle de payout' : '50% pendant l\'évaluation'}. Calcul sur tes jours de trading (compte master).</div>`;
   }
 
   function renderHealthGauges() {
