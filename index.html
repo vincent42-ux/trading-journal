@@ -64,7 +64,7 @@
       panel.onclick = function () { panel.remove(); };
       document.body.appendChild(panel);
     } catch (e) {
-      alert('Debug panel failed: ' + e.message);
+      uiAlert('Debug panel failed: ' + e.message);
     }
   };
   // Debug panel disponible via Cmd+Shift+D ou ?debug=1 dans l'URL
@@ -5294,7 +5294,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-17 · r26</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-17 · r27</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -5685,7 +5685,7 @@
         <div class="form-row">
           <div class="form-field">
             <label>Prop firm</label>
-            <select id="am-firm">
+            <select id="am-firm" onchange="onFirmChange()">
               <option value="MFFU">MFFU</option>
               <option value="Apex">Apex Trader Funding</option>
               <option value="Phidias">Phidias</option>
@@ -5708,14 +5708,13 @@
         <div class="section-label">Capital et risque</div>
         <div class="form-row">
           <div class="form-field" style="flex:1; background:rgba(167,139,250,0.08); border:1px solid rgba(167,139,250,0.3); border-radius:10px; padding:10px 12px;">
-            <label style="color:var(--accent);">⚡ Modèle MFFU <span style="opacity:.6; font-weight:400; text-transform:none;">— choisis la taille, tout se remplit (taille, drawdown, cible, risque)</span></label>
+            <label style="color:var(--accent);">⚡ Taille du compte <span style="opacity:.6; font-weight:400; text-transform:none;">— les règles (drawdown, cible, risque) se remplissent selon ta prop firm</span></label>
             <select id="am-template" onchange="applyAccountTemplate(this.value)">
               <option value="">Personnalisé</option>
-              <option value="25000">MFFU 25K</option>
-              <option value="50000">MFFU 50K</option>
-              <option value="100000">MFFU 100K</option>
-              <option value="150000">MFFU 150K</option>
-              <option value="300000">MFFU 300K</option>
+              <option value="25000">25K</option>
+              <option value="50000">50K</option>
+              <option value="100000">100K</option>
+              <option value="200000">200K</option>
             </select>
           </div>
         </div>
@@ -10603,7 +10602,10 @@
       if (hasReal) return Number(acc.realPnl);
       const master = ACCOUNTS.find(a => a.role === 'master');
       const masterTrades = master ? accountTradesSum(master) : 0;
-      return masterTrades * (acc.multiplier || 1);
+      // copyBaseline = trades du master au moment où ce follower a été créé.
+      // Il ne copie donc QUE les trades postérieurs (un nouveau compte démarre à 0, pas avec tout l'historique).
+      const base = acc.copyBaseline || 0;
+      return (masterTrades - base) * (acc.multiplier || 1);
     }
     // Master (ou compte indépendant) : base (P&L réel) + ses propres trades.
     return (hasReal ? Number(acc.realPnl) : 0) + accountTradesSum(acc);
@@ -11464,6 +11466,44 @@
       setTimeout(() => okBtn.focus(), 30);
     });
   }
+  // Alerte premium (remplace uiAlert() natif). Accepte une string ou un objet d'options.
+  function uiAlert(msgOrOpts, maybeOpts) {
+    let o;
+    if (typeof msgOrOpts === 'string') { o = Object.assign({ message: msgOrOpts }, maybeOpts || {}); }
+    else { o = msgOrOpts || {}; }
+    const isErr = /obligatoire|invalide|aucun|erreur|échou|impossible|⚠|manqu/i.test(o.message || o.title || '');
+    return new Promise(resolve => {
+      const prev = document.getElementById('ui-confirm-overlay');
+      if (prev) prev.remove();
+      const accent = o.danger ? 'var(--red)' : 'var(--accent)';
+      const overlay = document.createElement('div');
+      overlay.id = 'ui-confirm-overlay';
+      overlay.style.cssText = 'position:fixed; inset:0; z-index:100000; display:flex; align-items:center; justify-content:center; padding:20px; background:rgba(8,5,20,0.62); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); animation:uiCfFade .18s ease-out;';
+      const title = o.title || (isErr ? 'Oups' : 'Info');
+      const icon = o.icon || (isErr ? '⚠️' : 'ℹ️');
+      overlay.innerHTML = `
+        <div role="dialog" aria-modal="true" style="width:100%; max-width:400px; background:var(--bg-1); border:1px solid var(--border); border-radius:18px; box-shadow:0 24px 70px rgba(0,0,0,.55); overflow:hidden; animation:uiCfPop .22s cubic-bezier(.2,.9,.3,1.2);">
+          <div style="height:3px; background:linear-gradient(90deg, var(--accent), var(--accent-bright, #d946ef));"></div>
+          <div style="padding:24px 24px 20px;">
+            <div style="display:flex; align-items:center; gap:12px; margin-bottom:8px;">
+              <div style="width:40px; height:40px; flex:0 0 auto; display:flex; align-items:center; justify-content:center; font-size:19px; border-radius:12px; background:color-mix(in srgb, ${accent} 16%, transparent); border:1px solid color-mix(in srgb, ${accent} 35%, transparent);">${icon}</div>
+              <div style="font-size:16px; font-weight:700; color:var(--text-0);">${title}</div>
+            </div>
+            <div style="font-size:13.5px; line-height:1.55; color:var(--text-2); white-space:pre-line;">${(o.message || '').replace(/</g, '&lt;')}</div>
+            <div style="display:flex; margin-top:22px;">
+              <button id="ui-al-ok" style="flex:1; padding:12px; border-radius:11px; border:1px solid ${accent}; background:${accent}; color:#fff; font-weight:700; font-size:13.5px; cursor:pointer; box-shadow:0 6px 18px color-mix(in srgb, ${accent} 40%, transparent);">${o.okLabel || 'OK'}</button>
+            </div>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+      const done = () => { document.removeEventListener('keydown', onKey); overlay.style.animation = 'uiCfFade .15s ease-in reverse'; setTimeout(() => overlay.remove(), 140); resolve(); };
+      const onKey = (e) => { if (e.key === 'Escape' || e.key === 'Enter') { e.preventDefault(); done(); } };
+      document.addEventListener('keydown', onKey);
+      overlay.addEventListener('click', e => { if (e.target === overlay) done(); });
+      overlay.querySelector('#ui-al-ok').addEventListener('click', done);
+      setTimeout(() => overlay.querySelector('#ui-al-ok').focus(), 30);
+    });
+  }
   // Keyframes du confirm (injectées une fois)
   (function () {
     if (document.getElementById('ui-confirm-kf')) return;
@@ -11522,14 +11562,14 @@
     reader.onload = function (ev) {
       try {
         const arr = JSON.parse(ev.target.result);
-        if (!Array.isArray(arr)) { alert('Fichier invalide : tableau attendu'); return; }
+        if (!Array.isArray(arr)) { uiAlert('Fichier invalide : tableau attendu'); return; }
         TRADES = arr;
         saveTrades();
         if (typeof render === 'function') render();
         const banner = document.getElementById('__dataloss_banner');
         if (banner) banner.remove();
         if (typeof showToast === 'function') showToast('✓ ' + arr.length + ' trades importés', 'success');
-      } catch (e) { alert('Erreur import : ' + e.message); }
+      } catch (e) { uiAlert('Erreur import : ' + e.message); }
     };
     reader.readAsText(file);
   };
@@ -11660,11 +11700,11 @@
         const idbArr = idbRaw ? JSON.parse(idbRaw) : [];
         const fullMsg = baseMsg + '\nIndexedDB : ' + idbArr.length + ' trades\n(détails console)';
         console.log('IndexedDB trades:', idbArr);
-        alert(fullMsg);
+        uiAlert(fullMsg);
       }).catch(e => {
-        alert(baseMsg + '\nIndexedDB : erreur — ' + e.message);
+        uiAlert(baseMsg + '\nIndexedDB : erreur — ' + e.message);
       });
-    } catch (e) { alert('Diag échoué : ' + e.message); }
+    } catch (e) { uiAlert('Diag échoué : ' + e.message); }
   };
   // Bouton export rapide JSON depuis la console : window.exportTradesJSON()
   window.exportTradesJSON = function () {
@@ -11680,7 +11720,7 @@
       setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
       window.__unsavedToDisk = false;
       if (typeof showToast === 'function') showToast('✓ JSON téléchargé — garde ce fichier !', 'success');
-    } catch (e) { alert('Export échoué : ' + e.message); }
+    } catch (e) { uiAlert('Export échoué : ' + e.message); }
   };
   // AVERTISSEMENT avant de fermer l'onglet si trades non exportés
   window.addEventListener('beforeunload', function (e) {
@@ -12095,7 +12135,7 @@
     if (!file) return;
     const reader = new FileReader();
     reader.onerror = err => {
-      alert('Erreur lecture image : ' + (err && err.message ? err.message : 'inconnue'));
+      uiAlert('Erreur lecture image : ' + (err && err.message ? err.message : 'inconnue'));
     };
     reader.onload = ev => {
       compressImageDataUrl(ev.target.result, out => {
@@ -12397,7 +12437,7 @@
       TRADES.length = 0; saveTrades();
     }
     render();
-    alert('✅ Comptes remis propre : 50K master ($1 190,04) · 25K follower ×1 ($154,88). Saisis sur le 50K, le 25K suit.');
+    uiAlert('✅ Comptes remis propre : 50K master ($1 190,04) · 25K follower ×1 ($154,88). Saisis sur le 50K, le 25K suit.');
   }
 
   function loadAccountsAndRotation() {
@@ -12450,23 +12490,38 @@
 
   // ========== MODÈLES DE COMPTE (MFFU) ==========
   // Drawdown 4% · cible 6% · risque ≈ 0,25% de la taille (cohérent avec le 25K à $62,80)
-  const ACCOUNT_TEMPLATES = {
-    '25000':  { size: 25000,  trailing: 1000,  payoutTarget: 1500,  dll: 0, risk: 62.80 },
-    '50000':  { size: 50000,  trailing: 2000,  payoutTarget: 3000,  dll: 0, risk: 125.60 },
-    '100000': { size: 100000, trailing: 4000,  payoutTarget: 6000,  dll: 0, risk: 251.20 },
-    '150000': { size: 150000, trailing: 6000,  payoutTarget: 9000,  dll: 0, risk: 376.80 },
-    '300000': { size: 300000, trailing: 12000, payoutTarget: 18000, dll: 0, risk: 753.60 },
-  };
+  const ACCOUNT_SIZES = ['25000', '50000', '100000', '200000'];
+  // Règles (drawdown trailing + cible) par prop firm et par taille. Risque ≈ 0,25% de la taille.
+  function firmSizePreset(firm, sizeVal) {
+    const size = parseInt(sizeVal) || 0;
+    // Base générique : drawdown 4%, cible 6%, pas de DLL
+    let trailing = Math.round(size * 0.04), target = Math.round(size * 0.06), dll = 0;
+    if (firm === 'MFFU') {
+      const m = { 25000: [1000, 1500], 50000: [2000, 3000], 100000: [4000, 6000], 200000: [8000, 12000] };
+      if (m[size]) { trailing = m[size][0]; target = m[size][1]; }
+    } else if (firm === 'Apex') {
+      const a = { 25000: [1500, 1500], 50000: [2500, 3000], 100000: [3000, 6000], 200000: [6000, 12000] };
+      if (a[size]) { trailing = a[size][0]; target = a[size][1]; }
+    }
+    const risk = +(size * 0.0025).toFixed(2);
+    return { size, trailing, payoutTarget: target, dll, risk };
+  }
   function applyAccountTemplate(v) {
-    const t = ACCOUNT_TEMPLATES[v];
-    if (!t) return;
+    if (!v) return;
+    const firm = (document.getElementById('am-firm') || {}).value || 'MFFU';
+    const t = firmSizePreset(firm, v);
     document.getElementById('am-size').value = t.size;
     document.getElementById('am-trailing').value = t.trailing;
     document.getElementById('am-payoutTarget').value = t.payoutTarget;
     document.getElementById('am-dll').value = t.dll;
     document.getElementById('am-risk').value = t.risk;
     const nameEl = document.getElementById('am-name');
-    if (nameEl && !nameEl.value.trim()) nameEl.value = 'MFFU ' + (t.size / 1000) + 'K';
+    if (nameEl && !nameEl.value.trim()) nameEl.value = firm + ' ' + (t.size / 1000) + 'K';
+  }
+  // Changement de prop firm → on réapplique les règles à la taille déjà choisie
+  function onFirmChange() {
+    const sz = (document.getElementById('am-template') || {}).value;
+    if (sz) applyAccountTemplate(sz);
   }
 
   // ========== ACCOUNT MODAL ==========
@@ -12517,7 +12572,7 @@
     const tmplEl = document.getElementById('am-template');
     if (tmplEl) {
       const sz = String(parseInt(document.getElementById('am-size').value) || '');
-      tmplEl.value = ACCOUNT_TEMPLATES[sz] ? sz : '';
+      tmplEl.value = ACCOUNT_SIZES.includes(sz) ? sz : '';
     }
     // Section "effacer les trades" : seulement en édition d'un compte existant
     const clearSec = document.getElementById('amf-clearTrades');
@@ -12556,7 +12611,7 @@
   }
   function saveAccountFromModal() {
     const name = document.getElementById('am-name').value.trim();
-    if (!name) { alert('Le nom est obligatoire'); return; }
+    if (!name) { uiAlert('Le nom est obligatoire'); return; }
     const data = {
       name,
       firm: document.getElementById('am-firm').value,
@@ -12594,6 +12649,12 @@
     } else {
       const id = name.toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + Date.now().toString(36).slice(-4);
       if (data.realPnl != null && data.role !== 'follower') data.realPnl = +(data.realPnl - accountTradesSum({ name: data.name })).toFixed(2);
+      // Nouveau follower sans P&L réel saisi → il copie le master à partir de MAINTENANT (démarre à 0),
+      // pas avec tout l'historique du master (sinon il apparaît "objectif déjà atteint").
+      if (data.role === 'follower' && data.realPnl == null) {
+        const master = ACCOUNTS.find(a => a.role === 'master');
+        data.copyBaseline = master ? accountTradesSum(master) : 0;
+      }
       ACCOUNTS.push({ id, ...data });
     }
     saveAccountsAndRotation();
@@ -12610,7 +12671,7 @@
     const acc = ACCOUNTS.find(a => a.id === EDITING_ACCOUNT_ID);
     if (!acc) return;
     const linked = tradesLinkedToAccount(acc.name);
-    if (!linked.length) { alert('Aucun trade sur ce compte.'); return; }
+    if (!linked.length) { uiAlert('Aucun trade sur ce compte.'); return; }
     if (!confirm('Effacer ' + linked.length + ' trade(s) liés à ' + acc.name + ' ?\nLe compte revient à sa base. Les copies sur les comptes liés partent aussi.')) return;
     const linkIds = new Set(TRADES.filter(t => t.account === acc.name).map(t => t.linkId).filter(Boolean));
     for (let i = TRADES.length - 1; i >= 0; i--) {
@@ -12621,7 +12682,7 @@
     const cnt = document.getElementById('am-trades-count');
     if (cnt) cnt.textContent = 'Aucun trade sur ce compte.';
     render();
-    alert('✅ ' + linked.length + ' trade(s) effacés. ' + acc.name + ' est revenu à sa base.');
+    uiAlert('✅ ' + linked.length + ' trade(s) effacés. ' + acc.name + ' est revenu à sa base.');
   }
   function deleteCurrentAccount() {
     if (!EDITING_ACCOUNT_ID) return;
@@ -12677,7 +12738,7 @@
   }
   function saveWeekFromModal() {
     const mondayISO = document.getElementById('wm-monday').value;
-    if (!mondayISO) { alert('Date obligatoire'); return; }
+    if (!mondayISO) { uiAlert('Date obligatoire'); return; }
     const accountIds = [...document.querySelectorAll('#wm-accounts-list input:checked')].map(cb => cb.dataset.id);
     // Normalize to actual monday
     const monday = getMondayISO(mondayISO);
@@ -12811,7 +12872,7 @@
     if (typeof syncEnabled === 'function' && syncEnabled() && typeof syncPush === 'function') {
       syncPush(); // pousse l'état vide + le marqueur de wipe vers le cloud immédiatement
     }
-    alert('✅ Tout est à zéro. Site propre pour la semaine — les trades ne reviendront pas.');
+    uiAlert('✅ Tout est à zéro. Site propre pour la semaine — les trades ne reviendront pas.');
   }
   function loadDemoTrades() {
     if (TRADES.length > 0) {
@@ -12891,7 +12952,7 @@
     try { localStorage.setItem('account_filter', JSON.stringify(ACCOUNT_FILTER)); } catch (e) {}
     if (typeof closeSettingsModal === 'function') closeSettingsModal();
     render();
-    alert(`✓ 15 trades démo chargés (45 lignes au total avec les followers Apex).\nFiltres comptes réinitialisés (tous activés).`);
+    uiAlert(`✓ 15 trades démo chargés (45 lignes au total avec les followers Apex).\nFiltres comptes réinitialisés (tous activés).`);
   }
 
   function resetAllData() {
@@ -12912,7 +12973,7 @@
     closeSettingsModal();
     renderRotation();
     render();
-    alert('Site remis à zéro.');
+    uiAlert('Site remis à zéro.');
   }
 
   // ========== PRÉFÉRENCES GLOBALES ==========
@@ -13301,7 +13362,7 @@
   async function activateSync() {
     const input = document.getElementById('sync-token-input');
     const token = input ? input.value.trim() : '';
-    if (!token) { alert('Colle d\'abord ton token GitHub (scope « gist » uniquement).'); return; }
+    if (!token) { uiAlert('Colle d\'abord ton token GitHub (scope « gist » uniquement).'); return; }
     try {
       setSyncStatus('☁️ Connexion…', 'busy');
       SYNC.token = token;
@@ -13336,7 +13397,7 @@
     } catch (e) {
       SYNC.token = '';
       setSyncStatus('⚠️ ' + e.message, 'err');
-      alert('Activation impossible : ' + e.message);
+      uiAlert('Activation impossible : ' + e.message);
     }
   }
   function deactivateSync() {
@@ -13387,7 +13448,7 @@
       return /[,"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
     }).join(',')).join('\n');
     downloadFile(`trades_filtered_${todayStamp()}.csv`, csv, 'text/csv');
-    alert(`${filtered.length} trade(s) exporté(s).`);
+    uiAlert(`${filtered.length} trade(s) exporté(s).`);
   }
   function importCSVFromSettings(e) {
     const file = e.target.files[0];
@@ -13401,13 +13462,13 @@
           TRADES.push(...result.trades);
           saveTrades();
           render();
-          alert(`${result.trades.length} trade(s) importé(s).`);
+          uiAlert(`${result.trades.length} trade(s) importé(s).`);
           closeSettingsModal();
         } else {
-          alert('Aucun trade détecté dans le fichier.');
+          uiAlert('Aucun trade détecté dans le fichier.');
         }
       } catch (err) {
-        alert('Erreur d\'import : ' + err.message);
+        uiAlert('Erreur d\'import : ' + err.message);
       }
     };
     reader.readAsText(file);
@@ -13426,9 +13487,9 @@
         closeSettingsModal();
         renderRotation();
         if (typeof syncPushDebounced === 'function') syncPushDebounced();
-        alert('Restauration réussie — tout a été réimporté (trades, plan, objectifs, notes, backtest).');
+        uiAlert('Restauration réussie — tout a été réimporté (trades, plan, objectifs, notes, backtest).');
       } catch (err) {
-        alert('Fichier JSON invalide : ' + err.message);
+        uiAlert('Fichier JSON invalide : ' + err.message);
       }
     };
     reader.readAsText(file);
@@ -13535,7 +13596,7 @@
     if (typeof rehydratePhotos === 'function') rehydratePhotos(); // récupère les screenshots depuis IndexedDB
     closeSettingsModal();
     render(); renderRotation();
-    alert('Sauvegarde restaurée.');
+    uiAlert('Sauvegarde restaurée.');
   }
 
   // ========== MODE MONO-COMPTE ==========
@@ -13678,7 +13739,7 @@
     TRADES = TRADES.filter(t => t.account !== accName);
     saveTrades();
     render();
-    alert(`${before - TRADES.length} trade(s) supprimé(s).`);
+    uiAlert(`${before - TRADES.length} trade(s) supprimé(s).`);
   }
 
   // ========== AVERTISSEMENT FERMETURE ==========
@@ -13790,7 +13851,7 @@
   }
   function saveScenarioFromModal() {
     const name = document.getElementById('sm-name').value.trim();
-    if (!name) { alert('Nom obligatoire'); return; }
+    if (!name) { uiAlert('Nom obligatoire'); return; }
     const data = {
       name,
       description: document.getElementById('sm-description').value.trim(),
@@ -13825,7 +13886,7 @@
   }
   function deleteCurrentScenario() {
     if (!EDITING_SCENARIO_ID) return;
-    if (SCENARIOS.length <= 1) { alert('Tu dois conserver au moins un scénario.'); return; }
+    if (SCENARIOS.length <= 1) { uiAlert('Tu dois conserver au moins un scénario.'); return; }
     const sc = SCENARIOS.find(s => s.id === EDITING_SCENARIO_ID);
     const tradesCount = BACKTEST_TRADES.filter(t => t.scenarioId === EDITING_SCENARIO_ID).length;
     if (!confirm(`Supprimer "${sc.name}" et ses ${tradesCount} trade(s) ? Irréversible.`)) return;
@@ -13944,11 +14005,11 @@
     const scenarioId = document.getElementById('btm-scenario').value;
     const date = document.getElementById('btm-date').value;
     const time = document.getElementById('btm-time').value;
-    if (!time) { alert('Heure obligatoire'); return; }
+    if (!time) { uiAlert('Heure obligatoire'); return; }
     const side = document.getElementById('bt-trade-modal-backdrop').dataset.side || 'LONG';
     const result = document.getElementById('bt-trade-modal-backdrop').dataset.result || 'TP';
     const rRealised = parseFloat(document.getElementById('btm-rRealised').value);
-    if (isNaN(rRealised)) { alert('R réalisé invalide'); return; }
+    if (isNaN(rRealised)) { uiAlert('R réalisé invalide'); return; }
     const confirms = getBtmConfirms();
     const data = { scenarioId, date, time, side, result, rRealised, photo: BTM_CURRENT_PHOTO, confirms };
     if (EDITING_BTM_ID) {
@@ -14004,7 +14065,7 @@
     }
     saveBacktestData();
     renderBacktest();
-    alert(`✓ 15 trades démo ajoutés au scénario "${sc.name}"`);
+    uiAlert(`✓ 15 trades démo ajoutés au scénario "${sc.name}"`);
   }
 
   function deleteCurrentBtmTrade() {
