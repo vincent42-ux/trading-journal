@@ -3793,6 +3793,10 @@
         <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M2 10h20M6 14h4"/></svg></span>
         <span class="label">Comptes</span>
       </button>
+      <button class="nav-item" data-view="capital" data-tooltip="Capital">
+        <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span>
+        <span class="label">Capital</span>
+      </button>
       <button class="nav-item" data-view="weekly" data-tooltip="Rapport hebdo">
         <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg></span>
         <span class="label">Rapport hebdo</span>
@@ -4331,6 +4335,62 @@
         <div id="accounts-summary"></div>
         <div class="account-tabs" id="account-tabs"></div>
         <div id="accounts-grid-dyn"></div>
+      </section>
+
+      <!-- ============ CAPITAL & MONEY MANAGEMENT ============ -->
+      <section class="view" id="view-capital">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:18px; gap:12px; flex-wrap:wrap;">
+          <div>
+            <div style="font-size:18px; font-weight:700; letter-spacing:-0.02em;">Capital &amp; Money Management</div>
+            <div style="font-size:12px; color:var(--text-2); margin-top:4px;">Mon portefeuille — ce que j'investis, mes coûts, mes payouts.</div>
+          </div>
+          <button class="btn btn-primary" onclick="openCapitalConfig()">⚙ Config</button>
+        </div>
+
+        <!-- Capital net -->
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-body" style="padding:22px 24px;">
+            <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-3); margin-bottom:6px;">Capital net</div>
+            <div class="mono" id="cap-net" style="font-size:40px; font-weight:800; letter-spacing:-0.02em;">€0</div>
+            <div style="font-size:12px; color:var(--text-2); margin-top:4px;" id="cap-net-sub">Investi − coûts + payouts</div>
+          </div>
+        </div>
+
+        <!-- KPIs -->
+        <div id="cap-kpis" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:12px; margin-bottom:16px;"></div>
+
+        <!-- Vue d'ensemble portefeuille -->
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-header">
+            <span class="card-title">📊 Vue d'ensemble portefeuille</span>
+            <span class="muted" id="cap-overview-count">—</span>
+          </div>
+          <div class="card-body">
+            <div id="cap-overview" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:12px;"></div>
+            <div style="text-align:center; font-size:11px; color:var(--text-3); margin-top:12px;" id="cap-overview-foot"></div>
+          </div>
+        </div>
+
+        <!-- Évolution capital net -->
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-header"><span class="card-title">📈 Évolution du capital net (€)</span></div>
+          <div class="card-body"><div style="height:240px;"><canvas id="cap-evolution-chart"></canvas></div></div>
+        </div>
+
+        <!-- Répartition dépenses + comptes -->
+        <div class="row-2col">
+          <div class="card">
+            <div class="card-header"><span class="card-title">🍩 Répartition des dépenses</span></div>
+            <div class="card-body">
+              <div style="height:200px;"><canvas id="cap-expense-chart"></canvas></div>
+              <div id="cap-expense-legend" style="margin-top:14px;"></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><span class="card-title">🏦 Coûts par compte</span></div>
+            <div class="card-body" id="cap-accounts-list"></div>
+          </div>
+        </div>
       </section>
 
       <!-- ============ BACKTEST ============ -->
@@ -5234,7 +5294,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-17 · r25</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-17 · r26</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -6484,6 +6544,7 @@
     _safe(() => renderKPIs(s), 'renderKPIs');
     _safe(() => renderHealthGauges(), 'renderHealthGauges');
     _safe(() => renderConsistency(s), 'renderConsistency');
+    if (typeof renderCapital === 'function') _safe(() => renderCapital(), 'renderCapital');
     _safe(() => rebuildCharts(filtered), 'rebuildCharts');
     _safe(() => renderStatsPage(s), 'renderStatsPage');
     _safe(() => renderAdvancedStats(s), 'renderAdvancedStats');
@@ -7875,6 +7936,246 @@
       <div style="margin-top:8px; font-size:11px; color:var(--text-3);">Règle MyFundedFutures : ${funded ? '40% sur compte funded (Core), par cycle de payout' : '50% pendant l\'évaluation'}. Calcul sur tes jours de trading (compte master).</div>`;
   }
 
+  // ========== CAPITAL & MONEY MANAGEMENT (portefeuille) ==========
+  let CAPITAL = { investi: 0, expenses: [], payouts: [] };
+  function loadCapital() {
+    try {
+      const raw = localStorage.getItem('capital_mm');
+      if (raw) { const d = JSON.parse(raw); CAPITAL = { investi: +d.investi || 0, expenses: Array.isArray(d.expenses) ? d.expenses : [], payouts: Array.isArray(d.payouts) ? d.payouts : [] }; }
+    } catch (e) { CAPITAL = { investi: 0, expenses: [], payouts: [] }; }
+  }
+  function saveCapital() {
+    try { localStorage.setItem('capital_mm', JSON.stringify(CAPITAL)); } catch (e) {}
+    if (typeof markLocalChange === 'function') markLocalChange();
+  }
+  function capEur(n) { return '€' + Math.round(n || 0).toLocaleString('fr-FR'); }
+  function capEur2(n) { return '€' + (n || 0).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function capCostsTotal() { return CAPITAL.expenses.reduce((s, e) => s + (+e.amount || 0), 0); }
+  function capPayoutsTotal() { return CAPITAL.payouts.reduce((s, p) => s + (+p.amount || 0), 0); }
+
+  function renderCapital() {
+    if (!document.getElementById('view-capital')) return;
+    const couts = capCostsTotal();
+    const payouts = capPayoutsTotal();
+    const investi = +CAPITAL.investi || 0;
+    const net = investi - couts + payouts;
+    const roi = couts > 0 ? ((payouts - couts) / couts) * 100 : 0;
+    const renta = investi > 0 ? ((payouts - couts) / investi) * 100 : 0;
+    const netEl = document.getElementById('cap-net');
+    if (netEl) { netEl.textContent = capEur2(net); netEl.className = 'mono ' + (net >= 0 ? 'pos' : 'neg'); }
+
+    // KPIs
+    const kpis = document.getElementById('cap-kpis');
+    if (kpis) {
+      const card = (label, value, cls) => `
+        <div class="card" style="margin:0;"><div class="card-body" style="padding:14px 16px;">
+          <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-3); margin-bottom:5px;">${label}</div>
+          <div class="mono ${cls || ''}" style="font-size:20px; font-weight:700;">${value}</div>
+        </div></div>`;
+      kpis.innerHTML =
+        card('Investi', capEur(investi)) +
+        card('Gains prop', capEur(payouts), payouts > 0 ? 'pos' : '') +
+        card('Coûts totaux', capEur(couts), couts > 0 ? 'neg' : '') +
+        card('ROI prop', (roi >= 0 ? '+' : '') + roi.toFixed(1) + '%', roi >= 0 ? 'pos' : 'neg') +
+        card('Rentabilité', (renta >= 0 ? '+' : '') + renta.toFixed(1) + '%', renta >= 0 ? 'pos' : 'neg') +
+        card('Payouts', CAPITAL.payouts.length);
+    }
+
+    // Vue d'ensemble portefeuille (dérivée des comptes)
+    let crames = 0, funded = 0, valides = 0, enCours = 0, capitalGere = 0;
+    for (const a of ACCOUNTS) {
+      const cat = (typeof accountCategory === 'function') ? accountCategory(a) : 'active';
+      const blown = a.status === 'blown' || cat === 'blown';
+      if (!blown) capitalGere += (a.size || 0);
+      if (blown) { crames++; continue; }
+      if (a.status === 'funded') { funded++; continue; }
+      if (cat === 'validated') { valides++; continue; }
+      enCours++;
+    }
+    const ov = document.getElementById('cap-overview');
+    if (ov) {
+      const tile = (icon, n, label, cls) => `
+        <div style="text-align:center; padding:14px 8px; border:1px solid var(--border); border-radius:12px; background:var(--bg-2);">
+          <div style="font-size:18px;">${icon}</div>
+          <div class="mono ${cls || ''}" style="font-size:22px; font-weight:800; margin-top:2px;">${n}</div>
+          <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-3); margin-top:2px;">${label}</div>
+        </div>`;
+      ov.innerHTML =
+        tile('🔥', enCours, 'En cours') +
+        tile('✅', valides, 'Validés', 'pos') +
+        tile('💎', funded, 'Funded') +
+        tile('💀', crames, 'Cramés', 'neg') +
+        tile('🏛️', capEur(capitalGere), 'Capital géré') +
+        tile('💰', capEur(payouts), 'Payouts reçus', payouts > 0 ? 'pos' : '');
+    }
+    const ovCount = document.getElementById('cap-overview-count');
+    if (ovCount) ovCount.textContent = ACCOUNTS.length + ' compte' + (ACCOUNTS.length > 1 ? 's' : '');
+    const ovFoot = document.getElementById('cap-overview-foot');
+    if (ovFoot) ovFoot.textContent = 'Total investi en frais de challenges/funded : ' + capEur(couts);
+
+    // Graphe évolution capital net
+    const c = getThemeColors();
+    const evCanvas = document.getElementById('cap-evolution-chart');
+    if (evCanvas && typeof Chart !== 'undefined') {
+      const events = [];
+      for (const e of CAPITAL.expenses) events.push({ d: new Date(e.date || Date.now()), delta: -(+e.amount || 0) });
+      for (const p of CAPITAL.payouts) events.push({ d: new Date(p.date || Date.now()), delta: (+p.amount || 0) });
+      events.sort((a, b) => a.d - b.d);
+      let running = investi;
+      const labels = ['Départ'], data = [running];
+      for (const ev of events) { running += ev.delta; labels.push(ev.d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })); data.push(running); }
+      if (!window.allCharts) window.allCharts = {};
+      if (window.allCharts.capEvolution) window.allCharts.capEvolution.destroy();
+      const ctx2d = evCanvas.getContext('2d');
+      const grad = ctx2d.createLinearGradient(0, 0, 0, 220);
+      grad.addColorStop(0, c.green + '40'); grad.addColorStop(1, c.green + '00');
+      window.allCharts.capEvolution = new Chart(evCanvas, {
+        type: 'line',
+        data: { labels, datasets: [{ data, borderColor: c.green, backgroundColor: grad, fill: true, tension: 0.35, pointRadius: 3, pointBackgroundColor: c.green, borderWidth: 2 }] },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => '€' + ctx.parsed.y.toLocaleString('fr-FR') } } },
+          scales: { x: { grid: { display: false } }, y: { grid: { color: c.grid }, ticks: { callback: v => '€' + v } } }
+        }
+      });
+    }
+
+    // Donut répartition des dépenses
+    const exCanvas = document.getElementById('cap-expense-chart');
+    const legend = document.getElementById('cap-expense-legend');
+    if (exCanvas && typeof Chart !== 'undefined') {
+      const byType = { Challenge: 0, Abonnement: 0, Autre: 0 };
+      for (const e of CAPITAL.expenses) {
+        const k = e.type === 'challenge' ? 'Challenge' : e.type === 'abonnement' ? 'Abonnement' : 'Autre';
+        byType[k] += (+e.amount || 0);
+      }
+      const cols = { Challenge: c.accent, Abonnement: c.accentBright, Autre: c.amber };
+      const entries = Object.entries(byType).filter(([, v]) => v > 0);
+      if (!window.allCharts) window.allCharts = {};
+      if (window.allCharts.capExpense) window.allCharts.capExpense.destroy();
+      if (entries.length) {
+        window.allCharts.capExpense = new Chart(exCanvas, {
+          type: 'doughnut',
+          data: { labels: entries.map(e => e[0]), datasets: [{ data: entries.map(e => e[1]), backgroundColor: entries.map(e => cols[e[0]]), borderColor: c.bg1, borderWidth: 3 }] },
+          options: { responsive: true, maintainAspectRatio: false, cutout: '68%', plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ctx.label + ' : €' + ctx.parsed.toLocaleString('fr-FR') } } } }
+        });
+        if (legend) legend.innerHTML = entries.map(([k, v]) => {
+          const pct = couts > 0 ? (v / couts * 100).toFixed(0) : 0;
+          return `<div style="display:flex; align-items:center; justify-content:space-between; padding:5px 0; border-bottom:1px solid var(--border);">
+            <span style="display:flex; align-items:center; gap:8px;"><span style="width:10px; height:10px; border-radius:3px; background:${cols[k]};"></span>${k}</span>
+            <span class="mono" style="font-weight:600;">${capEur(v)} <span style="color:var(--text-3);">${pct}%</span></span></div>`;
+        }).join('');
+      } else {
+        if (window.allCharts.capExpense) { window.allCharts.capExpense.destroy(); window.allCharts.capExpense = null; }
+        if (legend) legend.innerHTML = '<div class="empty-state" style="padding:18px;">Aucune dépense saisie. Clique sur ⚙ Config.</div>';
+      }
+    }
+
+    // Coûts / payouts par compte
+    const accList = document.getElementById('cap-accounts-list');
+    if (accList) {
+      if (!ACCOUNTS.length) { accList.innerHTML = '<div class="empty-state" style="padding:18px;">Aucun compte.</div>'; }
+      else {
+        accList.innerHTML = ACCOUNTS.map(a => {
+          const pOut = CAPITAL.payouts.filter(p => p.account === a.name).reduce((s, p) => s + (+p.amount || 0), 0);
+          const badge = a.status === 'funded' ? '💎 Funded' : a.status === 'blown' ? '💀 Cramé' : '🔥 En cours';
+          return `<div style="display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border);">
+            <span><strong>${a.name}</strong> <span style="font-size:11px; color:var(--text-3);">${badge}</span></span>
+            <span class="mono ${pOut > 0 ? 'pos' : ''}" style="font-weight:600;">${pOut > 0 ? capEur(pOut) + ' reçus' : '—'}</span></div>`;
+        }).join('');
+      }
+    }
+  }
+
+  // ----- Config Capital (modal dynamique) -----
+  function openCapitalConfig() { renderCapitalConfig(); }
+  function closeCapitalConfig() { const o = document.getElementById('cap-config-overlay'); if (o) o.remove(); }
+  function renderCapitalConfig() {
+    let o = document.getElementById('cap-config-overlay');
+    if (!o) {
+      o = document.createElement('div');
+      o.id = 'cap-config-overlay';
+      o.style.cssText = 'position:fixed; inset:0; z-index:99990; display:flex; align-items:flex-start; justify-content:center; padding:30px 16px; overflow-y:auto; background:rgba(8,5,20,0.62); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);';
+      o.addEventListener('click', e => { if (e.target === o) closeCapitalConfig(); });
+      document.body.appendChild(o);
+    }
+    const expRows = CAPITAL.expenses.map(e => `
+      <div style="display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--border); font-size:12px;">
+        <span style="flex:0 0 78px; color:var(--text-3);">${e.type === 'challenge' ? 'Challenge' : e.type === 'abonnement' ? 'Abonnement' : 'Autre'}</span>
+        <span style="flex:1;">${e.label || '—'}</span>
+        <span style="color:var(--text-3);">${e.date || ''}</span>
+        <span class="mono neg" style="font-weight:600;">${capEur(e.amount)}</span>
+        <button onclick="capRemoveExpense('${e.id}')" style="background:none; border:none; color:var(--red); cursor:pointer; font-size:15px;">×</button>
+      </div>`).join('') || '<div style="font-size:12px; color:var(--text-3); padding:6px 0;">Aucune dépense.</div>';
+    const payRows = CAPITAL.payouts.map(p => `
+      <div style="display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--border); font-size:12px;">
+        <span style="flex:1;">${p.account || 'Compte'}</span>
+        <span style="color:var(--text-3);">${p.date || ''}</span>
+        <span class="mono pos" style="font-weight:600;">${capEur(p.amount)}</span>
+        <button onclick="capRemovePayout('${p.id}')" style="background:none; border:none; color:var(--red); cursor:pointer; font-size:15px;">×</button>
+      </div>`).join('') || '<div style="font-size:12px; color:var(--text-3); padding:6px 0;">Aucun payout.</div>';
+    const accOpts = ACCOUNTS.map(a => `<option value="${a.name}">${a.name}</option>`).join('');
+    const today = new Date().toISOString().slice(0, 10);
+    o.innerHTML = `
+      <div style="width:100%; max-width:560px; background:var(--bg-1); border:1px solid var(--border); border-radius:18px; box-shadow:0 24px 70px rgba(0,0,0,.55); overflow:hidden;">
+        <div style="height:3px; background:linear-gradient(90deg, var(--accent), var(--accent-bright));"></div>
+        <div style="padding:22px 24px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border);">
+          <div style="font-size:16px; font-weight:700;">⚙ Config — Capital &amp; Money Management</div>
+          <button onclick="closeCapitalConfig()" style="background:none; border:none; color:var(--text-2); cursor:pointer; font-size:22px; line-height:1;">×</button>
+        </div>
+        <div style="padding:22px 24px; max-height:70vh; overflow-y:auto;">
+          <div style="margin-bottom:20px;">
+            <label style="font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-3);">Capital investi (budget total €)</label>
+            <input type="number" id="cap-investi-input" value="${CAPITAL.investi || ''}" placeholder="1500" onchange="capSetInvesti(this.value)" style="width:100%; margin-top:6px; padding:10px 12px; border-radius:10px; border:1px solid var(--border); background:var(--bg-2); color:var(--text-0); font-size:14px;">
+          </div>
+
+          <div style="font-weight:700; font-size:13px; margin-bottom:8px;">💸 Dépenses (challenges, abonnements…)</div>
+          ${expRows}
+          <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; align-items:end;">
+            <select id="cap-exp-type" style="padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg-2); color:var(--text-0); font-size:12px;">
+              <option value="challenge">Challenge</option><option value="abonnement">Abonnement</option><option value="autre">Autre</option>
+            </select>
+            <input id="cap-exp-label" placeholder="Libellé" style="flex:1; min-width:90px; padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg-2); color:var(--text-0); font-size:12px;">
+            <input id="cap-exp-amount" type="number" placeholder="€" style="width:70px; padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg-2); color:var(--text-0); font-size:12px;">
+            <input id="cap-exp-date" type="date" value="${today}" style="padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg-2); color:var(--text-0); font-size:12px;">
+            <button class="btn btn-primary" onclick="capAddExpense()" style="padding:8px 12px; font-size:12px;">+ Ajouter</button>
+          </div>
+
+          <div style="font-weight:700; font-size:13px; margin:22px 0 8px;">💰 Payouts reçus</div>
+          ${payRows}
+          <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; align-items:end;">
+            <select id="cap-pay-account" style="flex:1; min-width:110px; padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg-2); color:var(--text-0); font-size:12px;">${accOpts}</select>
+            <input id="cap-pay-amount" type="number" placeholder="€" style="width:70px; padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg-2); color:var(--text-0); font-size:12px;">
+            <input id="cap-pay-date" type="date" value="${today}" style="padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg-2); color:var(--text-0); font-size:12px;">
+            <button class="btn btn-primary" onclick="capAddPayout()" style="padding:8px 12px; font-size:12px;">+ Ajouter</button>
+          </div>
+        </div>
+        <div style="padding:16px 24px; border-top:1px solid var(--border); text-align:right;">
+          <button class="btn btn-primary" onclick="closeCapitalConfig()">Terminé</button>
+        </div>
+      </div>`;
+  }
+  function capSetInvesti(v) { CAPITAL.investi = parseFloat(String(v).replace(',', '.')) || 0; saveCapital(); renderCapital(); }
+  function capAddExpense() {
+    const type = (document.getElementById('cap-exp-type') || {}).value || 'autre';
+    const label = (document.getElementById('cap-exp-label') || {}).value || '';
+    const amount = parseFloat(((document.getElementById('cap-exp-amount') || {}).value || '').replace(',', '.')) || 0;
+    const date = (document.getElementById('cap-exp-date') || {}).value || new Date().toISOString().slice(0, 10);
+    if (amount <= 0) { if (typeof showToast === 'function') showToast('⚠ Montant invalide', 'error'); return; }
+    CAPITAL.expenses.push({ id: 'e' + Date.now(), type, label, amount, date });
+    saveCapital(); renderCapital(); renderCapitalConfig();
+  }
+  function capRemoveExpense(id) { CAPITAL.expenses = CAPITAL.expenses.filter(e => e.id !== id); saveCapital(); renderCapital(); renderCapitalConfig(); }
+  function capAddPayout() {
+    const account = (document.getElementById('cap-pay-account') || {}).value || '';
+    const amount = parseFloat(((document.getElementById('cap-pay-amount') || {}).value || '').replace(',', '.')) || 0;
+    const date = (document.getElementById('cap-pay-date') || {}).value || new Date().toISOString().slice(0, 10);
+    if (amount <= 0) { if (typeof showToast === 'function') showToast('⚠ Montant invalide', 'error'); return; }
+    CAPITAL.payouts.push({ id: 'p' + Date.now(), account, amount, date });
+    saveCapital(); renderCapital(); renderCapitalConfig();
+  }
+  function capRemovePayout(id) { CAPITAL.payouts = CAPITAL.payouts.filter(p => p.id !== id); saveCapital(); renderCapital(); renderCapitalConfig(); }
+
   function renderHealthGauges() {
     const container = document.getElementById('health-gauges');
     const summary = document.getElementById('health-summary');
@@ -8823,15 +9124,24 @@
     renderSessionView();
   }
   function endSession() {
-    if (!confirm('Terminer la session ?')) return;
-    const count = SESSION.tradeIds.length;
-    SESSION.active = false;
-    saveSession();
-    if (typeof pushNotif === 'function') {
-      pushNotif('info', '⏹', `<strong>Session terminée</strong> — ${count} trade${count > 1 ? 's' : ''} enregistré${count > 1 ? 's' : ''}.`, null);
-    }
-    render();
-    showSessionRecap(count);
+    uiConfirm({
+      icon: '⏹',
+      title: 'Terminer la session ?',
+      message: 'Ta session de trading sera clôturée et tu verras ton bilan du jour.',
+      confirmLabel: 'Terminer la session',
+      cancelLabel: 'Annuler',
+      danger: true,
+    }).then(ok => {
+      if (!ok) return;
+      const count = SESSION.tradeIds.length;
+      SESSION.active = false;
+      saveSession();
+      if (typeof pushNotif === 'function') {
+        pushNotif('info', '⏹', `<strong>Session terminée</strong> — ${count} trade${count > 1 ? 's' : ''} enregistré${count > 1 ? 's' : ''}.`, null);
+      }
+      render();
+      showSessionRecap(count);
+    });
   }
 
   // ========== BILAN DE FIN DE SESSION ==========
@@ -11099,6 +11409,70 @@
     return 0;
   }
 
+  // ========== CONFIRM PREMIUM (remplace le confirm() natif moche) ==========
+  // Renvoie une Promise<boolean>. Thème violet/magenta, backdrop flouté, clavier (Échap/Entrée).
+  function uiConfirm(opts) {
+    opts = opts || {};
+    const o = {
+      icon: opts.icon || '',
+      title: opts.title || 'Confirmer ?',
+      message: opts.message || '',
+      confirmLabel: opts.confirmLabel || 'Confirmer',
+      cancelLabel: opts.cancelLabel || 'Annuler',
+      danger: !!opts.danger,
+    };
+    return new Promise(resolve => {
+      const prev = document.getElementById('ui-confirm-overlay');
+      if (prev) prev.remove();
+      const accent = o.danger ? 'var(--red)' : 'var(--accent)';
+      const overlay = document.createElement('div');
+      overlay.id = 'ui-confirm-overlay';
+      overlay.style.cssText = 'position:fixed; inset:0; z-index:100000; display:flex; align-items:center; justify-content:center; padding:20px; background:rgba(8,5,20,0.62); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); animation:uiCfFade .18s ease-out;';
+      overlay.innerHTML = `
+        <div role="dialog" aria-modal="true" style="width:100%; max-width:420px; background:var(--bg-1); border:1px solid var(--border); border-radius:18px; box-shadow:0 24px 70px rgba(0,0,0,.55); overflow:hidden; animation:uiCfPop .22s cubic-bezier(.2,.9,.3,1.2);">
+          <div style="height:3px; background:linear-gradient(90deg, var(--accent), var(--accent-bright, #d946ef));"></div>
+          <div style="padding:26px 26px 22px;">
+            <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px;">
+              ${o.icon ? `<div style="width:42px; height:42px; flex:0 0 auto; display:flex; align-items:center; justify-content:center; font-size:20px; border-radius:12px; background:color-mix(in srgb, ${accent} 16%, transparent); border:1px solid color-mix(in srgb, ${accent} 35%, transparent);">${o.icon}</div>` : ''}
+              <div style="font-size:17px; font-weight:700; letter-spacing:-0.01em; color:var(--text-0);">${o.title}</div>
+            </div>
+            ${o.message ? `<div style="font-size:13.5px; line-height:1.55; color:var(--text-2); margin:2px 0 4px;">${o.message}</div>` : ''}
+            <div style="display:flex; gap:10px; margin-top:22px;">
+              <button id="ui-cf-cancel" style="flex:1; padding:12px; border-radius:11px; border:1px solid var(--border); background:transparent; color:var(--text-1); font-weight:600; font-size:13.5px; cursor:pointer; transition:all .15s;">${o.cancelLabel}</button>
+              <button id="ui-cf-ok" style="flex:1; padding:12px; border-radius:11px; border:1px solid ${accent}; background:${accent}; color:#fff; font-weight:700; font-size:13.5px; cursor:pointer; box-shadow:0 6px 18px color-mix(in srgb, ${accent} 40%, transparent); transition:all .15s;">${o.confirmLabel}</button>
+            </div>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+      const done = (val) => {
+        document.removeEventListener('keydown', onKey);
+        overlay.style.animation = 'uiCfFade .15s ease-in reverse';
+        setTimeout(() => overlay.remove(), 140);
+        resolve(val);
+      };
+      const onKey = (e) => {
+        if (e.key === 'Escape') { e.preventDefault(); done(false); }
+        else if (e.key === 'Enter') { e.preventDefault(); done(true); }
+      };
+      document.addEventListener('keydown', onKey);
+      overlay.addEventListener('click', e => { if (e.target === overlay) done(false); });
+      overlay.querySelector('#ui-cf-cancel').addEventListener('click', () => done(false));
+      overlay.querySelector('#ui-cf-ok').addEventListener('click', () => done(true));
+      const okBtn = overlay.querySelector('#ui-cf-ok');
+      okBtn.addEventListener('mouseenter', () => okBtn.style.filter = 'brightness(1.08)');
+      okBtn.addEventListener('mouseleave', () => okBtn.style.filter = '');
+      setTimeout(() => okBtn.focus(), 30);
+    });
+  }
+  // Keyframes du confirm (injectées une fois)
+  (function () {
+    if (document.getElementById('ui-confirm-kf')) return;
+    const st = document.createElement('style');
+    st.id = 'ui-confirm-kf';
+    st.textContent = '@keyframes uiCfFade{from{opacity:0}to{opacity:1}}@keyframes uiCfPop{from{opacity:0;transform:translateY(10px) scale(.97)}to{opacity:1;transform:none}}';
+    document.head.appendChild(st);
+  })();
+
   // ========== TOAST ==========
   function showToast(msg, type) {
     try {
@@ -12758,6 +13132,7 @@
       session: (typeof SESSION !== 'undefined') ? SESSION : null,
       backtestScenarios: (typeof SCENARIOS !== 'undefined') ? SCENARIOS : null,
       backtestTrades: (typeof BACKTEST_TRADES !== 'undefined') ? BACKTEST_TRADES : null,
+      capital: (typeof CAPITAL !== 'undefined') ? CAPITAL : null,
     };
   }
   // Applique une sauvegarde (import fichier OU synchro cloud)
@@ -12804,6 +13179,10 @@
       if (Array.isArray(data.backtestTrades)) {
         BACKTEST_TRADES = data.backtestTrades;
         try { localStorage.setItem('backtest_trades', JSON.stringify(BACKTEST_TRADES)); } catch (e2) {}
+      }
+      if (data.capital && typeof data.capital === 'object') {
+        CAPITAL = { investi: +data.capital.investi || 0, expenses: Array.isArray(data.capital.expenses) ? data.capital.expenses : [], payouts: Array.isArray(data.capital.payouts) ? data.capital.payouts : [] };
+        try { localStorage.setItem('capital_mm', JSON.stringify(CAPITAL)); } catch (e2) {}
       }
     }
     saveTrades(true); saveAccountsAndRotation(); savePrefs();
@@ -14092,6 +14471,7 @@
   try { loadTrades(); console.log('[init] loadTrades OK — TRADES:', TRADES.length); } catch (e) { console.error('[init loadTrades]', e); }
   try { const freed = compactStorage(); if (freed > 50000) console.log('[init] compactStorage —', (freed/1048576).toFixed(2), 'Mo libérés'); } catch (e) { console.error('[init compactStorage]', e); }
   try { if (typeof loadMarketNotes === 'function') loadMarketNotes(); } catch (e) { console.error('[init loadMarketNotes]', e); }
+  try { if (typeof loadCapital === 'function') loadCapital(); } catch (e) { console.error('[init loadCapital]', e); }
   try { loadPlan(); renderPlanView(); console.log('[init] loadPlan OK'); } catch (e) { console.error('[init loadPlan]', e); }
   try { loadGoalsLadder(); console.log('[init] loadGoalsLadder OK'); } catch (e) { console.error('[init loadGoalsLadder]', e); }
   try { updateNotifBadge(); renderNotifications(); console.log('[init] notifications OK'); } catch (e) { console.error('[init notifications]', e); }
