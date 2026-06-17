@@ -5294,7 +5294,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-17 · r27</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-17 · r28</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -10665,7 +10665,7 @@
       container.innerHTML = '<div class="empty-state" style="padding:40px;">Aucun compte. Clique <strong>+ Nouveau compte</strong> en haut.</div>';
       return;
     }
-    container.className = 'accounts-grid' + (ACCOUNTS.length === 1 ? ' solo' : '');
+    container.className = '';
     container.removeAttribute('style');
     // Master toujours en premier — c'est lui qui compte
     const ACCOUNTS_SORTED = ACCOUNTS.slice().sort((a, b) => (a.role === 'master' ? -1 : 1) - (b.role === 'master' ? -1 : 1));
@@ -10714,7 +10714,7 @@
     const _todayFull = `${String(_d.getDate()).padStart(2,'0')}/${String(_d.getMonth()+1).padStart(2,'0')}/${_d.getFullYear()}`;
     const _todayShort = _todayFull.slice(0, 5);
 
-    container.innerHTML = _visible.map(acc => {
+    const buildAccountCard = (acc) => {
       const accTrades = TRADES.filter(t => t.account === acc.name);
       const pnl = accountPnl(acc);
       const balance = (acc.currentBalance || acc.size) + pnl;
@@ -10893,6 +10893,57 @@
           </div>
         </div>
       `;
+    };
+
+    // ===== Regroupement par prop firm : barre de section (objectifs, payouts, scaling) puis cartes =====
+    const FIRM_COLORS = {
+      mffu: ['#8b5cf6', '#6d28d9'], apex: ['#f97316', '#c2410c'], phidias: ['#10b981', '#047857'],
+      alphafutures: ['#3b82f6', '#1e40af'], topstep: ['#2563eb', '#1e3a8a'], takeprofit: ['#ef4444', '#b91c1c'], autre: ['#6b7280', '#374151']
+    };
+    const firmOrder = ['MFFU', 'Apex', 'Phidias', 'Alpha Futures', 'Autre'];
+    const groups = {};
+    for (const a of _visible) { const f = a.firm || 'Autre'; (groups[f] = groups[f] || []).push(a); }
+    const firms = [...firmOrder.filter(f => groups[f]), ...Object.keys(groups).filter(f => !firmOrder.includes(f))];
+    const fmtK = (n) => n >= 1000 ? (Math.round(n / 100) / 10).toString().replace(/\.0$/, '') + 'K' : '$' + n;
+
+    container.innerHTML = firms.map(firm => {
+      const accs = groups[firm];
+      const firmAll = ACCOUNTS.filter(a => (a.firm || 'Autre') === firm); // stats sur TOUS les comptes de la firm
+      const slug = getFirmSlug(firm);
+      const [c1, c2] = FIRM_COLORS[slug] || FIRM_COLORS.autre;
+      const fr = FIRM_RULES_DB[firm];
+      const fullName = fr ? fr.fullName : firm;
+      const live = firmAll.filter(a => a.status !== 'blown');
+      const capital = live.reduce((s, a) => s + (a.size || 0), 0);
+      const funded = firmAll.filter(a => a.status === 'funded').length;
+      const blown = firmAll.filter(a => a.status === 'blown').length;
+      const active = firmAll.length - funded - blown;
+      const totalObj = live.reduce((s, a) => s + (accountObjTarget(a) || 0), 0);
+      // Pastilles règles funded (payout / split / consistency) pour voir ce qu'on peut faire sur la firm
+      const chips = (fr && fr.funded ? fr.funded : [])
+        .filter(r => /payout|split|consistency|consistance/i.test(r.name))
+        .slice(0, 3)
+        .map(r => `<span style="font-size:11px; padding:4px 10px; border-radius:99px; background:var(--bg-2); border:1px solid var(--border); color:var(--text-1);"><strong>${r.name}</strong> · ${r.value}</span>`)
+        .join('');
+      const cardsHtml = accs.map(buildAccountCard).join('');
+      return `
+        <div class="firm-group" style="margin-bottom:24px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; padding:14px 18px; border-radius:14px; background:linear-gradient(135deg, ${c1}, ${c2}); color:#fff; box-shadow:0 6px 20px rgba(0,0,0,.28);">
+            <div style="display:flex; align-items:center; gap:13px;">
+              <div style="width:42px; height:42px; flex:0 0 auto; display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:800; border-radius:12px; background:rgba(255,255,255,0.18);">${fullName.charAt(0)}</div>
+              <div>
+                <div style="font-size:16px; font-weight:800; letter-spacing:-0.01em;">${fullName}</div>
+                <div style="font-size:11px; opacity:.9;">${firmAll.length} compte${firmAll.length > 1 ? 's' : ''} · 💎 ${funded} funded · 🔥 ${active} en cours${blown ? ' · 💀 ' + blown + ' cramé' + (blown > 1 ? 's' : '') : ''}</div>
+              </div>
+            </div>
+            <div style="display:flex; gap:22px; flex-wrap:wrap;">
+              <div style="text-align:right;"><div style="font-size:10px; opacity:.85; text-transform:uppercase; letter-spacing:0.05em;">Capital géré</div><div class="mono" style="font-size:19px; font-weight:800;">${fmtK(capital)}</div></div>
+              <div style="text-align:right;"><div style="font-size:10px; opacity:.85; text-transform:uppercase; letter-spacing:0.05em;">Objectif total</div><div class="mono" style="font-size:19px; font-weight:800;">${totalObj > 0 ? '$' + totalObj.toLocaleString('en-US') : '—'}</div></div>
+            </div>
+          </div>
+          ${chips ? `<div style="display:flex; gap:8px; flex-wrap:wrap; margin:12px 2px 0;"><span style="font-size:11px; color:var(--text-3); align-self:center;">🚀 Sur cette firm :</span>${chips}<button class="btn" style="font-size:11px; padding:4px 10px;" onclick="openFirmRulesModal('${firm}')">Voir toutes les règles</button></div>` : ''}
+          <div class="accounts-grid${accs.length === 1 ? ' solo' : ''}" style="margin-top:14px;">${cardsHtml}</div>
+        </div>`;
     }).join('');
   }
 
