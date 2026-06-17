@@ -5301,7 +5301,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-17 · r31</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-17 · r32</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -9847,6 +9847,38 @@
     if (mo) mo.classList.toggle('active', m === 'month');
     renderWeeklyReport();
   }
+  // Synthèse capital pour une période [start, end] (utilisée dans le rapport hebdo/mensuel)
+  function capitalSynthesisHTML(start, end, periodWord) {
+    if (typeof CAPITAL === 'undefined') return '';
+    const inRange = ds => { const d = new Date(ds); return !isNaN(d) && d >= start && d <= end; };
+    const exps = (CAPITAL.expenses || []).filter(e => inRange(e.date));
+    const pays = (CAPITAL.payouts || []).filter(p => inRange(p.date));
+    const sorties = exps.reduce((s, e) => s + (+e.amount || 0), 0);
+    const entrees = pays.reduce((s, p) => s + (+p.amount || 0), 0);
+    const net = entrees - sorties;
+    const byT = {}; for (const e of exps) { byT[e.type] = (byT[e.type] || 0) + (+e.amount || 0); }
+    const catLines = Object.keys(CAP_CATS).filter(t => byT[t] > 0)
+      .map(t => `<div style="display:flex; justify-content:space-between; padding:4px 0; font-size:12px; border-bottom:1px solid var(--border);"><span>${capCatIcon(t)} ${capCatLabel(t)}</span><span class="mono neg">−${capEur(byT[t])}</span></div>`).join('');
+    const col = net > 0 ? 'var(--green)' : net < 0 ? 'var(--red)' : 'var(--text-2)';
+    const verdict = (entrees === 0 && sorties === 0) ? 'Aucun mouvement de capital sur la période.'
+      : net > 0 ? `🎉 Période rentable : +${capEur(net)} net.`
+      : net < 0 ? `⚠️ Période négative : −${capEur(-net)} net.`
+      : 'À l\'équilibre sur la période.';
+    return `
+      <div class="card" style="margin-bottom:20px;">
+        <div class="card-header"><span class="card-title">💼 Synthèse capital — ${periodWord}</span></div>
+        <div class="card-body">
+          <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:12px;">
+            <div style="text-align:center;"><div style="font-size:10px; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-3);">Entrées</div><div class="mono pos" style="font-size:20px; font-weight:800;">+${capEur(entrees)}</div></div>
+            <div style="text-align:center;"><div style="font-size:10px; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-3);">Sorties</div><div class="mono neg" style="font-size:20px; font-weight:800;">−${capEur(sorties)}</div></div>
+            <div style="text-align:center;"><div style="font-size:10px; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-3);">Net</div><div class="mono" style="font-size:20px; font-weight:800; color:${col};">${net >= 0 ? '+' : '−'}${capEur(Math.abs(net))}</div></div>
+          </div>
+          <div style="padding:10px 14px; border-radius:10px; background:${net > 0 ? 'rgba(16,185,129,0.10)' : net < 0 ? 'rgba(225,29,72,0.10)' : 'var(--bg-2)'}; border:1px solid ${col}; font-size:12.5px; color:var(--text);">${verdict}</div>
+          ${catLines ? `<div style="margin-top:12px;"><div style="font-size:11px; color:var(--text-3); margin-bottom:4px;">Détail des sorties</div>${catLines}</div>` : ''}
+          ${pays.length ? `<div style="margin-top:10px; font-size:11px; color:var(--text-3);">${pays.length} payout${pays.length > 1 ? 's' : ''} encaissé${pays.length > 1 ? 's' : ''} sur la période.</div>` : ''}
+        </div>
+      </div>`;
+  }
   function renderWeeklyReport() {
     const c = document.getElementById('weekly-report-body');
     if (!c) return;
@@ -9883,7 +9915,7 @@
     });
 
     if (!weekTrades.length) {
-      c.innerHTML = `<div class="empty-state" style="padding:40px;">Aucun trade ${periodWordLow}.<br><span style="font-size:11px;">Navigue avec ‹ › pour voir les périodes passées.</span></div>`;
+      c.innerHTML = `<div class="empty-state" style="padding:40px;">Aucun trade ${periodWordLow}.<br><span style="font-size:11px;">Navigue avec ‹ › pour voir les périodes passées.</span></div>` + capitalSynthesisHTML(monday, sunday, periodWord);
       return;
     }
 
@@ -10033,6 +10065,8 @@
           <span class="muted" style="font-size:11px;">${tradesPerfect} parfait${tradesPerfect>1?'s':''} · ${tradesDerive} dérive${tradesDerive>1?'s':''}</span>
         </div>
       </div>
+
+      ${capitalSynthesisHTML(monday, sunday, periodWord)}
 
       <!-- Ce qui a marché / Ce qui n'a pas marché -->
       <div class="row-2col" style="margin-bottom:20px;">
