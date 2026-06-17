@@ -5294,7 +5294,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-17 · r28</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-17 · r29</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -5680,6 +5680,10 @@
           <div class="form-field">
             <label>Nom du compte</label>
             <input type="text" id="am-name" placeholder="MFFU 25K, Apex #3..." />
+          </div>
+          <div class="form-field" style="max-width:160px;">
+            <label>N° de compte (#)</label>
+            <input type="text" id="am-acctnum" placeholder="ex. 248137" />
           </div>
         </div>
         <div class="form-row">
@@ -10527,6 +10531,10 @@
     const f = FIRM_RULES_DB[firmName];
     return f ? f.slug : 'autre';
   }
+  // Plafond de comptes par prop firm (0 = illimité). MFFU = 10 max (éval + funded), Apex = 20 PAs.
+  function firmMaxAccounts(firmName) {
+    return ({ 'MFFU': 10, 'Apex': 20 })[firmName] || 0;
+  }
 
   function openFirmRulesModal(firmName) {
     const firm = FIRM_RULES_DB[firmName] || FIRM_RULES_DB['Autre'];
@@ -10714,7 +10722,7 @@
     const _todayFull = `${String(_d.getDate()).padStart(2,'0')}/${String(_d.getMonth()+1).padStart(2,'0')}/${_d.getFullYear()}`;
     const _todayShort = _todayFull.slice(0, 5);
 
-    const buildAccountCard = (acc) => {
+    const buildAccountCard = (acc, num) => {
       const accTrades = TRADES.filter(t => t.account === acc.name);
       const pnl = accountPnl(acc);
       const balance = (acc.currentBalance || acc.size) + pnl;
@@ -10768,6 +10776,7 @@
               <div>
                 <div class="account-banner-firm">${acc.firm}</div>
                 <div class="account-banner-name">${acc.name}</div>
+                <div style="font-size:11px; font-weight:600; opacity:.78; margin-top:1px;">#${acc.acctNum || num}</div>
               </div>
               <div style="display:flex; flex-direction:column; gap:5px; align-items:flex-end;">
                 <span class="account-banner-status ${statusClass}">${statusLabel}</span>
@@ -10919,13 +10928,10 @@
       const blown = firmAll.filter(a => a.status === 'blown').length;
       const active = firmAll.length - funded - blown;
       const totalObj = live.reduce((s, a) => s + (accountObjTarget(a) || 0), 0);
-      // Pastilles règles funded (payout / split / consistency) pour voir ce qu'on peut faire sur la firm
-      const chips = (fr && fr.funded ? fr.funded : [])
-        .filter(r => /payout|split|consistency|consistance/i.test(r.name))
-        .slice(0, 3)
-        .map(r => `<span style="font-size:11px; padding:4px 10px; border-radius:99px; background:var(--bg-2); border:1px solid var(--border); color:var(--text-1);"><strong>${r.name}</strong> · ${r.value}</span>`)
-        .join('');
-      const cardsHtml = accs.map(buildAccountCard).join('');
+      const max = firmMaxAccounts(firm);
+      const atCap = max && firmAll.length >= max;
+      const comptesStr = max ? `${firmAll.length} / ${max}` : `${firmAll.length}`;
+      const cardsHtml = accs.map((a, i) => buildAccountCard(a, i + 1)).join('');
       return `
         <div class="firm-group" style="margin-bottom:24px;">
           <div style="display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; padding:14px 18px; border-radius:14px; background:linear-gradient(135deg, ${c1}, ${c2}); color:#fff; box-shadow:0 6px 20px rgba(0,0,0,.28);">
@@ -10933,15 +10939,15 @@
               <div style="width:42px; height:42px; flex:0 0 auto; display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:800; border-radius:12px; background:rgba(255,255,255,0.18);">${fullName.charAt(0)}</div>
               <div>
                 <div style="font-size:16px; font-weight:800; letter-spacing:-0.01em;">${fullName}</div>
-                <div style="font-size:11px; opacity:.9;">${firmAll.length} compte${firmAll.length > 1 ? 's' : ''} · 💎 ${funded} funded · 🔥 ${active} en cours${blown ? ' · 💀 ' + blown + ' cramé' + (blown > 1 ? 's' : '') : ''}</div>
+                <div style="font-size:11px; opacity:.9;">💎 ${funded} funded · 🔥 ${active} en cours${blown ? ' · 💀 ' + blown + ' cramé' + (blown > 1 ? 's' : '') : ''}</div>
               </div>
             </div>
             <div style="display:flex; gap:22px; flex-wrap:wrap;">
+              <div style="text-align:right;"><div style="font-size:10px; opacity:.85; text-transform:uppercase; letter-spacing:0.05em;">Comptes</div><div class="mono" style="font-size:19px; font-weight:800;${atCap ? ' color:#ffd1d1;' : ''}">${comptesStr}${atCap ? ' 🔒' : ''}</div></div>
               <div style="text-align:right;"><div style="font-size:10px; opacity:.85; text-transform:uppercase; letter-spacing:0.05em;">Capital géré</div><div class="mono" style="font-size:19px; font-weight:800;">${fmtK(capital)}</div></div>
               <div style="text-align:right;"><div style="font-size:10px; opacity:.85; text-transform:uppercase; letter-spacing:0.05em;">Objectif total</div><div class="mono" style="font-size:19px; font-weight:800;">${totalObj > 0 ? '$' + totalObj.toLocaleString('en-US') : '—'}</div></div>
             </div>
           </div>
-          ${chips ? `<div style="display:flex; gap:8px; flex-wrap:wrap; margin:12px 2px 0;"><span style="font-size:11px; color:var(--text-3); align-self:center;">🚀 Sur cette firm :</span>${chips}<button class="btn" style="font-size:11px; padding:4px 10px;" onclick="openFirmRulesModal('${firm}')">Voir toutes les règles</button></div>` : ''}
           <div class="accounts-grid${accs.length === 1 ? ' solo' : ''}" style="margin-top:14px;">${cardsHtml}</div>
         </div>`;
     }).join('');
@@ -12586,6 +12592,7 @@
       title.textContent = 'Modifier le compte';
       delBtn.style.display = 'inline-flex';
       document.getElementById('am-name').value = a.name;
+      { const el = document.getElementById('am-acctnum'); if (el) el.value = a.acctNum || ''; }
       document.getElementById('am-firm').value = a.firm;
       document.getElementById('am-role').value = a.role;
       document.getElementById('am-size').value = a.size;
@@ -12606,6 +12613,7 @@
       title.textContent = 'Nouveau compte';
       delBtn.style.display = 'none';
       document.getElementById('am-name').value = '';
+      { const el = document.getElementById('am-acctnum'); if (el) el.value = ''; }
       document.getElementById('am-firm').value = 'MFFU';
       document.getElementById('am-role').value = 'follower';
       document.getElementById('am-size').value = 50000;
@@ -12663,8 +12671,19 @@
   function saveAccountFromModal() {
     const name = document.getElementById('am-name').value.trim();
     if (!name) { uiAlert('Le nom est obligatoire'); return; }
+    const firmVal = document.getElementById('am-firm').value;
+    // Plafond de comptes par prop firm : on bloque la création au-delà du max autorisé.
+    if (!EDITING_ACCOUNT_ID) {
+      const cap = firmMaxAccounts(firmVal);
+      const already = ACCOUNTS.filter(a => (a.firm || 'Autre') === firmVal).length;
+      if (cap && already >= cap) {
+        uiAlert({ title: 'Limite atteinte', message: `${firmVal} autorise au maximum ${cap} comptes, et tu en as déjà ${already}. Impossible d'en créer un de plus sur cette prop firm.`, danger: true });
+        return;
+      }
+    }
     const data = {
       name,
+      acctNum: (document.getElementById('am-acctnum') || { value: '' }).value.trim(),
       firm: document.getElementById('am-firm').value,
       role: document.getElementById('am-role').value,
       size: parseFloat(document.getElementById('am-size').value) || 0,
