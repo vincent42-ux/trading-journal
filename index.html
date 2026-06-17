@@ -4342,22 +4342,29 @@
         <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:18px; gap:12px; flex-wrap:wrap;">
           <div>
             <div style="font-size:18px; font-weight:700; letter-spacing:-0.02em;">Capital &amp; Money Management</div>
-            <div style="font-size:12px; color:var(--text-2); margin-top:4px;">Mon portefeuille — ce que j'investis, mes coûts, mes payouts.</div>
+            <div style="font-size:12px; color:var(--text-2); margin-top:4px;">Mon entreprise de trading — ce qui rentre, ce qui sort, suis-je rentable.</div>
           </div>
-          <button class="btn btn-primary" onclick="openCapitalConfig()">⚙ Config</button>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn" onclick="openExpenseTicket()">➕ Dépense</button>
+            <button class="btn" onclick="openPayoutTicket()">💰 Payout reçu</button>
+            <button class="btn" onclick="openCapitalConfig()" title="Budget &amp; historique">⚙</button>
+          </div>
         </div>
 
-        <!-- Capital net -->
-        <div class="card" style="margin-bottom:16px;">
-          <div class="card-body" style="padding:22px 24px;">
-            <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-3); margin-bottom:6px;">Capital net</div>
-            <div class="mono" id="cap-net" style="font-size:40px; font-weight:800; letter-spacing:-0.02em;">€0</div>
-            <div style="font-size:12px; color:var(--text-2); margin-top:4px;" id="cap-net-sub">Investi − coûts + payouts</div>
-          </div>
-        </div>
+        <!-- Verdict rentabilité -->
+        <div class="card" style="margin-bottom:14px;"><div class="card-body" id="cap-verdict" style="padding:22px 24px;"></div></div>
+
+        <!-- Alertes -->
+        <div id="cap-alerts" style="margin-bottom:14px;"></div>
 
         <!-- KPIs -->
         <div id="cap-kpis" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:12px; margin-bottom:16px;"></div>
+
+        <!-- Bilan hebdomadaire -->
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-header"><span class="card-title">🗓️ Bilan hebdomadaire</span><span class="muted">Entrées · Sorties · Net</span></div>
+          <div class="card-body" id="cap-weekly"></div>
+        </div>
 
         <!-- Vue d'ensemble portefeuille -->
         <div class="card" style="margin-bottom:16px;">
@@ -5294,7 +5301,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-17 · r30</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-17 · r31</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -7978,10 +7985,23 @@
     const net = investi - couts + payouts;
     const roi = couts > 0 ? ((payouts - couts) / couts) * 100 : 0;
     const renta = investi > 0 ? ((payouts - couts) / investi) * 100 : 0;
-    const netEl = document.getElementById('cap-net');
-    if (netEl) { netEl.textContent = capEur2(net); netEl.className = 'mono ' + (net >= 0 ? 'pos' : 'neg'); }
+    const bNet = payouts - couts; // résultat net de l'activité = ce qui rentre − ce qui sort
 
-    // KPIs
+    // ----- Verdict rentabilité -----
+    const verdict = document.getElementById('cap-verdict');
+    if (verdict) {
+      let col, emoji, title, msg;
+      if (couts === 0 && payouts === 0) { col = 'var(--text-2)'; emoji = '🚀'; title = 'Prêt à démarrer'; msg = 'Ajoute ta première dépense ou ton premier payout pour suivre la rentabilité de ton activité.'; }
+      else if (bNet > 0) { col = 'var(--green)'; emoji = '🎉'; title = 'Activité rentable'; msg = 'Tu as encaissé plus que tu n\'as dépensé. Continue comme ça.'; }
+      else if (bNet === 0) { col = 'var(--amber)'; emoji = '⚖️'; title = 'À l\'équilibre'; msg = 'Tu rentres exactement dans tes frais.'; }
+      else { col = 'var(--red)'; emoji = '⚠️'; title = 'Dans le négatif'; msg = 'Il te manque ' + capEur(-bNet) + ' de payouts pour couvrir tes dépenses.'; }
+      verdict.innerHTML = `
+        <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-3); margin-bottom:6px;">Résultat net de l'activité</div>
+        <div class="mono" style="font-size:40px; font-weight:800; letter-spacing:-0.02em; color:${col};">${(bNet >= 0 ? '+' : '−') + capEur(Math.abs(bNet)).replace('€', '')} €</div>
+        <div style="display:flex; align-items:center; gap:8px; margin-top:6px; font-size:13px; color:var(--text-1);"><span style="font-size:17px;">${emoji}</span><strong style="color:${col};">${title}</strong> · <span style="color:var(--text-2);">${msg}</span></div>`;
+    }
+
+    // ----- KPIs -----
     const kpis = document.getElementById('cap-kpis');
     if (kpis) {
       const card = (label, value, cls) => `
@@ -7990,12 +8010,56 @@
           <div class="mono ${cls || ''}" style="font-size:20px; font-weight:700;">${value}</div>
         </div></div>`;
       kpis.innerHTML =
-        card('Investi', capEur(investi)) +
-        card('Gains prop', capEur(payouts), payouts > 0 ? 'pos' : '') +
-        card('Coûts totaux', capEur(couts), couts > 0 ? 'neg' : '') +
-        card('ROI prop', (roi >= 0 ? '+' : '') + roi.toFixed(1) + '%', roi >= 0 ? 'pos' : 'neg') +
+        card('Capital net', capEur(net), net >= 0 ? '' : 'neg') +
+        card('Encaissé', capEur(payouts), payouts > 0 ? 'pos' : '') +
+        card('Dépensé', capEur(couts), couts > 0 ? 'neg' : '') +
+        card('Résultat net', (bNet >= 0 ? '+' : '−') + capEur(Math.abs(bNet)), bNet >= 0 ? 'pos' : 'neg') +
         card('Rentabilité', (renta >= 0 ? '+' : '') + renta.toFixed(1) + '%', renta >= 0 ? 'pos' : 'neg') +
-        card('Payouts', CAPITAL.payouts.length);
+        card('Payouts reçus', CAPITAL.payouts.length);
+    }
+
+    // ----- Alertes business -----
+    const alertsEl = document.getElementById('cap-alerts');
+    if (alertsEl) {
+      const al = [];
+      if (bNet < 0) al.push(['err', '⚠️', 'Tu es dans le négatif de ' + capEur(-bNet) + '. Objectif : encaisser des payouts pour repasser positif.']);
+      if (couts > 0 && payouts === 0) al.push(['warn', '⏳', 'Aucun payout encore encaissé — ' + capEur(couts) + ' déjà dépensés dans l\'activité.']);
+      const byT = {}; for (const e of CAPITAL.expenses) { byT[e.type] = (byT[e.type] || 0) + (+e.amount || 0); }
+      let topT = null, topV = 0; for (const k in byT) { if (byT[k] > topV) { topV = byT[k]; topT = k; } }
+      if (topT && couts > 0 && topV / couts >= 0.6) al.push(['warn', '📊', capCatLabel(topT) + ' pèse ' + Math.round(topV / couts * 100) + '% de tes dépenses.']);
+      if (bNet > 0) al.push(['ok', '🎉', 'Activité rentable : +' + capEur(bNet) + ' de bénéfice net. Beau travail.']);
+      const cols = { err: ['var(--red)', 'rgba(225,29,72,0.10)'], warn: ['var(--amber)', 'rgba(245,158,11,0.10)'], ok: ['var(--green)', 'rgba(16,185,129,0.10)'] };
+      alertsEl.innerHTML = al.slice(0, 3).map(([ty, ic, m]) => `<div style="display:flex; align-items:center; gap:10px; padding:10px 14px; border-radius:10px; background:${cols[ty][1]}; border:1px solid ${cols[ty][0]}; font-size:12.5px; color:var(--text); margin-bottom:8px;"><span>${ic}</span><span>${m}</span></div>`).join('');
+    }
+
+    // ----- Bilan hebdomadaire (entrées / sorties / net par semaine) -----
+    const weeklyEl = document.getElementById('cap-weekly');
+    if (weeklyEl) {
+      const wk = {};
+      const addW = (ds, key, val) => {
+        const d = new Date(ds || Date.now()); if (isNaN(d)) return;
+        const off = (d.getDay() + 6) % 7; const m = new Date(d); m.setDate(d.getDate() - off); m.setHours(0, 0, 0, 0);
+        const t = m.getTime(); (wk[t] = wk[t] || { in: 0, out: 0, monday: m }); wk[t][key] += val;
+      };
+      for (const e of CAPITAL.expenses) addW(e.date, 'out', +e.amount || 0);
+      for (const p of CAPITAL.payouts) addW(p.date, 'in', +p.amount || 0);
+      const list = Object.values(wk).sort((a, b) => b.monday - a.monday).slice(0, 6);
+      const nowM = (() => { const d = new Date(); const off = (d.getDay() + 6) % 7; const m = new Date(d); m.setDate(d.getDate() - off); m.setHours(0, 0, 0, 0); return m.getTime(); })();
+      if (!list.length) { weeklyEl.innerHTML = '<div class="empty-state" style="padding:18px;">Aucun mouvement encore. Ajoute une dépense ou un payout.</div>'; }
+      else {
+        weeklyEl.innerHTML = list.map(w => {
+          const wnet = w.in - w.out; const sun = new Date(w.monday); sun.setDate(sun.getDate() + 6);
+          const cur = w.monday.getTime() === nowM;
+          const lbl = 'du ' + w.monday.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' }) + ' au ' + sun.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
+          return `<div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:9px 0; border-bottom:1px solid var(--border);">
+            <span style="font-size:12px;">${cur ? '<strong>Cette semaine</strong> <span style="color:var(--text-3);">' + lbl + '</span>' : lbl}</span>
+            <span style="display:flex; gap:14px; align-items:center;">
+              <span class="mono pos" style="font-size:12px;">+${capEur(w.in)}</span>
+              <span class="mono neg" style="font-size:12px;">−${capEur(w.out)}</span>
+              <span class="mono ${wnet >= 0 ? 'pos' : 'neg'}" style="font-weight:700; min-width:66px; text-align:right;">${(wnet >= 0 ? '+' : '−') + capEur(Math.abs(wnet))}</span>
+            </span></div>`;
+        }).join('');
+      }
     }
 
     // Vue d'ensemble portefeuille (dérivée des comptes)
@@ -8104,7 +8168,94 @@
     }
   }
 
-  // ----- Config Capital (modal dynamique) -----
+  // ----- Tickets rapides : ajouter une dépense / un payout (simple & ludique) -----
+  let _ticketCat = 'challenge';
+  function closeCapTicket() { const o = document.getElementById('cap-ticket-overlay'); if (o) o.remove(); }
+  function capPickCat(t) {
+    _ticketCat = t;
+    document.querySelectorAll('#cap-ticket-overlay .cap-pill').forEach(b => {
+      const on = b.dataset.cat === t;
+      b.style.borderColor = on ? capCatColor(t) : 'var(--border)';
+      b.style.background = on ? capCatColor(t) + '26' : 'var(--bg-2)';
+      b.style.color = on ? 'var(--text-0)' : 'var(--text-2)';
+      b.style.fontWeight = on ? '700' : '500';
+    });
+  }
+  function capTicketShell(title, accent, inner) {
+    closeCapTicket();
+    const o = document.createElement('div');
+    o.id = 'cap-ticket-overlay';
+    o.style.cssText = 'position:fixed; inset:0; z-index:100000; display:flex; align-items:center; justify-content:center; padding:20px; background:rgba(8,5,20,0.62); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); animation:uiCfFade .18s ease-out;';
+    o.addEventListener('click', e => { if (e.target === o) closeCapTicket(); });
+    o.innerHTML = `
+      <div style="width:100%; max-width:440px; background:var(--bg-1); border:1px solid var(--border); border-radius:18px; box-shadow:0 24px 70px rgba(0,0,0,.55); overflow:hidden; animation:uiCfPop .22s cubic-bezier(.2,.9,.3,1.2);">
+        <div style="height:3px; background:${accent};"></div>
+        <div style="padding:22px 24px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+            <div style="font-size:17px; font-weight:700;">${title}</div>
+            <button onclick="closeCapTicket()" style="background:none; border:none; color:var(--text-2); cursor:pointer; font-size:22px; line-height:1;">×</button>
+          </div>
+          ${inner}
+        </div>
+      </div>`;
+    document.body.appendChild(o);
+    return o;
+  }
+  const _capFieldCss = 'width:100%; padding:11px 13px; border-radius:11px; border:1px solid var(--border); background:var(--bg-2); color:var(--text-0); font-size:14px; box-sizing:border-box;';
+  function openExpenseTicket() {
+    _ticketCat = 'challenge';
+    const today = new Date().toISOString().slice(0, 10);
+    const pills = Object.keys(CAP_CATS).map(t => `<button type="button" class="cap-pill" data-cat="${t}" onclick="capPickCat('${t}')" style="padding:8px 12px; border-radius:99px; border:1px solid var(--border); background:var(--bg-2); color:var(--text-2); font-size:12.5px; cursor:pointer; transition:all .12s;">${CAP_CATS[t].icon} ${CAP_CATS[t].label}</button>`).join('');
+    capTicketShell('➕ Nouvelle dépense', 'linear-gradient(90deg, var(--accent), var(--accent-bright))', `
+      <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-3); margin-bottom:8px;">Catégorie</div>
+      <div style="display:flex; gap:7px; flex-wrap:wrap; margin-bottom:18px;">${pills}</div>
+      <div style="margin-bottom:12px;"><div style="font-size:11px; color:var(--text-3); margin-bottom:5px;">Libellé (quoi ?)</div><input id="cap-tk-label" placeholder="ex. Challenge MFFU 50K" style="${_capFieldCss}"></div>
+      <div style="display:flex; gap:10px; margin-bottom:20px;">
+        <div style="flex:1;"><div style="font-size:11px; color:var(--text-3); margin-bottom:5px;">Montant (€)</div><input id="cap-tk-amount" type="number" inputmode="decimal" placeholder="0" style="${_capFieldCss}"></div>
+        <div style="flex:1;"><div style="font-size:11px; color:var(--text-3); margin-bottom:5px;">Date</div><input id="cap-tk-date" type="date" value="${today}" style="${_capFieldCss}"></div>
+      </div>
+      <div style="display:flex; gap:10px;">
+        <button onclick="closeCapTicket()" style="flex:1; padding:12px; border-radius:11px; border:1px solid var(--border); background:transparent; color:var(--text-1); font-weight:600; cursor:pointer;">Annuler</button>
+        <button onclick="capSubmitExpenseTicket()" style="flex:1; padding:12px; border-radius:11px; border:1px solid var(--accent); background:var(--accent); color:#fff; font-weight:700; cursor:pointer;">Ajouter la dépense</button>
+      </div>`);
+    capPickCat('challenge');
+    setTimeout(() => { const el = document.getElementById('cap-tk-label'); if (el) el.focus(); }, 40);
+  }
+  function capSubmitExpenseTicket() {
+    const label = (document.getElementById('cap-tk-label') || {}).value || '';
+    const amount = parseFloat(((document.getElementById('cap-tk-amount') || {}).value || '').replace(',', '.')) || 0;
+    const date = (document.getElementById('cap-tk-date') || {}).value || new Date().toISOString().slice(0, 10);
+    if (amount <= 0) { if (typeof showToast === 'function') showToast('⚠ Mets un montant', 'error'); return; }
+    CAPITAL.expenses.push({ id: 'e' + Date.now(), type: _ticketCat, label, amount, date });
+    saveCapital(); renderCapital(); closeCapTicket();
+    if (typeof showToast === 'function') showToast('✓ Dépense ajoutée · ' + capEur(amount), 'success');
+  }
+  function openPayoutTicket() {
+    const today = new Date().toISOString().slice(0, 10);
+    const accOpts = ACCOUNTS.map(a => `<option value="${a.name}">${a.name}</option>`).join('') || '<option value="">—</option>';
+    capTicketShell('💰 Payout reçu', 'linear-gradient(90deg, #10b981, #047857)', `
+      <div style="margin-bottom:12px;"><div style="font-size:11px; color:var(--text-3); margin-bottom:5px;">Compte</div><select id="cap-tk-account" style="${_capFieldCss}">${accOpts}</select></div>
+      <div style="display:flex; gap:10px; margin-bottom:20px;">
+        <div style="flex:1;"><div style="font-size:11px; color:var(--text-3); margin-bottom:5px;">Montant (€)</div><input id="cap-tk-pamount" type="number" inputmode="decimal" placeholder="0" style="${_capFieldCss}"></div>
+        <div style="flex:1;"><div style="font-size:11px; color:var(--text-3); margin-bottom:5px;">Date</div><input id="cap-tk-pdate" type="date" value="${today}" style="${_capFieldCss}"></div>
+      </div>
+      <div style="display:flex; gap:10px;">
+        <button onclick="closeCapTicket()" style="flex:1; padding:12px; border-radius:11px; border:1px solid var(--border); background:transparent; color:var(--text-1); font-weight:600; cursor:pointer;">Annuler</button>
+        <button onclick="capSubmitPayoutTicket()" style="flex:1; padding:12px; border-radius:11px; border:1px solid #10b981; background:#10b981; color:#fff; font-weight:700; cursor:pointer;">Encaisser le payout</button>
+      </div>`);
+    setTimeout(() => { const el = document.getElementById('cap-tk-pamount'); if (el) el.focus(); }, 40);
+  }
+  function capSubmitPayoutTicket() {
+    const account = (document.getElementById('cap-tk-account') || {}).value || '';
+    const amount = parseFloat(((document.getElementById('cap-tk-pamount') || {}).value || '').replace(',', '.')) || 0;
+    const date = (document.getElementById('cap-tk-pdate') || {}).value || new Date().toISOString().slice(0, 10);
+    if (amount <= 0) { if (typeof showToast === 'function') showToast('⚠ Mets un montant', 'error'); return; }
+    CAPITAL.payouts.push({ id: 'p' + Date.now(), account, amount, date });
+    saveCapital(); renderCapital(); closeCapTicket();
+    if (typeof showToast === 'function') showToast('💰 Payout encaissé · ' + capEur(amount), 'success');
+  }
+
+  // ----- Config Capital (budget + historique, modal dynamique) -----
   function openCapitalConfig() { renderCapitalConfig(); }
   function closeCapitalConfig() { const o = document.getElementById('cap-config-overlay'); if (o) o.remove(); }
   function renderCapitalConfig() {
@@ -8131,13 +8282,11 @@
         <span class="mono pos" style="font-weight:600;">${capEur(p.amount)}</span>
         <button onclick="capRemovePayout('${p.id}')" style="background:none; border:none; color:var(--red); cursor:pointer; font-size:15px;">×</button>
       </div>`).join('') || '<div style="font-size:12px; color:var(--text-3); padding:6px 0;">Aucun payout.</div>';
-    const accOpts = ACCOUNTS.map(a => `<option value="${a.name}">${a.name}</option>`).join('');
-    const today = new Date().toISOString().slice(0, 10);
     o.innerHTML = `
       <div style="width:100%; max-width:560px; background:var(--bg-1); border:1px solid var(--border); border-radius:18px; box-shadow:0 24px 70px rgba(0,0,0,.55); overflow:hidden;">
         <div style="height:3px; background:linear-gradient(90deg, var(--accent), var(--accent-bright));"></div>
         <div style="padding:22px 24px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border);">
-          <div style="font-size:16px; font-weight:700;">⚙ Config — Capital &amp; Money Management</div>
+          <div style="font-size:16px; font-weight:700;">⚙ Budget &amp; historique</div>
           <button onclick="closeCapitalConfig()" style="background:none; border:none; color:var(--text-2); cursor:pointer; font-size:22px; line-height:1;">×</button>
         </div>
         <div style="padding:22px 24px; max-height:70vh; overflow-y:auto;">
@@ -8146,26 +8295,11 @@
             <input type="number" id="cap-investi-input" value="${CAPITAL.investi || ''}" placeholder="1500" onchange="capSetInvesti(this.value)" style="width:100%; margin-top:6px; padding:10px 12px; border-radius:10px; border:1px solid var(--border); background:var(--bg-2); color:var(--text-0); font-size:14px;">
           </div>
 
-          <div style="font-weight:700; font-size:13px; margin-bottom:8px;">💸 Dépenses de l'activité</div>
+          <div style="font-size:12px; color:var(--text-3); margin-bottom:14px;">Pour ajouter, utilise les boutons <strong>➕ Dépense</strong> et <strong>💰 Payout reçu</strong> de la page. Ici tu gères ton budget et tu supprimes des lignes.</div>
+          <div style="font-weight:700; font-size:13px; margin-bottom:8px;">💸 Dépenses (${CAPITAL.expenses.length})</div>
           ${expRows}
-          <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; align-items:end;">
-            <select id="cap-exp-type" style="padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg-2); color:var(--text-0); font-size:12px;">
-              ${Object.keys(CAP_CATS).map(t => `<option value="${t}">${CAP_CATS[t].icon} ${CAP_CATS[t].label}</option>`).join('')}
-            </select>
-            <input id="cap-exp-label" placeholder="Libellé" style="flex:1; min-width:90px; padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg-2); color:var(--text-0); font-size:12px;">
-            <input id="cap-exp-amount" type="number" placeholder="€" style="width:70px; padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg-2); color:var(--text-0); font-size:12px;">
-            <input id="cap-exp-date" type="date" value="${today}" style="padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg-2); color:var(--text-0); font-size:12px;">
-            <button class="btn btn-primary" onclick="capAddExpense()" style="padding:8px 12px; font-size:12px;">+ Ajouter</button>
-          </div>
-
-          <div style="font-weight:700; font-size:13px; margin:22px 0 8px;">💰 Payouts reçus</div>
+          <div style="font-weight:700; font-size:13px; margin:22px 0 8px;">💰 Payouts reçus (${CAPITAL.payouts.length})</div>
           ${payRows}
-          <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; align-items:end;">
-            <select id="cap-pay-account" style="flex:1; min-width:110px; padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg-2); color:var(--text-0); font-size:12px;">${accOpts}</select>
-            <input id="cap-pay-amount" type="number" placeholder="€" style="width:70px; padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg-2); color:var(--text-0); font-size:12px;">
-            <input id="cap-pay-date" type="date" value="${today}" style="padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg-2); color:var(--text-0); font-size:12px;">
-            <button class="btn btn-primary" onclick="capAddPayout()" style="padding:8px 12px; font-size:12px;">+ Ajouter</button>
-          </div>
         </div>
         <div style="padding:16px 24px; border-top:1px solid var(--border); text-align:right;">
           <button class="btn btn-primary" onclick="closeCapitalConfig()">Terminé</button>
@@ -8173,24 +8307,7 @@
       </div>`;
   }
   function capSetInvesti(v) { CAPITAL.investi = parseFloat(String(v).replace(',', '.')) || 0; saveCapital(); renderCapital(); }
-  function capAddExpense() {
-    const type = (document.getElementById('cap-exp-type') || {}).value || 'autre';
-    const label = (document.getElementById('cap-exp-label') || {}).value || '';
-    const amount = parseFloat(((document.getElementById('cap-exp-amount') || {}).value || '').replace(',', '.')) || 0;
-    const date = (document.getElementById('cap-exp-date') || {}).value || new Date().toISOString().slice(0, 10);
-    if (amount <= 0) { if (typeof showToast === 'function') showToast('⚠ Montant invalide', 'error'); return; }
-    CAPITAL.expenses.push({ id: 'e' + Date.now(), type, label, amount, date });
-    saveCapital(); renderCapital(); renderCapitalConfig();
-  }
   function capRemoveExpense(id) { CAPITAL.expenses = CAPITAL.expenses.filter(e => e.id !== id); saveCapital(); renderCapital(); renderCapitalConfig(); }
-  function capAddPayout() {
-    const account = (document.getElementById('cap-pay-account') || {}).value || '';
-    const amount = parseFloat(((document.getElementById('cap-pay-amount') || {}).value || '').replace(',', '.')) || 0;
-    const date = (document.getElementById('cap-pay-date') || {}).value || new Date().toISOString().slice(0, 10);
-    if (amount <= 0) { if (typeof showToast === 'function') showToast('⚠ Montant invalide', 'error'); return; }
-    CAPITAL.payouts.push({ id: 'p' + Date.now(), account, amount, date });
-    saveCapital(); renderCapital(); renderCapitalConfig();
-  }
   function capRemovePayout(id) { CAPITAL.payouts = CAPITAL.payouts.filter(p => p.id !== id); saveCapital(); renderCapital(); renderCapitalConfig(); }
 
   function renderHealthGauges() {
