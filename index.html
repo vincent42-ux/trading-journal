@@ -5226,7 +5226,7 @@
           <button class="btn" onclick="runIntegrityCheck()" style="width:100%; margin-top:10px;">Vérifier l'intégrité des données</button>
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-14 · r22</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-17 · r23</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -9227,6 +9227,8 @@
     clearQtPhoto();
     render();
     renderSessionView();
+    // Followers actifs (non cramés) : ils reflètent le trade en direct via leur multiplicateur
+    const activeFollowers = ACCOUNTS.filter(a => a.role === 'follower' && a.status !== 'blown');
     showToast(activeFollowers.length
       ? '✓ Trade ajouté · master + ' + activeFollowers.length + ' follower' + (activeFollowers.length > 1 ? 's' : '')
       : '✓ Trade ajouté', 'success');
