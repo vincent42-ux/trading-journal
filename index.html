@@ -5319,7 +5319,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-18 · r35</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-18 · r36</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -8359,36 +8359,64 @@
   function capSetInvesti(v) { CAPITAL.investi = parseFloat(String(v).replace(',', '.')) || 0; saveCapital(); renderCapital(); }
   function capSetPayoutGoal(v) { CAPITAL.payoutGoalMonthly = parseFloat(String(v).replace(',', '.')) || 0; saveCapital(); renderCapital(); }
 
-  // ========== ROUTINE DISCIPLINE (quotidienne + hebdo, éditable) ==========
-  const DEFAULT_ROUTINE = {
-    daily: [
-      { id: 'd1', text: '☀️ Lumière dehors 10 min au réveil' },
-      { id: 'd2', text: '🧘 NSDR si nuit courte' },
-      { id: 'd3', text: '📊 Deepchart + journal prêts avant 13h' },
-      { id: 'd4', text: '📰 News vérifiées (pas de trade sur news)' },
-      { id: 'd5', text: '⏱️ Fenêtre 13h–14h30 respectée, plan suivi' },
-      { id: 'd6', text: '🛑 Stop respecté après mes SL (pas de tilt)' },
-      { id: 'd7', text: '📝 Journal rempli le jour même (résultat + screen)' },
-      { id: 'd8', text: '💪 Sport fait' },
-      { id: 'd9', text: '🥗 Nutrition clean' },
-      { id: 'd10', text: '🕶️ Lunettes au retour du poste' },
-      { id: 'd11', text: '🌑 Chambre noire + magnésium + créatine' },
-    ],
-    weekly: [
-      { id: 'w1', text: '5 jours de discipline ≥ 4/5' },
-      { id: 'w2', text: 'Au moins 2 jours parfaits (5/5)' },
-      { id: 'w3', text: 'Sport 3× dans la semaine' },
-      { id: 'w4', text: 'Aucun compte cramé par indiscipline' },
-      { id: 'w5', text: 'Bilan hebdo lu + 3 axes notés' },
-      { id: 'w6', text: 'Capital à jour (dépenses + payouts)' },
-    ],
-  };
+  // ========== ROUTINE DISCIPLINE (par jour Lun→Ven + bilan hebdo, éditable) ==========
+  const WD_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  const WD_LABEL = { mon: 'Lundi', tue: 'Mardi', wed: 'Mercredi', thu: 'Jeudi', fri: 'Vendredi', sat: 'Samedi', sun: 'Dimanche' };
+  const DEFAULT_ROUTINE = (function () {
+    const mk = (p, arr) => arr.map((t, i) => ({ id: p + '-' + (i + 1), text: t }));
+    const base = [
+      '☀️ Lumière dehors 10 min au réveil',
+      '🧘 NSDR si nuit courte',
+      '📊 Deepchart + journal prêts avant 13h',
+      '📰 News vérifiées (pas de trade sur news)',
+      '⏱️ Fenêtre 13h–14h30 respectée, plan suivi',
+      '🛑 Stop respecté après mes SL (pas de tilt)',
+      '📝 Journal rempli le jour même (résultat + screen)',
+      '🥗 Nutrition clean',
+      '🕶️ Lunettes au retour du poste',
+      '🌑 Chambre noire + magnésium + créatine',
+    ];
+    return {
+      days: {
+        mon: mk('mon', ['🗓️ Préparer ma semaine (objectifs + plan)'].concat(base, ['💪 Sport'])),
+        tue: mk('tue', base),
+        wed: mk('wed', base.concat(['💪 Sport'])),
+        thu: mk('thu', base),
+        fri: mk('fri', base.concat(['💪 Sport'])),
+        sat: [], sun: [],
+      },
+      weekly: mk('wk', [
+        'Ai-je respecté mon plan toute la semaine ?',
+        '5 jours de discipline ≥ 4/5',
+        'Au moins 2 jours parfaits (5/5)',
+        'Sport 3× dans la semaine',
+        'Aucun compte cramé par indiscipline',
+        'Bilan hebdo lu + 3 axes pour la semaine prochaine',
+        'Capital à jour (dépenses + payouts)',
+      ]),
+    };
+  })();
   let ROUTINE = JSON.parse(JSON.stringify(DEFAULT_ROUTINE));
   let ROUTINE_LOG = { daily: {}, weekly: {} };
   let ROUTINE_EDIT = false;
+  let ROUTINE_EDIT_DAY = null;
+  function normalizeRoutine(r) {
+    if (!r || typeof r !== 'object') return JSON.parse(JSON.stringify(DEFAULT_ROUTINE));
+    if (r.days && typeof r.days === 'object') {
+      for (const k of ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']) if (!Array.isArray(r.days[k])) r.days[k] = [];
+      if (!Array.isArray(r.weekly)) r.weekly = JSON.parse(JSON.stringify(DEFAULT_ROUTINE.weekly));
+      return r;
+    }
+    // Ancien format { daily, weekly } → on recopie la liste dans chaque jour ouvré
+    const days = {}; const src = Array.isArray(r.daily) ? r.daily : [];
+    for (const k of ['mon', 'tue', 'wed', 'thu', 'fri']) days[k] = src.map((it, i) => ({ id: k + '-' + (i + 1), text: it.text }));
+    days.sat = []; days.sun = [];
+    return { days, weekly: Array.isArray(r.weekly) ? r.weekly : JSON.parse(JSON.stringify(DEFAULT_ROUTINE.weekly)) };
+  }
   function loadRoutine() {
-    try { const r = localStorage.getItem('routine_def'); if (r) { const d = JSON.parse(r); if (d && Array.isArray(d.daily) && Array.isArray(d.weekly)) ROUTINE = d; } } catch (e) {}
+    try { const r = localStorage.getItem('routine_def'); ROUTINE = r ? normalizeRoutine(JSON.parse(r)) : JSON.parse(JSON.stringify(DEFAULT_ROUTINE)); } catch (e) { ROUTINE = JSON.parse(JSON.stringify(DEFAULT_ROUTINE)); }
     try { const l = localStorage.getItem('routine_log'); if (l) { const d = JSON.parse(l); if (d) ROUTINE_LOG = { daily: d.daily || {}, weekly: d.weekly || {} }; } } catch (e) {}
+    try { localStorage.setItem('routine_def', JSON.stringify(ROUTINE)); } catch (e) {}
   }
   function saveRoutine() {
     try { localStorage.setItem('routine_def', JSON.stringify(ROUTINE)); } catch (e) {}
@@ -8397,6 +8425,8 @@
   }
   function routineDayKey(d) { d = d || new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
   function routineWeekKey(d) { d = d || new Date(); const off = (d.getDay() + 6) % 7; const m = new Date(d); m.setDate(d.getDate() - off); m.setHours(0, 0, 0, 0); return routineDayKey(m); }
+  function wdKeyOf(d) { return WD_KEYS[(d || new Date()).getDay()]; }
+  function routineDayItems(d) { return ROUTINE.days[wdKeyOf(d)] || []; }
   function toggleRoutine(scope, id) {
     const key = scope === 'weekly' ? routineWeekKey() : routineDayKey();
     const bucket = ROUTINE_LOG[scope] || (ROUTINE_LOG[scope] = {});
@@ -8404,67 +8434,144 @@
     day[id] = !day[id];
     saveRoutine(); renderRoutine();
   }
+  function routineDayComplete(d) {
+    const items = routineDayItems(d); if (!items.length) return null; // jour de repos → ni complet ni cassé
+    const log = (ROUTINE_LOG.daily || {})[routineDayKey(d)] || {};
+    return items.every(it => log[it.id]);
+  }
   function routineStreak() {
-    const ids = ROUTINE.daily.map(i => i.id);
-    if (!ids.length) return 0;
     const today = new Date(); today.setHours(0, 0, 0, 0);
-    const isComplete = (d) => { const day = (ROUTINE_LOG.daily || {})[routineDayKey(d)] || {}; return ids.every(id => day[id]); };
-    let streak = 0, start = isComplete(today) ? 0 : 1;
-    for (let i = start; i < 400; i++) {
+    let streak = 0;
+    for (let i = 0; i < 400; i++) {
       const d = new Date(today); d.setDate(today.getDate() - i);
-      if (isComplete(d)) streak++; else break;
+      const c = routineDayComplete(d);
+      if (c === null) continue;              // jour de repos, on saute
+      if (c) streak++;
+      else { if (i === 0) continue; break; } // aujourd'hui pas fini → on ne casse pas la série
     }
     return streak;
   }
-  function addRoutineItem(scope) {
-    const input = document.getElementById('routine-new-' + scope);
-    if (!input || !input.value.trim()) return;
-    ROUTINE[scope].push({ id: scope[0] + Date.now().toString(36), text: input.value.trim() });
-    input.value = '';
-    saveRoutine(); renderRoutine();
+  function routineList(k) { return k === 'weekly' ? ROUTINE.weekly : (ROUTINE.days[k] || (ROUTINE.days[k] = [])); }
+  function setRoutineEditDay(k) { ROUTINE_EDIT_DAY = k; renderRoutine(); }
+  function routineEditAdd(k) { const inp = document.getElementById('routine-new'); if (!inp || !inp.value.trim()) return; routineList(k).push({ id: k + '-' + Date.now().toString(36), text: inp.value.trim() }); inp.value = ''; saveRoutine(); renderRoutine(); }
+  function routineEditRemove(k, id) { const l = routineList(k); const i = l.findIndex(x => x.id === id); if (i >= 0) l.splice(i, 1); saveRoutine(); renderRoutine(); }
+  function routineEditText(k, id) { const it = routineList(k).find(x => x.id === id); if (!it) return; const nv = prompt('Modifier :', it.text); if (nv == null || !nv.trim()) return; it.text = nv.trim(); saveRoutine(); renderRoutine(); }
+  function toggleRoutineEdit() {
+    ROUTINE_EDIT = !ROUTINE_EDIT;
+    if (ROUTINE_EDIT && !ROUTINE_EDIT_DAY) { const t = wdKeyOf(); ROUTINE_EDIT_DAY = (t === 'sat' || t === 'sun') ? 'mon' : t; }
+    renderRoutine();
   }
-  function removeRoutineItem(scope, id) { ROUTINE[scope] = ROUTINE[scope].filter(i => i.id !== id); saveRoutine(); renderRoutine(); }
-  function editRoutineItem(scope, id) {
-    const it = ROUTINE[scope].find(i => i.id === id); if (!it) return;
-    const nv = prompt('Modifier l\'item :', it.text); if (nv == null || !nv.trim()) return;
-    it.text = nv.trim(); saveRoutine(); renderRoutine();
-  }
-  function toggleRoutineEdit() { ROUTINE_EDIT = !ROUTINE_EDIT; renderRoutine(); }
   function renderRoutine() {
-    const el = document.getElementById('routine-body');
-    if (!el) return;
+    const el = document.getElementById('routine-body'); if (!el) return;
+    if (ROUTINE_EDIT) { el.innerHTML = renderRoutineEditor(); return; }
+    const now = new Date();
+    const wd = wdKeyOf(now);
+    const items = ROUTINE.days[wd] || [];
     const dayLog = (ROUTINE_LOG.daily || {})[routineDayKey()] || {};
-    const weekLog = (ROUTINE_LOG.weekly || {})[routineWeekKey()] || {};
-    const dailyDone = ROUTINE.daily.filter(i => dayLog[i.id]).length;
-    const weeklyDone = ROUTINE.weekly.filter(i => weekLog[i.id]).length;
-    const allDay = ROUTINE.daily.length && dailyDone === ROUTINE.daily.length;
+    const done = items.filter(i => dayLog[i.id]).length;
+    const allDone = items.length > 0 && done === items.length;
     const streak = routineStreak();
-    const row = (scope, it, done) => `
-      <div style="display:flex; align-items:center; gap:10px; padding:9px 2px; border-bottom:1px solid var(--border);">
-        <span onclick="toggleRoutine('${scope}','${it.id}')" style="cursor:pointer; width:22px; height:22px; flex:0 0 auto; border-radius:7px; border:2px solid ${done ? 'var(--green)' : 'var(--border)'}; background:${done ? 'var(--green)' : 'transparent'}; display:flex; align-items:center; justify-content:center; color:#fff; font-size:13px;">${done ? '✓' : ''}</span>
-        <span onclick="toggleRoutine('${scope}','${it.id}')" style="flex:1; cursor:pointer; font-size:13px; ${done ? 'color:var(--text-3); text-decoration:line-through;' : ''}">${it.text}</span>
-        ${ROUTINE_EDIT ? `<span onclick="editRoutineItem('${scope}','${it.id}')" style="cursor:pointer; color:var(--text-3); font-size:13px;">✏️</span><span onclick="removeRoutineItem('${scope}','${it.id}')" style="cursor:pointer; color:var(--red); font-size:17px;">×</span>` : ''}
+    const dateLong = now.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
+    const isWeekend = wd === 'sat' || wd === 'sun';
+    const isFriday = wd === 'fri';
+    const checkRow = (scope, it, d) => `
+      <div onclick="toggleRoutine('${scope}','${it.id}')" style="display:flex; align-items:center; gap:12px; padding:13px 6px; border-bottom:1px solid var(--border); cursor:pointer;">
+        <span style="flex:1; font-size:14px; ${d ? 'color:var(--text-3); text-decoration:line-through;' : 'color:var(--text-0);'}">${it.text}</span>
+        <span style="width:27px; height:27px; flex:0 0 auto; border-radius:8px; border:2px solid ${d ? 'var(--green)' : 'var(--border)'}; background:${d ? 'var(--green)' : 'transparent'}; display:flex; align-items:center; justify-content:center; color:#fff; font-size:15px;">${d ? '✓' : ''}</span>
       </div>`;
-    const addRow = (scope) => ROUTINE_EDIT ? `
-      <div style="display:flex; gap:6px; margin-top:8px;">
-        <input id="routine-new-${scope}" placeholder="Nouvel item…" style="flex:1; padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg-2); color:var(--text-0); font-size:12px;">
-        <button class="btn btn-primary" style="padding:8px 12px; font-size:12px;" onclick="addRoutineItem('${scope}')">+ Ajouter</button>
-      </div>` : '';
-    el.innerHTML = `
-      <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:14px;">
-        <div style="display:flex; gap:10px; align-items:center;">
-          <div class="mono" style="font-size:22px; font-weight:800; color:${streak > 0 ? 'var(--amber)' : 'var(--text-3)'};">🔥 ${streak}</div>
-          <div style="font-size:11px; color:var(--text-2); line-height:1.3;">jour${streak > 1 ? 's' : ''} d'affilée<br>à 100%</div>
+    let html = `<div style="max-width:480px; margin:0 auto;">
+      <div style="text-align:center; margin-bottom:16px;">
+        <div style="font-size:11px; color:var(--text-3); text-transform:uppercase; letter-spacing:0.1em;">${dateLong}</div>
+        <div style="font-size:26px; font-weight:800; letter-spacing:-0.02em; margin-top:2px;">${WD_LABEL[wd]}</div>
+        <div style="margin-top:8px; display:inline-flex; align-items:center; gap:14px; font-size:12px; color:var(--text-2);">
+          <span class="mono" style="color:${streak > 0 ? 'var(--amber)' : 'var(--text-3)'}; font-weight:700;">🔥 ${streak} ${streak > 1 ? 'jours' : 'jour'}</span>
+          ${items.length ? `<span class="mono ${allDone ? 'pos' : ''}" style="font-weight:700;">${done}/${items.length}</span>` : ''}
+          <span onclick="toggleRoutineEdit()" style="cursor:pointer; color:var(--accent);">✏️ Modifier</span>
         </div>
-        <div style="font-size:12px; color:var(--text-2);">Aujourd'hui <strong class="mono ${allDay ? 'pos' : ''}">${dailyDone}/${ROUTINE.daily.length}</strong>${allDay ? ' ✅' : ''}</div>
-        <button class="btn" style="font-size:11px; padding:5px 10px;" onclick="toggleRoutineEdit()">${ROUTINE_EDIT ? '✓ Terminé' : '✏️ Modifier'}</button>
+      </div>`;
+    if (isWeekend && !items.length) {
+      html += `<div style="text-align:center; padding:36px 20px; border:1px solid var(--border); border-radius:16px; background:var(--bg-2);">
+        <div style="font-size:34px;">🌴</div>
+        <div style="font-size:15px; font-weight:700; margin-top:8px;">Week-end — on coupe.</div>
+        <div style="font-size:12px; color:var(--text-2); margin-top:4px;">Repos, famille, copine, amis. Tu reviens carré lundi. 💪</div>
+      </div>`;
+    } else {
+      html += `<div style="border:1px solid var(--border); border-radius:16px; background:var(--bg-1); padding:6px 16px; box-shadow:0 4px 18px rgba(0,0,0,.18);">
+        ${items.map(it => checkRow('daily', it, !!dayLog[it.id])).join('') || '<div style="padding:18px; text-align:center; color:var(--text-3); font-size:12px;">Aucun item ce jour. Clique ✏️ Modifier pour en ajouter.</div>'}
+      </div>`;
+      if (items.length) {
+        html += allDone
+          ? `<div style="text-align:center; margin-top:16px; padding:16px; border-radius:14px; background:rgba(16,185,129,0.12); border:1px solid var(--green);"><div style="font-size:22px;">✅</div><strong style="color:var(--green);">Bien joué, bonne journée 💪</strong><div style="font-size:12px; color:var(--text-2); margin-top:3px;">Routine bouclée à 100%. C'est ça qui te sort de l'usine.</div></div>`
+          : `<div style="text-align:center; margin-top:16px; padding:14px; border-radius:14px; background:var(--bg-2); border:1px solid var(--border); color:var(--text-2); font-size:13px;">Il te reste <strong style="color:var(--text-0);">${items.length - done}</strong> chose${items.length - done > 1 ? 's' : ''} à cocher. Accroche-toi, finis ta journée propre.</div>`;
+      }
+    }
+    if (isFriday) {
+      const weekLog = (ROUTINE_LOG.weekly || {})[routineWeekKey()] || {};
+      const wDone = ROUTINE.weekly.filter(i => weekLog[i.id]).length;
+      const wAll = ROUTINE.weekly.length && wDone === ROUTINE.weekly.length;
+      html += `<div style="margin-top:26px; text-align:center; margin-bottom:10px;">
+          <div style="font-size:18px; font-weight:800;">📊 Bilan de la semaine</div>
+          <div style="font-size:12px; color:var(--text-2);">Ai-je été discipliné ? · ${wDone}/${ROUTINE.weekly.length}</div>
+        </div>
+        <div style="border:1px solid var(--border); border-radius:16px; background:var(--bg-1); padding:6px 16px;">
+          ${ROUTINE.weekly.map(it => checkRow('weekly', it, !!weekLog[it.id])).join('')}
+        </div>
+        ${wAll ? `<div style="text-align:center; margin-top:14px; padding:14px; border-radius:14px; background:rgba(16,185,129,0.12); border:1px solid var(--green);"><strong style="color:var(--green);">Semaine carrée 🎯</strong> — repos mérité ce week-end.</div>` : ''}`;
+    }
+    html += `</div>`;
+    el.innerHTML = html;
+  }
+  function renderRoutineEditor() {
+    const dayTabs = ['mon', 'tue', 'wed', 'thu', 'fri', 'weekly'].map(k => {
+      const on = ROUTINE_EDIT_DAY === k;
+      const lbl = k === 'weekly' ? 'Bilan hebdo' : WD_LABEL[k].slice(0, 3);
+      return `<button onclick="setRoutineEditDay('${k}')" style="padding:7px 11px; border-radius:9px; border:1px solid ${on ? 'var(--accent)' : 'var(--border)'}; background:${on ? 'var(--accent)' : 'var(--bg-2)'}; color:${on ? '#fff' : 'var(--text-2)'}; font-size:12px; font-weight:600; cursor:pointer;">${lbl}</button>`;
+    }).join('');
+    const k = ROUTINE_EDIT_DAY || 'mon';
+    const list = routineList(k);
+    const rows = list.map(it => `
+      <div style="display:flex; align-items:center; gap:8px; padding:8px 4px; border-bottom:1px solid var(--border); font-size:13px;">
+        <span style="flex:1;">${it.text}</span>
+        <span onclick="routineEditText('${k}','${it.id}')" style="cursor:pointer; color:var(--text-3);">✏️</span>
+        <span onclick="routineEditRemove('${k}','${it.id}')" style="cursor:pointer; color:var(--red); font-size:17px;">×</span>
+      </div>`).join('') || '<div style="padding:14px; text-align:center; color:var(--text-3); font-size:12px;">Vide. Ajoute un item ci-dessous.</div>';
+    return `<div style="max-width:520px; margin:0 auto;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+        <strong style="font-size:14px;">✏️ Modifier mes routines</strong>
+        <button class="btn btn-primary" style="font-size:12px; padding:6px 12px;" onclick="toggleRoutineEdit()">✓ Terminé</button>
       </div>
-      <div style="font-weight:700; font-size:11px; color:var(--text-3); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Routine du jour</div>
-      ${ROUTINE.daily.map(it => row('daily', it, !!dayLog[it.id])).join('')}
-      ${addRow('daily')}
-      <div style="font-weight:700; font-size:11px; color:var(--text-3); text-transform:uppercase; letter-spacing:0.05em; margin:18px 0 4px;">Bilan de la semaine · ${weeklyDone}/${ROUTINE.weekly.length}</div>
-      ${ROUTINE.weekly.map(it => row('weekly', it, !!weekLog[it.id])).join('')}
-      ${addRow('weekly')}`;
+      <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px;">${dayTabs}</div>
+      <div style="font-size:11px; color:var(--text-3); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">${k === 'weekly' ? 'Bilan de la semaine (vendredi)' : 'Routine du ' + WD_LABEL[k]}</div>
+      <div style="border:1px solid var(--border); border-radius:12px; padding:4px 14px; background:var(--bg-1);">${rows}</div>
+      <div style="display:flex; gap:6px; margin-top:10px;">
+        <input id="routine-new" placeholder="Nouvel item…" style="flex:1; padding:9px 11px; border-radius:9px; border:1px solid var(--border); background:var(--bg-2); color:var(--text-0); font-size:13px;">
+        <button class="btn btn-primary" style="padding:9px 14px; font-size:13px;" onclick="routineEditAdd('${k}')">+ Ajouter</button>
+      </div>
+    </div>`;
+  }
+  // Résumé routine pour le rapport hebdo : jours bouclés à 100% sur la période
+  function routinePeriodHTML(start, end) {
+    if (typeof ROUTINE === 'undefined') return '';
+    let total = 0, done = 0;
+    const d = new Date(start);
+    while (d <= end) {
+      const c = routineDayComplete(d);
+      if (c !== null) { total++; if (c) done++; }
+      d.setDate(d.getDate() + 1);
+    }
+    if (!total) return '';
+    const pct = Math.round(done / total * 100);
+    const col = pct >= 80 ? 'var(--green)' : pct >= 50 ? 'var(--amber)' : 'var(--red)';
+    return `<div class="card" style="margin-bottom:20px;">
+      <div class="card-header"><span class="card-title">🔁 Routine discipline</span></div>
+      <div class="card-body">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span style="font-size:13px;">Jours de routine bouclés à 100%</span>
+          <span class="mono" style="font-size:20px; font-weight:800; color:${col};">${done}/${total}</span>
+        </div>
+        <div style="height:8px; border-radius:99px; background:var(--bg-2); border:1px solid var(--border); overflow:hidden; margin-top:8px;"><div style="height:100%; width:${pct}%; background:${col};"></div></div>
+      </div>
+    </div>`;
   }
   function capRemoveExpense(id) { CAPITAL.expenses = CAPITAL.expenses.filter(e => e.id !== id); saveCapital(); renderCapital(); renderCapitalConfig(); }
   function capRemovePayout(id) { CAPITAL.payouts = CAPITAL.payouts.filter(p => p.id !== id); saveCapital(); renderCapital(); renderCapitalConfig(); }
@@ -10074,7 +10181,7 @@
     });
 
     if (!weekTrades.length) {
-      c.innerHTML = `<div class="empty-state" style="padding:40px;">Aucun trade ${periodWordLow}.<br><span style="font-size:11px;">Navigue avec ‹ › pour voir les périodes passées.</span></div>` + capitalSynthesisHTML(monday, sunday, periodWord);
+      c.innerHTML = `<div class="empty-state" style="padding:40px;">Aucun trade ${periodWordLow}.<br><span style="font-size:11px;">Navigue avec ‹ › pour voir les périodes passées.</span></div>` + routinePeriodHTML(monday, sunday) + capitalSynthesisHTML(monday, sunday, periodWord);
       return;
     }
 
@@ -10225,6 +10332,7 @@
         </div>
       </div>
 
+      ${routinePeriodHTML(monday, sunday)}
       ${capitalSynthesisHTML(monday, sunday, periodWord)}
 
       <!-- Ce qui a marché / Ce qui n'a pas marché -->
@@ -13656,8 +13764,8 @@
         CAPITAL = { investi: +data.capital.investi || 0, expenses: Array.isArray(data.capital.expenses) ? data.capital.expenses : [], payouts: Array.isArray(data.capital.payouts) ? data.capital.payouts : [], payoutGoalMonthly: (data.capital.payoutGoalMonthly != null ? +data.capital.payoutGoalMonthly : 1500) };
         try { localStorage.setItem('capital_mm', JSON.stringify(CAPITAL)); } catch (e2) {}
       }
-      if (data.routine && Array.isArray(data.routine.daily) && Array.isArray(data.routine.weekly)) {
-        ROUTINE = data.routine;
+      if (data.routine && typeof data.routine === 'object' && (data.routine.days || data.routine.daily)) {
+        ROUTINE = (typeof normalizeRoutine === 'function') ? normalizeRoutine(data.routine) : data.routine;
         try { localStorage.setItem('routine_def', JSON.stringify(ROUTINE)); } catch (e2) {}
       }
       if (data.routineLog && typeof data.routineLog === 'object') {
