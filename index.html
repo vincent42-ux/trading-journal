@@ -5319,7 +5319,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-18 · r36</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-18 · r37</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -8475,8 +8475,8 @@
     const isWeekend = wd === 'sat' || wd === 'sun';
     const isFriday = wd === 'fri';
     const checkRow = (scope, it, d) => `
-      <div onclick="toggleRoutine('${scope}','${it.id}')" style="display:flex; align-items:center; gap:12px; padding:13px 6px; border-bottom:1px solid var(--border); cursor:pointer;">
-        <span style="flex:1; font-size:14px; ${d ? 'color:var(--text-3); text-decoration:line-through;' : 'color:var(--text-0);'}">${it.text}</span>
+      <div onclick="toggleRoutine('${scope}','${it.id}')" style="display:flex; align-items:center; gap:12px; padding:13px 12px; margin:2px 0; border-radius:11px; cursor:pointer; transition:background .15s; ${d ? 'background:rgba(16,185,129,0.16);' : 'border-bottom:1px solid var(--border);'}">
+        <span style="flex:1; font-size:14px; font-weight:${d ? '600' : '400'}; color:${d ? 'var(--green)' : 'var(--text-0)'};">${it.text}</span>
         <span style="width:27px; height:27px; flex:0 0 auto; border-radius:8px; border:2px solid ${d ? 'var(--green)' : 'var(--border)'}; background:${d ? 'var(--green)' : 'transparent'}; display:flex; align-items:center; justify-content:center; color:#fff; font-size:15px;">${d ? '✓' : ''}</span>
       </div>`;
     let html = `<div style="max-width:480px; margin:0 auto;">
