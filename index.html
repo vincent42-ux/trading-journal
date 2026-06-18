@@ -4544,6 +4544,10 @@
 
         <!-- ===== ONGLET DISCIPLINE ===== -->
         <div class="stats-tab-panel active" id="stats-tab-discipline">
+        <div class="card" style="margin-bottom:18px;">
+          <div class="card-header"><span class="card-title">🔁 Ma routine discipline</span><span class="muted" style="font-size:11px;">se coche chaque jour · éditable</span></div>
+          <div class="card-body" id="routine-body"></div>
+        </div>
         <div class="stats-section-title">Discipline — respect du plan</div>
         <div class="row-4col" style="margin-bottom: 18px;">
           <div class="card discipline-card discipline-perfect">
@@ -5304,7 +5308,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-18 · r33</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-18 · r34</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -6558,6 +6562,7 @@
     _safe(() => renderHealthGauges(), 'renderHealthGauges');
     _safe(() => renderConsistency(s), 'renderConsistency');
     if (typeof renderCapital === 'function') _safe(() => renderCapital(), 'renderCapital');
+    if (typeof renderRoutine === 'function') _safe(() => renderRoutine(), 'renderRoutine');
     _safe(() => rebuildCharts(filtered), 'rebuildCharts');
     _safe(() => renderStatsPage(s), 'renderStatsPage');
     _safe(() => renderAdvancedStats(s), 'renderAdvancedStats');
@@ -8342,6 +8347,114 @@
   }
   function capSetInvesti(v) { CAPITAL.investi = parseFloat(String(v).replace(',', '.')) || 0; saveCapital(); renderCapital(); }
   function capSetPayoutGoal(v) { CAPITAL.payoutGoalMonthly = parseFloat(String(v).replace(',', '.')) || 0; saveCapital(); renderCapital(); }
+
+  // ========== ROUTINE DISCIPLINE (quotidienne + hebdo, éditable) ==========
+  const DEFAULT_ROUTINE = {
+    daily: [
+      { id: 'd1', text: '☀️ Lumière dehors 10 min au réveil' },
+      { id: 'd2', text: '🧘 NSDR si nuit courte' },
+      { id: 'd3', text: '📊 Deepchart + journal prêts avant 13h' },
+      { id: 'd4', text: '📰 News vérifiées (pas de trade sur news)' },
+      { id: 'd5', text: '⏱️ Fenêtre 13h–14h30 respectée, plan suivi' },
+      { id: 'd6', text: '🛑 Stop respecté après mes SL (pas de tilt)' },
+      { id: 'd7', text: '📝 Journal rempli le jour même (résultat + screen)' },
+      { id: 'd8', text: '💪 Sport fait' },
+      { id: 'd9', text: '🥗 Nutrition clean' },
+      { id: 'd10', text: '🕶️ Lunettes au retour du poste' },
+      { id: 'd11', text: '🌑 Chambre noire + magnésium + créatine' },
+    ],
+    weekly: [
+      { id: 'w1', text: '5 jours de discipline ≥ 4/5' },
+      { id: 'w2', text: 'Au moins 2 jours parfaits (5/5)' },
+      { id: 'w3', text: 'Sport 3× dans la semaine' },
+      { id: 'w4', text: 'Aucun compte cramé par indiscipline' },
+      { id: 'w5', text: 'Bilan hebdo lu + 3 axes notés' },
+      { id: 'w6', text: 'Capital à jour (dépenses + payouts)' },
+    ],
+  };
+  let ROUTINE = JSON.parse(JSON.stringify(DEFAULT_ROUTINE));
+  let ROUTINE_LOG = { daily: {}, weekly: {} };
+  let ROUTINE_EDIT = false;
+  function loadRoutine() {
+    try { const r = localStorage.getItem('routine_def'); if (r) { const d = JSON.parse(r); if (d && Array.isArray(d.daily) && Array.isArray(d.weekly)) ROUTINE = d; } } catch (e) {}
+    try { const l = localStorage.getItem('routine_log'); if (l) { const d = JSON.parse(l); if (d) ROUTINE_LOG = { daily: d.daily || {}, weekly: d.weekly || {} }; } } catch (e) {}
+  }
+  function saveRoutine() {
+    try { localStorage.setItem('routine_def', JSON.stringify(ROUTINE)); } catch (e) {}
+    try { localStorage.setItem('routine_log', JSON.stringify(ROUTINE_LOG)); } catch (e) {}
+    if (typeof markLocalChange === 'function') markLocalChange();
+  }
+  function routineDayKey(d) { d = d || new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+  function routineWeekKey(d) { d = d || new Date(); const off = (d.getDay() + 6) % 7; const m = new Date(d); m.setDate(d.getDate() - off); m.setHours(0, 0, 0, 0); return routineDayKey(m); }
+  function toggleRoutine(scope, id) {
+    const key = scope === 'weekly' ? routineWeekKey() : routineDayKey();
+    const bucket = ROUTINE_LOG[scope] || (ROUTINE_LOG[scope] = {});
+    const day = bucket[key] || (bucket[key] = {});
+    day[id] = !day[id];
+    saveRoutine(); renderRoutine();
+  }
+  function routineStreak() {
+    const ids = ROUTINE.daily.map(i => i.id);
+    if (!ids.length) return 0;
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const isComplete = (d) => { const day = (ROUTINE_LOG.daily || {})[routineDayKey(d)] || {}; return ids.every(id => day[id]); };
+    let streak = 0, start = isComplete(today) ? 0 : 1;
+    for (let i = start; i < 400; i++) {
+      const d = new Date(today); d.setDate(today.getDate() - i);
+      if (isComplete(d)) streak++; else break;
+    }
+    return streak;
+  }
+  function addRoutineItem(scope) {
+    const input = document.getElementById('routine-new-' + scope);
+    if (!input || !input.value.trim()) return;
+    ROUTINE[scope].push({ id: scope[0] + Date.now().toString(36), text: input.value.trim() });
+    input.value = '';
+    saveRoutine(); renderRoutine();
+  }
+  function removeRoutineItem(scope, id) { ROUTINE[scope] = ROUTINE[scope].filter(i => i.id !== id); saveRoutine(); renderRoutine(); }
+  function editRoutineItem(scope, id) {
+    const it = ROUTINE[scope].find(i => i.id === id); if (!it) return;
+    const nv = prompt('Modifier l\'item :', it.text); if (nv == null || !nv.trim()) return;
+    it.text = nv.trim(); saveRoutine(); renderRoutine();
+  }
+  function toggleRoutineEdit() { ROUTINE_EDIT = !ROUTINE_EDIT; renderRoutine(); }
+  function renderRoutine() {
+    const el = document.getElementById('routine-body');
+    if (!el) return;
+    const dayLog = (ROUTINE_LOG.daily || {})[routineDayKey()] || {};
+    const weekLog = (ROUTINE_LOG.weekly || {})[routineWeekKey()] || {};
+    const dailyDone = ROUTINE.daily.filter(i => dayLog[i.id]).length;
+    const weeklyDone = ROUTINE.weekly.filter(i => weekLog[i.id]).length;
+    const allDay = ROUTINE.daily.length && dailyDone === ROUTINE.daily.length;
+    const streak = routineStreak();
+    const row = (scope, it, done) => `
+      <div style="display:flex; align-items:center; gap:10px; padding:9px 2px; border-bottom:1px solid var(--border);">
+        <span onclick="toggleRoutine('${scope}','${it.id}')" style="cursor:pointer; width:22px; height:22px; flex:0 0 auto; border-radius:7px; border:2px solid ${done ? 'var(--green)' : 'var(--border)'}; background:${done ? 'var(--green)' : 'transparent'}; display:flex; align-items:center; justify-content:center; color:#fff; font-size:13px;">${done ? '✓' : ''}</span>
+        <span onclick="toggleRoutine('${scope}','${it.id}')" style="flex:1; cursor:pointer; font-size:13px; ${done ? 'color:var(--text-3); text-decoration:line-through;' : ''}">${it.text}</span>
+        ${ROUTINE_EDIT ? `<span onclick="editRoutineItem('${scope}','${it.id}')" style="cursor:pointer; color:var(--text-3); font-size:13px;">✏️</span><span onclick="removeRoutineItem('${scope}','${it.id}')" style="cursor:pointer; color:var(--red); font-size:17px;">×</span>` : ''}
+      </div>`;
+    const addRow = (scope) => ROUTINE_EDIT ? `
+      <div style="display:flex; gap:6px; margin-top:8px;">
+        <input id="routine-new-${scope}" placeholder="Nouvel item…" style="flex:1; padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg-2); color:var(--text-0); font-size:12px;">
+        <button class="btn btn-primary" style="padding:8px 12px; font-size:12px;" onclick="addRoutineItem('${scope}')">+ Ajouter</button>
+      </div>` : '';
+    el.innerHTML = `
+      <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:14px;">
+        <div style="display:flex; gap:10px; align-items:center;">
+          <div class="mono" style="font-size:22px; font-weight:800; color:${streak > 0 ? 'var(--amber)' : 'var(--text-3)'};">🔥 ${streak}</div>
+          <div style="font-size:11px; color:var(--text-2); line-height:1.3;">jour${streak > 1 ? 's' : ''} d'affilée<br>à 100%</div>
+        </div>
+        <div style="font-size:12px; color:var(--text-2);">Aujourd'hui <strong class="mono ${allDay ? 'pos' : ''}">${dailyDone}/${ROUTINE.daily.length}</strong>${allDay ? ' ✅' : ''}</div>
+        <button class="btn" style="font-size:11px; padding:5px 10px;" onclick="toggleRoutineEdit()">${ROUTINE_EDIT ? '✓ Terminé' : '✏️ Modifier'}</button>
+      </div>
+      <div style="font-weight:700; font-size:11px; color:var(--text-3); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Routine du jour</div>
+      ${ROUTINE.daily.map(it => row('daily', it, !!dayLog[it.id])).join('')}
+      ${addRow('daily')}
+      <div style="font-weight:700; font-size:11px; color:var(--text-3); text-transform:uppercase; letter-spacing:0.05em; margin:18px 0 4px;">Bilan de la semaine · ${weeklyDone}/${ROUTINE.weekly.length}</div>
+      ${ROUTINE.weekly.map(it => row('weekly', it, !!weekLog[it.id])).join('')}
+      ${addRow('weekly')}`;
+  }
   function capRemoveExpense(id) { CAPITAL.expenses = CAPITAL.expenses.filter(e => e.id !== id); saveCapital(); renderCapital(); renderCapitalConfig(); }
   function capRemovePayout(id) { CAPITAL.payouts = CAPITAL.payouts.filter(p => p.id !== id); saveCapital(); renderCapital(); renderCapitalConfig(); }
 
@@ -13479,6 +13592,8 @@
       backtestScenarios: (typeof SCENARIOS !== 'undefined') ? SCENARIOS : null,
       backtestTrades: (typeof BACKTEST_TRADES !== 'undefined') ? BACKTEST_TRADES : null,
       capital: (typeof CAPITAL !== 'undefined') ? CAPITAL : null,
+      routine: (typeof ROUTINE !== 'undefined') ? ROUTINE : null,
+      routineLog: (typeof ROUTINE_LOG !== 'undefined') ? ROUTINE_LOG : null,
     };
   }
   // Applique une sauvegarde (import fichier OU synchro cloud)
@@ -13529,6 +13644,14 @@
       if (data.capital && typeof data.capital === 'object') {
         CAPITAL = { investi: +data.capital.investi || 0, expenses: Array.isArray(data.capital.expenses) ? data.capital.expenses : [], payouts: Array.isArray(data.capital.payouts) ? data.capital.payouts : [], payoutGoalMonthly: (data.capital.payoutGoalMonthly != null ? +data.capital.payoutGoalMonthly : 1500) };
         try { localStorage.setItem('capital_mm', JSON.stringify(CAPITAL)); } catch (e2) {}
+      }
+      if (data.routine && Array.isArray(data.routine.daily) && Array.isArray(data.routine.weekly)) {
+        ROUTINE = data.routine;
+        try { localStorage.setItem('routine_def', JSON.stringify(ROUTINE)); } catch (e2) {}
+      }
+      if (data.routineLog && typeof data.routineLog === 'object') {
+        ROUTINE_LOG = { daily: data.routineLog.daily || {}, weekly: data.routineLog.weekly || {} };
+        try { localStorage.setItem('routine_log', JSON.stringify(ROUTINE_LOG)); } catch (e2) {}
       }
     }
     saveTrades(true); saveAccountsAndRotation(); savePrefs();
@@ -14818,6 +14941,7 @@
   try { const freed = compactStorage(); if (freed > 50000) console.log('[init] compactStorage —', (freed/1048576).toFixed(2), 'Mo libérés'); } catch (e) { console.error('[init compactStorage]', e); }
   try { if (typeof loadMarketNotes === 'function') loadMarketNotes(); } catch (e) { console.error('[init loadMarketNotes]', e); }
   try { if (typeof loadCapital === 'function') loadCapital(); } catch (e) { console.error('[init loadCapital]', e); }
+  try { if (typeof loadRoutine === 'function') loadRoutine(); } catch (e) { console.error('[init loadRoutine]', e); }
   try { loadPlan(); renderPlanView(); console.log('[init] loadPlan OK'); } catch (e) { console.error('[init loadPlan]', e); }
   try { loadGoalsLadder(); console.log('[init] loadGoalsLadder OK'); } catch (e) { console.error('[init loadGoalsLadder]', e); }
   try { updateNotifBadge(); renderNotifications(); console.log('[init] notifications OK'); } catch (e) { console.error('[init notifications]', e); }
