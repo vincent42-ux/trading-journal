@@ -4354,6 +4354,9 @@
         <!-- Verdict rentabilité -->
         <div class="card" style="margin-bottom:14px;"><div class="card-body" id="cap-verdict" style="padding:22px 24px;"></div></div>
 
+        <!-- Objectif payout du mois (relié aux objectifs) -->
+        <div class="card" style="margin-bottom:14px;"><div class="card-body" id="cap-month-goal" style="padding:18px 22px;"></div></div>
+
         <!-- Alertes -->
         <div id="cap-alerts" style="margin-bottom:14px;"></div>
 
@@ -5301,7 +5304,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-17 · r32</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-18 · r33</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -7947,7 +7950,7 @@
   }
 
   // ========== CAPITAL & MONEY MANAGEMENT (portefeuille) ==========
-  let CAPITAL = { investi: 0, expenses: [], payouts: [] };
+  let CAPITAL = { investi: 0, expenses: [], payouts: [], payoutGoalMonthly: 1500 };
   // Catégories de dépenses (gestion type entreprise). Ordre = ordre d'affichage dans le menu.
   const CAP_CATS = {
     challenge:  { label: 'Achat de compte', icon: '🏦', color: '#a855f7' },
@@ -7965,8 +7968,8 @@
   function loadCapital() {
     try {
       const raw = localStorage.getItem('capital_mm');
-      if (raw) { const d = JSON.parse(raw); CAPITAL = { investi: +d.investi || 0, expenses: Array.isArray(d.expenses) ? d.expenses : [], payouts: Array.isArray(d.payouts) ? d.payouts : [] }; }
-    } catch (e) { CAPITAL = { investi: 0, expenses: [], payouts: [] }; }
+      if (raw) { const d = JSON.parse(raw); CAPITAL = { investi: +d.investi || 0, expenses: Array.isArray(d.expenses) ? d.expenses : [], payouts: Array.isArray(d.payouts) ? d.payouts : [], payoutGoalMonthly: (d.payoutGoalMonthly != null ? +d.payoutGoalMonthly : 1500) }; }
+    } catch (e) { CAPITAL = { investi: 0, expenses: [], payouts: [], payoutGoalMonthly: 1500 }; }
   }
   function saveCapital() {
     try { localStorage.setItem('capital_mm', JSON.stringify(CAPITAL)); } catch (e) {}
@@ -7999,6 +8002,31 @@
         <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-3); margin-bottom:6px;">Résultat net de l'activité</div>
         <div class="mono" style="font-size:40px; font-weight:800; letter-spacing:-0.02em; color:${col};">${(bNet >= 0 ? '+' : '−') + capEur(Math.abs(bNet)).replace('€', '')} €</div>
         <div style="display:flex; align-items:center; gap:8px; margin-top:6px; font-size:13px; color:var(--text-1);"><span style="font-size:17px;">${emoji}</span><strong style="color:${col};">${title}</strong> · <span style="color:var(--text-2);">${msg}</span></div>`;
+    }
+
+    // ----- Objectif payout du mois (relié à l'escalier d'objectifs) -----
+    const goalEl = document.getElementById('cap-month-goal');
+    if (goalEl) {
+      const goal = +CAPITAL.payoutGoalMonthly || 0;
+      const now = new Date(); const mStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const monthIn = CAPITAL.payouts.filter(p => { const d = new Date(p.date); return !isNaN(d) && d >= mStart && d <= now; }).reduce((s, p) => s + (+p.amount || 0), 0);
+      const moName = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'][now.getMonth()];
+      if (goal <= 0) {
+        goalEl.innerHTML = `<div style="font-size:12px; color:var(--text-3);">Aucun objectif de payout mensuel défini. <span style="color:var(--accent); cursor:pointer; text-decoration:underline;" onclick="openCapitalConfig()">En définir un</span>.</div>`;
+      } else {
+        const pct = Math.min(100, monthIn / goal * 100);
+        const reached = monthIn >= goal;
+        const col = reached ? 'var(--green)' : 'var(--accent)';
+        goalEl.innerHTML = `
+          <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px;">
+            <span style="font-size:13px; font-weight:700;">🎯 Objectif payout — ${moName}</span>
+            <span class="mono" style="font-weight:700; color:${col};">${capEur(monthIn)} / ${capEur(goal)}</span>
+          </div>
+          <div style="height:10px; border-radius:99px; background:var(--bg-2); border:1px solid var(--border); overflow:hidden;">
+            <div style="height:100%; width:${pct}%; border-radius:99px; background:${col};"></div>
+          </div>
+          <div style="font-size:11px; color:var(--text-2); margin-top:7px;">${reached ? '✅ Objectif du mois atteint — beau travail.' : 'Il te reste ' + capEur(goal - monthIn) + ' à encaisser ce mois-ci pour ta cible.'}</div>`;
+      }
     }
 
     // ----- KPIs -----
@@ -8290,9 +8318,15 @@
           <button onclick="closeCapitalConfig()" style="background:none; border:none; color:var(--text-2); cursor:pointer; font-size:22px; line-height:1;">×</button>
         </div>
         <div style="padding:22px 24px; max-height:70vh; overflow-y:auto;">
-          <div style="margin-bottom:20px;">
-            <label style="font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-3);">Capital investi (budget total €)</label>
-            <input type="number" id="cap-investi-input" value="${CAPITAL.investi || ''}" placeholder="1500" onchange="capSetInvesti(this.value)" style="width:100%; margin-top:6px; padding:10px 12px; border-radius:10px; border:1px solid var(--border); background:var(--bg-2); color:var(--text-0); font-size:14px;">
+          <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:20px;">
+            <div style="flex:1; min-width:160px;">
+              <label style="font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-3);">Capital investi (budget total €)</label>
+              <input type="number" id="cap-investi-input" value="${CAPITAL.investi || ''}" placeholder="1500" onchange="capSetInvesti(this.value)" style="width:100%; margin-top:6px; padding:10px 12px; border-radius:10px; border:1px solid var(--border); background:var(--bg-2); color:var(--text-0); font-size:14px; box-sizing:border-box;">
+            </div>
+            <div style="flex:1; min-width:160px;">
+              <label style="font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-3);">🎯 Objectif payout / mois (€)</label>
+              <input type="number" id="cap-paygoal-input" value="${CAPITAL.payoutGoalMonthly || ''}" placeholder="1500" onchange="capSetPayoutGoal(this.value)" style="width:100%; margin-top:6px; padding:10px 12px; border-radius:10px; border:1px solid var(--border); background:var(--bg-2); color:var(--text-0); font-size:14px; box-sizing:border-box;">
+            </div>
           </div>
 
           <div style="font-size:12px; color:var(--text-3); margin-bottom:14px;">Pour ajouter, utilise les boutons <strong>➕ Dépense</strong> et <strong>💰 Payout reçu</strong> de la page. Ici tu gères ton budget et tu supprimes des lignes.</div>
@@ -8307,6 +8341,7 @@
       </div>`;
   }
   function capSetInvesti(v) { CAPITAL.investi = parseFloat(String(v).replace(',', '.')) || 0; saveCapital(); renderCapital(); }
+  function capSetPayoutGoal(v) { CAPITAL.payoutGoalMonthly = parseFloat(String(v).replace(',', '.')) || 0; saveCapital(); renderCapital(); }
   function capRemoveExpense(id) { CAPITAL.expenses = CAPITAL.expenses.filter(e => e.id !== id); saveCapital(); renderCapital(); renderCapitalConfig(); }
   function capRemovePayout(id) { CAPITAL.payouts = CAPITAL.payouts.filter(p => p.id !== id); saveCapital(); renderCapital(); renderCapitalConfig(); }
 
@@ -11134,34 +11169,49 @@
   }
 
   // ========== OBJECTIFS — ESCALIER DE PALIERS ==========
+  // Escalier d'objectifs — version Vincent (18 juin 2026) : agressif sur le management, discipliné sur le trading.
   const DEFAULT_GOALS_LADDER = [
     { id: 'm3', horizon: '3 MOIS', due: 'Septembre 2026', title: 'Valider et encaisser', items: [
-      { text: 'Valider le compte MFFU 25K (objectif $1 500)', done: false },
-      { text: '30 jours avec discipline moyenne ≥ 80 %', done: false },
-      { text: 'Recevoir mon premier payout', done: false }
+      { text: 'Valider l\'éval MFFU 50K (cible $3 000)', done: false },
+      { text: 'Valider l\'éval MFFU 25K (cible $1 500)', done: false },
+      { text: 'Passer funded + encaisser mon 1er payout', done: false },
+      { text: 'Atteindre 1 000–1 500 €/mois de payouts', done: false },
+      { text: 'Discipline moyenne ≥ 80 % sur le mois', done: false }
     ]},
     { id: 'm6', horizon: '6 MOIS', due: 'Décembre 2026', title: 'Devenir régulier', items: [
-      { text: '3 payouts consécutifs sans casser de compte', done: false },
-      { text: '1 000 €/mois de moyenne sur 3 mois', done: false },
-      { text: 'Ajouter un 2e compte funded', done: false }
+      { text: '2 500–3 000 €/mois sur 2–3 mois consécutifs', done: false },
+      { text: 'Plusieurs comptes funded actifs', done: false },
+      { text: 'Règle de consistance respectée à chaque payout', done: false },
+      { text: 'Aucun compte cramé par indiscipline', done: false }
     ]},
     { id: 'y1', horizon: '1 AN', due: 'Juin 2027', title: 'Remplacer le salaire', items: [
-      { text: '3 000–4 000 €/mois pendant 3 mois d\'affilée', done: false },
-      { text: 'Quitter l\'usine 🏭→🏠', done: false }
+      { text: '4 000–6 000 €/mois pendant 3 mois d\'affilée', done: false },
+      { text: 'Matelas de sécurité reconstitué', done: false },
+      { text: 'Quitter l\'usine 🏭→🏠 (mai→juillet 2027)', done: false }
     ]},
     { id: 'y2', horizon: '2 ANS', due: '2028', title: 'Trader à temps plein', items: [
       { text: 'Vivre du trading sans stress financier', done: false },
-      { text: 'Scaling multi-comptes maîtrisé (followers actifs)', done: false },
+      { text: 'Scaling multi-comptes maîtrisé', done: false },
       { text: 'Capital personnel en croissance', done: false }
     ]},
     { id: 'y5', horizon: '5 ANS', due: '2031', title: 'La liberté', items: [
       { text: 'Indépendance financière installée', done: false },
-      { text: 'Un patrimoine qui travaille pour moi', done: false }
+      { text: 'Faire ce que je veux, quand je veux', done: false }
     ]}
   ];
+  const GOALS_VERSION = 2; // incrémenter pour pousser un nouvel escalier par défaut chez Vincent
   let GOALS_LADDER = JSON.parse(JSON.stringify(DEFAULT_GOALS_LADDER));
   function loadGoalsLadder() {
     try {
+      const ver = parseInt(localStorage.getItem('goals_ladder_version') || '1');
+      if (ver < GOALS_VERSION) {
+        // Nouvel escalier validé avec Vincent → on remplace l'ancien une seule fois
+        GOALS_LADDER = JSON.parse(JSON.stringify(DEFAULT_GOALS_LADDER));
+        localStorage.setItem('goals_ladder', JSON.stringify(GOALS_LADDER));
+        localStorage.setItem('goals_ladder_version', String(GOALS_VERSION));
+        if (typeof markLocalChange === 'function') markLocalChange(); // propage au cloud, évite l'écrasement
+        return;
+      }
       const raw = localStorage.getItem('goals_ladder');
       if (raw) {
         const saved = JSON.parse(raw);
@@ -13477,7 +13527,7 @@
         try { localStorage.setItem('backtest_trades', JSON.stringify(BACKTEST_TRADES)); } catch (e2) {}
       }
       if (data.capital && typeof data.capital === 'object') {
-        CAPITAL = { investi: +data.capital.investi || 0, expenses: Array.isArray(data.capital.expenses) ? data.capital.expenses : [], payouts: Array.isArray(data.capital.payouts) ? data.capital.payouts : [] };
+        CAPITAL = { investi: +data.capital.investi || 0, expenses: Array.isArray(data.capital.expenses) ? data.capital.expenses : [], payouts: Array.isArray(data.capital.payouts) ? data.capital.payouts : [], payoutGoalMonthly: (data.capital.payoutGoalMonthly != null ? +data.capital.payoutGoalMonthly : 1500) };
         try { localStorage.setItem('capital_mm', JSON.stringify(CAPITAL)); } catch (e2) {}
       }
     }
