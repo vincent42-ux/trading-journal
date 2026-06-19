@@ -5335,7 +5335,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-19 · r39</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-19 · r40</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -11204,15 +11204,12 @@
   function accountPnl(acc) {
     const hasReal = (acc.realPnl != null && acc.realPnl !== '' && !isNaN(Number(acc.realPnl)));
     if (acc.role === 'follower') {
-      // Follower : si un P&L réel est saisi → OVERRIDE ABSOLU (ton vrai chiffre MFFU, ex. quand la copie a divergé).
-      // Sinon → il copie le master : (somme des trades du master) × son multiplicateur, en dollars.
+      // Follower : si un P&L réel est saisi → OVERRIDE ABSOLU (ton vrai chiffre, ex. quand la copie a divergé).
+      // Sinon → MIROIR INTÉGRAL du master : (somme de TOUS les trades du master) × son multiplicateur, en dollars.
       if (hasReal) return Number(acc.realPnl);
       const master = ACCOUNTS.find(a => a.role === 'master');
       const masterTrades = master ? accountTradesSum(master) : 0;
-      // copyBaseline = trades du master au moment où ce follower a été créé.
-      // Il ne copie donc QUE les trades postérieurs (un nouveau compte démarre à 0, pas avec tout l'historique).
-      const base = acc.copyBaseline || 0;
-      return (masterTrades - base) * (acc.multiplier || 1);
+      return masterTrades * (acc.multiplier || 1);
     }
     // Master (ou compte indépendant) : base (P&L réel) + ses propres trades.
     return (hasReal ? Number(acc.realPnl) : 0) + accountTradesSum(acc);
@@ -13333,12 +13330,8 @@
     } else {
       const id = name.toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + Date.now().toString(36).slice(-4);
       if (data.realPnl != null && data.role !== 'follower') data.realPnl = +(data.realPnl - accountTradesSum({ name: data.name })).toFixed(2);
-      // Nouveau follower sans P&L réel saisi → il copie le master à partir de MAINTENANT (démarre à 0),
-      // pas avec tout l'historique du master (sinon il apparaît "objectif déjà atteint").
-      if (data.role === 'follower' && data.realPnl == null) {
-        const master = ACCOUNTS.find(a => a.role === 'master');
-        data.copyBaseline = master ? accountTradesSum(master) : 0;
-      }
+      // Un follower est un MIROIR INTÉGRAL du master : il copie tout le résultat du master × son multiplicateur.
+      // (plus de copyBaseline : pas de "démarrage à 0" qui masquait une partie du résultat).
       ACCOUNTS.push({ id, ...data });
     }
     saveAccountsAndRotation();
