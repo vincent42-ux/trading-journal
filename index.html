@@ -4384,6 +4384,12 @@
           <div class="card-body" id="cap-weekly"></div>
         </div>
 
+        <!-- Bilan mensuel -->
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-header"><span class="card-title">📅 Bilan mensuel</span><span class="muted">Entrées · Sorties · Net · Objectif</span></div>
+          <div class="card-body" id="cap-monthly"></div>
+        </div>
+
         <!-- Vue d'ensemble portefeuille -->
         <div class="card" style="margin-bottom:16px;">
           <div class="card-header">
@@ -5319,7 +5325,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-18 · r37</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-19 · r38</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -8097,6 +8103,45 @@
           const lbl = 'du ' + w.monday.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' }) + ' au ' + sun.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
           return `<div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:9px 0; border-bottom:1px solid var(--border);">
             <span style="font-size:12px;">${cur ? '<strong>Cette semaine</strong> <span style="color:var(--text-3);">' + lbl + '</span>' : lbl}</span>
+            <span style="display:flex; gap:14px; align-items:center;">
+              <span class="mono pos" style="font-size:12px;">+${capEur(w.in)}</span>
+              <span class="mono neg" style="font-size:12px;">−${capEur(w.out)}</span>
+              <span class="mono ${wnet >= 0 ? 'pos' : 'neg'}" style="font-weight:700; min-width:66px; text-align:right;">${(wnet >= 0 ? '+' : '−') + capEur(Math.abs(wnet))}</span>
+            </span></div>`;
+        }).join('');
+      }
+    }
+
+    // ----- Bilan mensuel (entrées / sorties / net par mois + objectif payout) -----
+    const monthlyEl = document.getElementById('cap-monthly');
+    if (monthlyEl) {
+      const MO = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+      const mo = {};
+      const addM = (ds, key, val) => {
+        const d = new Date(ds || Date.now()); if (isNaN(d)) return;
+        const t = d.getFullYear() * 12 + d.getMonth();
+        (mo[t] = mo[t] || { in: 0, out: 0, y: d.getFullYear(), m: d.getMonth() }); mo[t][key] += val;
+      };
+      for (const e of CAPITAL.expenses) addM(e.date, 'out', +e.amount || 0);
+      for (const p of CAPITAL.payouts) addM(p.date, 'in', +p.amount || 0);
+      const mGoal = +CAPITAL.payoutGoalMonthly || 0;
+      const mList = Object.entries(mo).map(([k, v]) => ({ k: +k, ...v })).sort((a, b) => b.k - a.k).slice(0, 12);
+      const nowK = (() => { const d = new Date(); return d.getFullYear() * 12 + d.getMonth(); })();
+      if (!mList.length) { monthlyEl.innerHTML = '<div class="empty-state" style="padding:18px;">Aucun mouvement encore. Ajoute une dépense ou un payout.</div>'; }
+      else {
+        monthlyEl.innerHTML = mList.map(w => {
+          const wnet = w.in - w.out; const cur = w.k === nowK;
+          const lbl = MO[w.m] + ' ' + w.y;
+          let goalTag = '';
+          if (mGoal > 0 && w.in > 0) {
+            const ok = w.in >= mGoal;
+            goalTag = `<span class="mono" style="font-size:10.5px; color:${ok ? 'var(--green)' : 'var(--text-3)'};">${ok ? '🎯 objectif atteint' : Math.round(w.in / mGoal * 100) + '% de l’objectif'}</span>`;
+          }
+          return `<div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 0; border-bottom:1px solid var(--border);">
+            <span style="display:flex; flex-direction:column; gap:3px;">
+              <span style="font-size:12.5px;">${cur ? '<strong>Ce mois-ci</strong> · ' : ''}${lbl}</span>
+              ${goalTag}
+            </span>
             <span style="display:flex; gap:14px; align-items:center;">
               <span class="mono pos" style="font-size:12px;">+${capEur(w.in)}</span>
               <span class="mono neg" style="font-size:12px;">−${capEur(w.out)}</span>
