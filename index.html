@@ -4723,6 +4723,20 @@
 
         <!-- ===== ONGLET COMPTES ===== -->
         <div class="stats-tab-panel" id="stats-tab-comptes">
+        <div class="stats-section-title">Vue d'ensemble du portefeuille</div>
+        <div id="stats-acc-kpis" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(135px, 1fr)); gap:12px; margin-bottom:18px;"></div>
+
+        <div class="stats-section-title">Gestion des comptes</div>
+        <div class="card" style="margin-bottom: 18px;">
+          <div class="card-header">
+            <span class="card-title">Détail par compte</span>
+            <span class="muted" id="stats-acc-table-tag">—</span>
+          </div>
+          <div class="card-body" style="padding:0;">
+            <div id="stats-acc-table" style="overflow-x:auto;"></div>
+          </div>
+        </div>
+
         <div class="stats-section-title">Santé des comptes</div>
         <div class="card" style="margin-bottom: 18px;">
           <div class="card-header">
@@ -4732,10 +4746,6 @@
           <div class="card-body" id="health-gauges">
             <div class="empty-state" style="padding:30px;">Aucun compte configuré.</div>
           </div>
-        </div>
-        <div class="card" style="margin-bottom: 18px;">
-          <div class="card-header"><span class="card-title">Drawdown max par compte</span></div>
-          <div class="card-body" id="stats-drawdown"></div>
         </div>
         <div class="card" style="margin-bottom: 18px;">
           <div class="card-header">
@@ -5325,7 +5335,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-19 · r38</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-19 · r39</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -6577,6 +6587,7 @@
     _safe(() => renderRRDeviation(s), 'renderRRDeviation');
     _safe(() => renderKPIs(s), 'renderKPIs');
     _safe(() => renderHealthGauges(), 'renderHealthGauges');
+    _safe(() => renderAccountsMgmt(), 'renderAccountsMgmt');
     _safe(() => renderConsistency(s), 'renderConsistency');
     if (typeof renderCapital === 'function') _safe(() => renderCapital(), 'renderCapital');
     if (typeof renderRoutine === 'function') _safe(() => renderRoutine(), 'renderRoutine');
@@ -8671,6 +8682,117 @@
     }).join('');
 
     if (summary) summary.textContent = `${ACCOUNTS.length} compte${ACCOUNTS.length > 1 ? 's' : ''} suivi${ACCOUNTS.length > 1 ? 's' : ''}`;
+  }
+
+  // Badge de statut d'un compte (cohérent avec accountCategory)
+  function acctStatusBadge(acc) {
+    if (acc.status === 'blown' || accountCategory(acc) === 'blown') return { t: '💀 Cramé', c: 'var(--red)' };
+    if (acc.status === 'funded') return { t: '💎 Funded', c: 'var(--accent)' };
+    if (accountCategory(acc) === 'validated') return { t: '✅ Validé', c: 'var(--green)' };
+    return { t: '🔥 En cours', c: 'var(--amber)' };
+  }
+
+  // ===== Espace gestion des comptes (onglet Stats → Comptes) : KPIs portefeuille + tableau détaillé =====
+  function renderAccountsMgmt() {
+    const kpiEl = document.getElementById('stats-acc-kpis');
+    const tableEl = document.getElementById('stats-acc-table');
+    if (!kpiEl && !tableEl) return;
+
+    // Métriques par compte
+    const rows = ACCOUNTS.map(acc => {
+      const accTrades = TRADES.filter(t => t.account === acc.name);
+      const wins = accTrades.filter(isWinTrade).length;
+      const losses = accTrades.filter(isLossTrade).length;
+      const decided = wins + losses;
+      const winRate = decided > 0 ? (wins / decided * 100) : null;
+      const rSum = accTrades.reduce((s, t) => s + tradeRValue(t), 0);
+      const pnl = accountPnl(acc);
+      // Marge avant trailing (même logique que les jauges de santé)
+      const realised = accTrades.reduce((s, t) => s + (t.pnl || 0), 0);
+      const base = (acc.currentBalance || acc.size || 0);
+      const balance = base + realised;
+      const trailingFloor = base - (acc.trailing || 0);
+      const distTrail = balance - trailingFloor;
+      const trailPct = acc.trailing > 0 ? Math.max(0, Math.min(100, (distTrail / acc.trailing) * 100)) : 100;
+      // % objectif
+      const target = accountObjTarget(acc);
+      const objPct = target > 0 ? Math.max(0, (pnl / target) * 100) : null;
+      // Drawdown max
+      let peak = 0, cum = 0, maxDD = 0;
+      for (const t of accTrades) { cum += (t.pnl || 0); if (cum > peak) peak = cum; const dd = peak - cum; if (dd > maxDD) maxDD = dd; }
+      return { acc, badge: acctStatusBadge(acc), pnl, nTrades: accTrades.length, winRate, rSum, trailPct, distTrail, objPct, target, maxDD, cat: accountCategory(acc) };
+    });
+
+    // ----- KPIs portefeuille -----
+    if (kpiEl) {
+      if (!ACCOUNTS.length) {
+        kpiEl.innerHTML = '<div class="empty-state" style="padding:24px; grid-column:1/-1;">Aucun compte configuré. Va dans Comptes → + Nouveau compte.</div>';
+      } else {
+        let enCours = 0, valides = 0, funded = 0, crames = 0, capitalGere = 0;
+        for (const r of rows) {
+          if (r.cat === 'blown') { crames++; continue; }
+          capitalGere += (r.acc.size || 0);
+          if (r.acc.status === 'funded') funded++;
+          else if (r.cat === 'validated') valides++;
+          else enCours++;
+        }
+        const pnlTotal = rows.reduce((s, r) => s + r.pnl, 0);
+        const payouts = (typeof capPayoutsTotal === 'function') ? capPayoutsTotal() : 0;
+        const activeRows = rows.filter(r => r.cat !== 'blown' && r.acc.trailing > 0);
+        const avgTrail = activeRows.length ? activeRows.reduce((s, r) => s + r.trailPct, 0) / activeRows.length : null;
+        const allTrades = TRADES.filter(t => ACCOUNTS.some(a => a.name === t.account));
+        const gw = allTrades.filter(isWinTrade).length, gl = allTrades.filter(isLossTrade).length;
+        const gWR = (gw + gl) > 0 ? (gw / (gw + gl) * 100) : null;
+
+        const card = (label, value, cls, sub) => `
+          <div class="card" style="margin:0;"><div class="card-body" style="padding:13px 15px;">
+            <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-3); margin-bottom:5px;">${label}</div>
+            <div class="mono ${cls || ''}" style="font-size:19px; font-weight:700;">${value}</div>
+            ${sub ? `<div style="font-size:10.5px; color:var(--text-3); margin-top:3px;">${sub}</div>` : ''}
+          </div></div>`;
+        kpiEl.innerHTML =
+          card('Comptes', ACCOUNTS.length, '', `${enCours} en cours · ${funded} funded`) +
+          card('Statuts', `${valides}✅ ${crames}💀`, '', `${valides} validé${valides > 1 ? 's' : ''} · ${crames} cramé${crames > 1 ? 's' : ''}`) +
+          card('Capital géré', fmt$(capitalGere).replace('+', ''), '', 'comptes actifs') +
+          card('P&L cumulé', fmt$(pnlTotal), pnlTotal >= 0 ? 'pos' : 'neg', 'tous comptes') +
+          card('Payouts reçus', capEur(payouts), payouts > 0 ? 'pos' : '', 'depuis Capital') +
+          card('Marge trailing', avgTrail != null ? `<span style="color:${avgTrail < 30 ? 'var(--red)' : avgTrail < 60 ? 'var(--amber)' : 'var(--green)'};">${avgTrail.toFixed(0)}%</span>` : '—', '', 'moyenne avant DD') +
+          card('Win rate global', gWR != null ? gWR.toFixed(0) + '%' : '—', '', `${gw}V / ${gl}P`);
+      }
+    }
+
+    // ----- Tableau détaillé -----
+    if (tableEl) {
+      const tag = document.getElementById('stats-acc-table-tag');
+      if (!rows.length) {
+        tableEl.innerHTML = '<div class="empty-state" style="padding:30px;">Aucun compte configuré.</div>';
+        if (tag) tag.textContent = '—';
+      } else {
+        if (tag) tag.textContent = rows.length + ' compte' + (rows.length > 1 ? 's' : '');
+        const th = (t, al) => `<th style="text-align:${al || 'left'}; padding:9px 12px; font-size:10px; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-3); font-weight:600; white-space:nowrap; border-bottom:1px solid var(--border);">${t}</th>`;
+        const head = `<tr>${th('Compte')}${th('Statut')}${th('Taille', 'right')}${th('P&L cumulé', 'right')}${th('Trades', 'right')}${th('Win%', 'right')}${th('R cumulé', 'right')}${th('Marge trail.', 'right')}${th('% objectif', 'right')}${th('DD max', 'right')}</tr>`;
+        const body = rows.map(r => {
+          const a = r.acc;
+          const roleTag = a.role === 'master' ? '👑' : '↳';
+          const sub = (a.acctNum ? '#' + a.acctNum + ' · ' : '') + (a.firm || '') + (a.role === 'follower' ? ' ·×' + (a.multiplier || 1) : '');
+          const trailCol = r.trailPct < 30 ? 'var(--red)' : r.trailPct < 60 ? 'var(--amber)' : 'var(--green)';
+          const td = (inner, al, extra) => `<td style="text-align:${al || 'left'}; padding:10px 12px; font-size:12.5px; white-space:nowrap; border-bottom:1px solid var(--border); ${extra || ''}">${inner}</td>`;
+          return `<tr>
+            ${td(`<span style="font-weight:700;">${roleTag} ${a.name}</span><div style="font-size:10.5px; color:var(--text-3); margin-top:2px;">${sub}</div>`)}
+            ${td(`<span style="display:inline-block; padding:2px 9px; border-radius:99px; font-size:11px; font-weight:600; color:${r.badge.c}; background:${r.badge.c}1f;">${r.badge.t}</span>`)}
+            ${td(a.size ? fmt$(a.size).replace('+', '') : '—', 'right')}
+            ${td(`<span class="mono ${r.pnl >= 0 ? 'pos' : 'neg'}" style="font-weight:700;">${fmt$(r.pnl)}</span>`, 'right')}
+            ${td(`<span class="mono">${r.nTrades}</span>`, 'right')}
+            ${td(r.winRate != null ? `<span class="mono">${r.winRate.toFixed(0)}%</span>` : '<span style="color:var(--text-3);">—</span>', 'right')}
+            ${td(`<span class="mono ${r.rSum >= 0 ? 'pos' : 'neg'}">${(r.rSum >= 0 ? '+' : '') + r.rSum.toFixed(1)}R</span>`, 'right')}
+            ${td(a.trailing > 0 ? `<span class="mono" style="color:${trailCol}; font-weight:700;">${r.trailPct.toFixed(0)}%</span>` : '<span style="color:var(--text-3);">—</span>', 'right')}
+            ${td(r.objPct != null ? `<span class="mono">${r.objPct.toFixed(0)}%</span>` : '<span style="color:var(--text-3);">—</span>', 'right')}
+            ${td(r.maxDD > 0 ? `<span class="mono neg">−${fmt$(r.maxDD).replace('-', '').replace('+', '').replace('$', '$')}</span>` : '<span style="color:var(--text-3);">—</span>', 'right')}
+          </tr>`;
+        }).join('');
+        tableEl.innerHTML = `<table style="width:100%; border-collapse:collapse; min-width:720px;"><thead>${head}</thead><tbody>${body}</tbody></table>`;
+      }
+    }
   }
 
   let HEATMAP_MODE = 'week'; // 'week' = semaine courante · 'all' = toutes les semaines cumulées
