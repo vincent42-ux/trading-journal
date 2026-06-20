@@ -4607,6 +4607,16 @@
         <div class="card" style="margin-bottom:18px;">
           <div class="card-body" id="setup-analysis"></div>
         </div>
+
+        <div class="stats-section-title">Performance par nombre de bougies</div>
+        <div class="card" style="margin-bottom:18px;">
+          <div class="card-header"><span class="card-title">🕯️ Où je rentre le mieux</span></div>
+          <div class="card-body">
+            <div id="bougies-filters" style="display:flex; gap:14px; flex-wrap:wrap; margin-bottom:14px;"></div>
+            <div id="bougies-perf"></div>
+          </div>
+        </div>
+
         <div class="stats-section-title">Records personnels</div>
         <div class="row-4col" style="margin-bottom: 18px;">
           <div class="card record-card record-best">
@@ -5335,7 +5345,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-19 · r40</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-19 · r41</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -6602,6 +6612,7 @@
     if (typeof renderBacktest === 'function') _safe(() => renderBacktest(), 'renderBacktest');
     if (typeof renderStorageGauge === 'function') _safe(() => renderStorageGauge(), 'renderStorageGauge');
     if (typeof renderSetupAnalysis === 'function') _safe(() => renderSetupAnalysis(), 'renderSetupAnalysis');
+    if (typeof renderBougiesPerf === 'function') _safe(() => renderBougiesPerf(), 'renderBougiesPerf');
   }
 
   // ========== STATS PAGE PREMIUM ==========
@@ -14392,6 +14403,92 @@
         </tr></thead><tbody>${body}</tbody></table>`;
     el.innerHTML = table('Par setup', 'Setup', rows(bySetup, k => k)) +
                    table('Par heure d\'entrée', 'Heure', rows(byHour, k => k + 'h'));
+  }
+
+  // ===== Performance par nombre de bougies (onglet Performance) : "où je rentre le mieux" + filtres =====
+  let BOUGIES_PERF_FILTER = { setup: 'all', side: 'all' };
+  function setBougiesFilter(kind, val) { BOUGIES_PERF_FILTER[kind] = val; renderBougiesPerf(); }
+  function renderBougiesPerf() {
+    const el = document.getElementById('bougies-perf');
+    const filtEl = document.getElementById('bougies-filters');
+    if (!el) return;
+    const f = BOUGIES_PERF_FILTER;
+
+    // ----- Boutons de filtre (setup + sens) -----
+    if (filtEl) {
+      const chip = (kind, val, label) => {
+        const on = f[kind] === val;
+        return `<button onclick="setBougiesFilter('${kind}','${val}')" style="padding:6px 12px; border-radius:99px; border:1px solid ${on ? 'var(--accent)' : 'var(--border)'}; background:${on ? 'var(--accent-soft)' : 'var(--bg-2)'}; color:${on ? 'var(--accent)' : 'var(--text-2)'}; font-size:12px; font-weight:${on ? '700' : '500'}; cursor:pointer; transition:all .12s;">${label}</button>`;
+      };
+      const group = (lbl, inner) => `<div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;"><span style="font-size:10px; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-3); margin-right:2px;">${lbl}</span>${inner}</div>`;
+      filtEl.innerHTML =
+        group('Setup', chip('setup', 'all', 'Tous') + chip('setup', 'absorption', 'ABS') + chip('setup', 'exhaustion', 'EXH')) +
+        group('Sens', chip('side', 'all', 'Tous') + chip('side', 'long', 'Long') + chip('side', 'short', 'Short'));
+    }
+
+    // ----- Trades filtrés -----
+    let trades = (computeStats(filteredTrades()) || { logical: [] }).logical;
+    if (f.setup !== 'all') trades = trades.filter(t => (t.rules || {}).setup === f.setup);
+    if (f.side !== 'all') trades = trades.filter(t => String(t.side || '').toLowerCase() === f.side);
+    const masterRisk = (ACCOUNTS.find(a => a.role === 'master') || ACCOUNTS[0] || { risk: 62.80 }).risk;
+    const bMin = (typeof PLAN !== 'undefined' && PLAN.bougiesMin) || 4;
+    const bMax = (typeof PLAN !== 'undefined' && PLAN.bougiesMax) || 11;
+
+    // ----- Groupement par nombre de bougies -----
+    const byB = {}; let noData = 0;
+    for (const t of trades) {
+      const n = (t.rules || {}).bougiesCount;
+      if (n == null || isNaN(+n)) { noData++; continue; }
+      const k = +n;
+      const o = (byB[k] = byB[k] || { n: 0, wins: 0, losses: 0, pnl: 0, r: 0, dur: 0, durN: 0 });
+      o.n++; o.pnl += (t.pnl || 0); o.r += tradeRValue(t, masterRisk);
+      if (isWinTrade(t)) o.wins++; if (isLossTrade(t)) o.losses++;
+      if (t.duration) { o.dur += t.duration; o.durN++; }
+    }
+    const counts = Object.keys(byB).map(Number).sort((a, b) => a - b);
+    if (!counts.length) {
+      el.innerHTML = '<div class="empty-state" style="padding:24px;">Aucun trade avec un nombre de bougies renseigné' + (f.setup !== 'all' || f.side !== 'all' ? ' pour ce filtre' : '') + '.</div>';
+      return;
+    }
+
+    // ----- Meilleur palier (min 2 trades, par winrate puis P&L) -----
+    let best = null;
+    for (const k of counts) {
+      const d = byB[k];
+      if (d.n < 2) continue;
+      const wr = d.wins / d.n;
+      if (!best || wr > best.wr || (wr === best.wr && d.pnl > best.pnl)) best = { k, wr, pnl: d.pnl, n: d.n };
+    }
+
+    const rowsHtml = counts.map(k => {
+      const d = byB[k];
+      const wr = d.n ? (d.wins / d.n * 100) : 0;
+      const inRange = k >= bMin && k <= bMax;
+      const avgDur = d.durN ? Math.round(d.dur / d.durN) : null;
+      const isBest = best && best.k === k;
+      return `<tr style="border-top:1px solid var(--border);${isBest ? ' background:var(--accent-soft);' : ''}">
+        <td style="padding:9px 6px; font-weight:700; white-space:nowrap;">${isBest ? '🏆 ' : ''}${k} bougie${k > 1 ? 's' : ''}${inRange ? '' : ' <span title="Hors zone du plan" style="color:var(--amber); font-size:11px;">⚠</span>'}</td>
+        <td class="mono" style="text-align:center;">${d.n}</td>
+        <td class="mono pos" style="text-align:center;">${d.wins}</td>
+        <td class="mono neg" style="text-align:center;">${d.losses}</td>
+        <td class="mono ${wr >= 50 ? 'pos' : ''}" style="text-align:center; font-weight:700;">${wr.toFixed(0)}%</td>
+        <td class="mono ${d.pnl >= 0 ? 'pos' : 'neg'}" style="text-align:right;">${fmt$(d.pnl)}</td>
+        <td class="mono ${d.r >= 0 ? 'pos' : 'neg'}" style="text-align:right;">${d.r >= 0 ? '+' : ''}${d.r.toFixed(1)}R</td>
+        <td class="mono" style="text-align:right; color:var(--text-2);">${avgDur != null ? avgDur + ' min' : '—'}</td>
+      </tr>`;
+    }).join('');
+
+    const head = `<thead><tr style="color:var(--text-3); font-size:10px; text-transform:uppercase; letter-spacing:0.04em;">
+      <th style="text-align:left; padding-bottom:6px;">Bougies</th>
+      <th style="text-align:center;">Trades</th><th style="text-align:center;">✓</th><th style="text-align:center;">✗</th>
+      <th style="text-align:center;">WR</th><th style="text-align:right;">P&amp;L</th><th style="text-align:right;">R</th><th style="text-align:right;">Durée moy.</th>
+    </tr></thead>`;
+    const banner = best
+      ? `<div style="margin-bottom:12px; padding:10px 14px; border-radius:10px; background:var(--accent-soft); border:1px solid var(--accent); font-size:12.5px;">🎯 Tu rentres le mieux à <strong>${best.k} bougie${best.k > 1 ? 's' : ''}</strong> : WR <strong>${(best.wr * 100).toFixed(0)}%</strong> sur ${best.n} trade${best.n > 1 ? 's' : ''}.</div>`
+      : '';
+    el.innerHTML = banner +
+      `<div style="overflow-x:auto;"><table style="width:100%; border-collapse:collapse; font-size:12.5px; min-width:560px;">${head}<tbody>${rowsHtml}</tbody></table></div>` +
+      (noData ? `<div style="font-size:11px; color:var(--text-3); margin-top:8px;">${noData} trade${noData > 1 ? 's' : ''} sans nombre de bougies renseigné (exclus).</div>` : '');
   }
   function runIntegrityCheck() {
     const issues = [];
