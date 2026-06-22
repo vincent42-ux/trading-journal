@@ -3801,6 +3801,10 @@
         <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span>
         <span class="label">Capital</span>
       </button>
+      <button class="nav-item" data-view="sante" data-tooltip="Santé">
+        <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8z"/></svg></span>
+        <span class="label">Santé</span>
+      </button>
       <button class="nav-item" data-view="weekly" data-tooltip="Rapport hebdo">
         <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg></span>
         <span class="label">Rapport hebdo</span>
@@ -4420,6 +4424,36 @@
           <div class="card">
             <div class="card-header"><span class="card-title">🏦 Coûts par compte</span></div>
             <div class="card-body" id="cap-accounts-list"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ SANTÉ ============ -->
+      <section class="view" id="view-sante">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:18px; gap:12px; flex-wrap:wrap;">
+          <div>
+            <div style="font-size:18px; font-weight:700; letter-spacing:-0.02em;">Santé &amp; Sèche</div>
+            <div style="font-size:12px; color:var(--text-2); margin-top:4px;">Mon poids, ma sèche, mes cibles — le corps suit comme le compte.</div>
+          </div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn" onclick="openWeightEntry()">⚖️ Me peser</button>
+            <button class="btn" onclick="openHealthConfig()" title="Objectifs &amp; cibles">⚙</button>
+          </div>
+        </div>
+        <div id="sante-kpis" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(135px, 1fr)); gap:12px; margin-bottom:16px;"></div>
+        <div class="card" style="margin-bottom:16px;"><div class="card-body" id="sante-progress" style="padding:18px 22px;"></div></div>
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-header"><span class="card-title">📉 Évolution du poids</span><span class="muted">objectif en pointillé</span></div>
+          <div class="card-body"><div style="height:240px;"><canvas id="sante-weight-chart"></canvas></div></div>
+        </div>
+        <div class="row-2col">
+          <div class="card">
+            <div class="card-header"><span class="card-title">🎯 Mes cibles du jour</span></div>
+            <div class="card-body" id="sante-targets"></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><span class="card-title">📝 Mes dernières pesées</span></div>
+            <div class="card-body" id="sante-log"></div>
           </div>
         </div>
       </section>
@@ -5345,7 +5379,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-22 · r42</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-22 · r43</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -6601,6 +6635,7 @@
     _safe(() => renderConsistency(s), 'renderConsistency');
     if (typeof renderCapital === 'function') _safe(() => renderCapital(), 'renderCapital');
     if (typeof renderRoutine === 'function') _safe(() => renderRoutine(), 'renderRoutine');
+    if (typeof renderSante === 'function') _safe(() => renderSante(), 'renderSante');
     _safe(() => rebuildCharts(filtered), 'rebuildCharts');
     _safe(() => renderStatsPage(s), 'renderStatsPage');
     _safe(() => renderAdvancedStats(s), 'renderAdvancedStats');
@@ -8837,6 +8872,164 @@
           </tr>`;
         }).join('');
         tableEl.innerHTML = `<table style="width:100%; border-collapse:collapse; min-width:720px;"><thead>${head}</thead><tbody>${body}</tbody></table>`;
+      }
+    }
+  }
+
+  // ========== SANTÉ & SÈCHE (suivi du poids) ==========
+  let HEALTH = { startWeight: 0, goalWeight: 0, heightCm: 0, kcal: 2450, protein: 185, weights: [] };
+  function loadHealth() {
+    try { const r = localStorage.getItem('health_data'); if (r) { const d = JSON.parse(r); HEALTH = { startWeight: +d.startWeight || 0, goalWeight: +d.goalWeight || 0, heightCm: +d.heightCm || 0, kcal: +d.kcal || 2450, protein: +d.protein || 185, weights: Array.isArray(d.weights) ? d.weights : [] }; } } catch (e) {}
+  }
+  function saveHealth() { try { localStorage.setItem('health_data', JSON.stringify(HEALTH)); } catch (e) {} if (typeof markLocalChange === 'function') markLocalChange(); }
+  function healthWeightsSorted() { return (HEALTH.weights || []).slice().sort((a, b) => new Date(a.date) - new Date(b.date)); }
+  function healthLastWeight() { const w = healthWeightsSorted(); return w.length ? +w[w.length - 1].kg : 0; }
+  function healthAvg7() {
+    const w = healthWeightsSorted(); if (!w.length) return 0;
+    const cut = new Date(); cut.setDate(cut.getDate() - 7);
+    const recent = w.filter(e => new Date(e.date) >= cut);
+    const arr = recent.length ? recent : [w[w.length - 1]];
+    return arr.reduce((s, e) => s + (+e.kg || 0), 0) / arr.length;
+  }
+  function fmtKg(n) { return (Math.round((n || 0) * 10) / 10).toLocaleString('fr-FR') + ' kg'; }
+  function closeHealthModal() { const o = document.getElementById('health-modal-overlay'); if (o) o.remove(); }
+  const _hFieldCss = 'width:100%; padding:11px 13px; border-radius:11px; border:1px solid var(--border); background:var(--bg-2); color:var(--text-0); font-size:14px; box-sizing:border-box;';
+  function openHealthModal(title, inner) {
+    closeHealthModal();
+    const o = document.createElement('div');
+    o.id = 'health-modal-overlay';
+    o.style.cssText = 'position:fixed; inset:0; z-index:100000; display:flex; align-items:center; justify-content:center; padding:20px; background:rgba(8,5,20,0.62); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);';
+    o.addEventListener('click', e => { if (e.target === o) closeHealthModal(); });
+    o.innerHTML = `<div style="width:100%; max-width:420px; background:var(--bg-1); border:1px solid var(--border); border-radius:18px; box-shadow:0 24px 70px rgba(0,0,0,.55); overflow:hidden;">
+      <div style="height:3px; background:linear-gradient(90deg, var(--accent), var(--accent-bright, #d946ef));"></div>
+      <div style="padding:22px 24px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+          <div style="font-size:17px; font-weight:700;">${title}</div>
+          <button onclick="closeHealthModal()" style="background:none; border:none; color:var(--text-2); cursor:pointer; font-size:22px; line-height:1;">×</button>
+        </div>${inner}</div></div>`;
+    document.body.appendChild(o);
+    return o;
+  }
+  function openWeightEntry() {
+    const today = new Date().toISOString().slice(0, 10);
+    openHealthModal('⚖️ Ma pesée', `
+      <div style="margin-bottom:12px;"><div style="font-size:11px; color:var(--text-3); margin-bottom:5px;">Date</div><input type="date" id="health-w-date" value="${today}" style="${_hFieldCss}"></div>
+      <div style="margin-bottom:20px;"><div style="font-size:11px; color:var(--text-3); margin-bottom:5px;">Poids (kg)</div><input type="number" step="0.1" inputmode="decimal" id="health-w-kg" placeholder="ex. 96.5" style="${_hFieldCss}"></div>
+      <button class="btn btn-primary" style="width:100%;" onclick="addWeight()">Enregistrer</button>`);
+    setTimeout(() => { const el = document.getElementById('health-w-kg'); if (el) el.focus(); }, 50);
+  }
+  function addWeight() {
+    const dEl = document.getElementById('health-w-date'); const kEl = document.getElementById('health-w-kg');
+    const date = dEl ? dEl.value : ''; const kg = kEl ? parseFloat(String(kEl.value).replace(',', '.')) : NaN;
+    if (!date || isNaN(kg) || kg <= 0) { if (typeof uiAlert === 'function') uiAlert('Entre une date et un poids valides.'); return; }
+    HEALTH.weights = (HEALTH.weights || []).filter(e => e.date !== date);
+    HEALTH.weights.push({ date, kg: Math.round(kg * 10) / 10 });
+    if (!HEALTH.startWeight) HEALTH.startWeight = Math.round(kg * 10) / 10;
+    saveHealth(); closeHealthModal(); renderSante();
+  }
+  function healthRemoveWeight(date) { HEALTH.weights = (HEALTH.weights || []).filter(e => e.date !== date); saveHealth(); renderSante(); }
+  function openHealthConfig() {
+    openHealthModal('⚙ Mes objectifs santé', `
+      <div style="display:flex; gap:10px; margin-bottom:12px;">
+        <div style="flex:1;"><div style="font-size:11px; color:var(--text-3); margin-bottom:5px;">Poids départ (kg)</div><input type="number" step="0.1" id="health-c-start" value="${HEALTH.startWeight || ''}" placeholder="97" style="${_hFieldCss}"></div>
+        <div style="flex:1;"><div style="font-size:11px; color:var(--text-3); margin-bottom:5px;">Objectif (kg)</div><input type="number" step="0.1" id="health-c-goal" value="${HEALTH.goalWeight || ''}" placeholder="90" style="${_hFieldCss}"></div>
+      </div>
+      <div style="margin-bottom:12px;"><div style="font-size:11px; color:var(--text-3); margin-bottom:5px;">Taille (cm)</div><input type="number" id="health-c-height" value="${HEALTH.heightCm || ''}" placeholder="186" style="${_hFieldCss}"></div>
+      <div style="display:flex; gap:10px; margin-bottom:20px;">
+        <div style="flex:1;"><div style="font-size:11px; color:var(--text-3); margin-bottom:5px;">Cible kcal/jour</div><input type="number" id="health-c-kcal" value="${HEALTH.kcal || ''}" placeholder="2450" style="${_hFieldCss}"></div>
+        <div style="flex:1;"><div style="font-size:11px; color:var(--text-3); margin-bottom:5px;">Cible protéines (g)</div><input type="number" id="health-c-prot" value="${HEALTH.protein || ''}" placeholder="185" style="${_hFieldCss}"></div>
+      </div>
+      <button class="btn btn-primary" style="width:100%;" onclick="saveHealthConfig()">Enregistrer</button>`);
+  }
+  function saveHealthConfig() {
+    const g = id => { const e = document.getElementById(id); return e ? parseFloat(String(e.value).replace(',', '.')) : NaN; };
+    const s = g('health-c-start'), go = g('health-c-goal'), h = g('health-c-height'), k = g('health-c-kcal'), p = g('health-c-prot');
+    if (!isNaN(s)) HEALTH.startWeight = s; if (!isNaN(go)) HEALTH.goalWeight = go; if (!isNaN(h)) HEALTH.heightCm = h;
+    if (!isNaN(k)) HEALTH.kcal = k; if (!isNaN(p)) HEALTH.protein = p;
+    saveHealth(); closeHealthModal(); renderSante();
+  }
+  function renderSante() {
+    if (!document.getElementById('view-sante')) return;
+    const last = healthLastWeight(); const avg7 = healthAvg7();
+    const start = +HEALTH.startWeight || 0; const goal = +HEALTH.goalWeight || 0;
+    const lost = (start && last) ? (start - last) : 0;
+    const remain = (last && goal) ? (last - goal) : 0;
+    const imc = (last && HEALTH.heightCm) ? (last / Math.pow(HEALTH.heightCm / 100, 2)) : 0;
+
+    const kpis = document.getElementById('sante-kpis');
+    if (kpis) {
+      const card = (label, value, cls, sub) => `<div class="card" style="margin:0;"><div class="card-body" style="padding:13px 15px;">
+        <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-3); margin-bottom:5px;">${label}</div>
+        <div class="mono ${cls || ''}" style="font-size:19px; font-weight:700;">${value}</div>
+        ${sub ? `<div style="font-size:10.5px; color:var(--text-3); margin-top:3px;">${sub}</div>` : ''}</div></div>`;
+      kpis.innerHTML =
+        card('Poids actuel', last ? fmtKg(last) : '—', '', last ? 'dernière pesée' : 'ajoute une pesée') +
+        card('Moyenne 7j', avg7 ? fmtKg(avg7) : '—', '', 'lissée') +
+        card('Perdu', lost ? fmtKg(Math.abs(lost)) : '—', lost > 0 ? 'pos' : (lost < 0 ? 'neg' : ''), start ? 'depuis ' + fmtKg(start) : '—') +
+        card('Reste objectif', (last && goal) ? fmtKg(Math.max(0, remain)) : '—', '', goal ? 'jusqu\'à ' + fmtKg(goal) : 'définis un objectif') +
+        card('IMC', imc ? imc.toFixed(1) : '—', '', 'indicatif');
+    }
+
+    const prog = document.getElementById('sante-progress');
+    if (prog) {
+      if (start && goal && last && start !== goal) {
+        const totalToLose = start - goal; const done = start - last;
+        const pct = Math.max(0, Math.min(100, totalToLose !== 0 ? (done / totalToLose * 100) : 0));
+        const reached = last <= goal;
+        prog.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px;">
+            <span style="font-size:13px; font-weight:700;">🏁 Progression de ma sèche</span>
+            <span class="mono" style="font-weight:700; color:${reached ? 'var(--green)' : 'var(--accent)'};">${pct.toFixed(0)}%</span></div>
+          <div style="height:10px; border-radius:99px; background:var(--bg-2); border:1px solid var(--border); overflow:hidden;">
+            <div style="height:100%; width:${pct}%; border-radius:99px; background:${reached ? 'var(--green)' : 'var(--accent)'};"></div></div>
+          <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-3); margin-top:7px;">
+            <span>${fmtKg(start)}</span><span>${reached ? '🎉 Objectif atteint !' : 'Objectif ' + fmtKg(goal)}</span></div>`;
+      } else {
+        prog.innerHTML = `<div style="font-size:12px; color:var(--text-3);">Définis ton poids de départ et ton objectif (⚙) puis ajoute une pesée pour voir ta progression.</div>`;
+      }
+    }
+
+    const c = (typeof getThemeColors === 'function') ? getThemeColors() : { green: '#10b981', grid: 'rgba(255,255,255,.06)', accent: '#a855f7' };
+    const canvas = document.getElementById('sante-weight-chart');
+    if (canvas && typeof Chart !== 'undefined') {
+      const w = healthWeightsSorted();
+      if (!window.allCharts) window.allCharts = {};
+      if (window.allCharts.santeWeight) window.allCharts.santeWeight.destroy();
+      if (w.length) {
+        const labels = w.map(e => new Date(e.date).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' }));
+        const data = w.map(e => +e.kg);
+        const acc = c.accent || '#a855f7';
+        const ds = [{ label: 'Poids', data, borderColor: acc, backgroundColor: 'transparent', tension: 0.3, pointRadius: 3, pointBackgroundColor: acc, borderWidth: 2 }];
+        if (goal) ds.push({ label: 'Objectif', data: labels.map(() => goal), borderColor: c.green, borderDash: [6, 5], borderWidth: 1.5, pointRadius: 0, fill: false });
+        window.allCharts.santeWeight = new Chart(canvas, {
+          type: 'line', data: { labels, datasets: ds },
+          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ctx.parsed.y + ' kg' } } }, scales: { x: { grid: { display: false } }, y: { grid: { color: c.grid }, ticks: { callback: v => v + ' kg' } } } }
+        });
+      }
+    }
+
+    const tg = document.getElementById('sante-targets');
+    if (tg) {
+      const row = (l, v) => `<div style="display:flex; justify-content:space-between; padding:7px 0; border-bottom:1px solid var(--border); font-size:13px;"><span class="muted">${l}</span><span class="mono" style="font-weight:700;">${v}</span></div>`;
+      tg.innerHTML = row('Calories / jour', (HEALTH.kcal || 2450) + ' kcal') + row('Protéines / jour', (HEALTH.protein || 185) + ' g') + row('Rythme visé', '−0,5 à −0,7 kg / sem') +
+        `<div style="font-size:11px; color:var(--text-3); margin-top:10px;">Menu fixe & compléments dans mon plan. Pèse-toi le matin à jeun, regarde la moyenne 7j.</div>`;
+    }
+
+    const log = document.getElementById('sante-log');
+    if (log) {
+      const all = healthWeightsSorted();
+      const recent = all.slice().reverse().slice(0, 10);
+      if (!recent.length) { log.innerHTML = '<div class="empty-state" style="padding:18px;">Aucune pesée. Clique ⚖️ Me peser.</div>'; }
+      else {
+        log.innerHTML = recent.map(e => {
+          const idx = all.findIndex(x => x.date === e.date);
+          const prev = idx > 0 ? +all[idx - 1].kg : null;
+          const delta = prev != null ? (+e.kg - prev) : null;
+          const dStr = delta != null ? `<span class="mono ${delta <= 0 ? 'pos' : 'neg'}" style="font-size:11px;">${delta <= 0 ? '' : '+'}${Math.round(delta * 10) / 10}</span>` : '';
+          return `<div style="display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border);">
+            <span style="font-size:12.5px;">${new Date(e.date).toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: 'short' })}</span>
+            <span style="display:flex; gap:12px; align-items:center;"><span class="mono" style="font-weight:700;">${fmtKg(e.kg)}</span>${dStr}
+            <span onclick="healthRemoveWeight('${e.date}')" style="cursor:pointer; color:var(--text-3); font-size:16px;">×</span></span></div>`;
+        }).join('');
       }
     }
   }
@@ -13919,6 +14112,7 @@
       capital: (typeof CAPITAL !== 'undefined') ? CAPITAL : null,
       routine: (typeof ROUTINE !== 'undefined') ? ROUTINE : null,
       routineLog: (typeof ROUTINE_LOG !== 'undefined') ? ROUTINE_LOG : null,
+      health: (typeof HEALTH !== 'undefined') ? HEALTH : null,
     };
   }
   // Applique une sauvegarde (import fichier OU synchro cloud)
@@ -13977,6 +14171,10 @@
       if (data.routineLog && typeof data.routineLog === 'object') {
         ROUTINE_LOG = { daily: data.routineLog.daily || {}, weekly: data.routineLog.weekly || {} };
         try { localStorage.setItem('routine_log', JSON.stringify(ROUTINE_LOG)); } catch (e2) {}
+      }
+      if (data.health && typeof data.health === 'object') {
+        HEALTH = { startWeight: +data.health.startWeight || 0, goalWeight: +data.health.goalWeight || 0, heightCm: +data.health.heightCm || 0, kcal: +data.health.kcal || 2450, protein: +data.health.protein || 185, weights: Array.isArray(data.health.weights) ? data.health.weights : [] };
+        try { localStorage.setItem('health_data', JSON.stringify(HEALTH)); } catch (e2) {}
       }
     }
     saveTrades(true); saveAccountsAndRotation(); savePrefs();
@@ -15353,6 +15551,7 @@
   try { if (typeof loadMarketNotes === 'function') loadMarketNotes(); } catch (e) { console.error('[init loadMarketNotes]', e); }
   try { if (typeof loadCapital === 'function') loadCapital(); } catch (e) { console.error('[init loadCapital]', e); }
   try { if (typeof loadRoutine === 'function') loadRoutine(); } catch (e) { console.error('[init loadRoutine]', e); }
+  try { if (typeof loadHealth === 'function') loadHealth(); } catch (e) { console.error('[init loadHealth]', e); }
   try { loadPlan(); renderPlanView(); console.log('[init] loadPlan OK'); } catch (e) { console.error('[init loadPlan]', e); }
   try { loadGoalsLadder(); console.log('[init] loadGoalsLadder OK'); } catch (e) { console.error('[init loadGoalsLadder]', e); }
   try { updateNotifBadge(); renderNotifications(); console.log('[init] notifications OK'); } catch (e) { console.error('[init notifications]', e); }
