@@ -5379,7 +5379,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-22 · r43</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-22 · r44</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -10551,6 +10551,27 @@
         </div>
       </div>`;
   }
+  // Synthèse Santé / Sèche pour le rapport (poids sur la période + objectif)
+  function santePeriodHTML(start, end) {
+    if (typeof HEALTH === 'undefined' || !Array.isArray(HEALTH.weights) || !HEALTH.weights.length) return '';
+    const ws = HEALTH.weights.slice().sort((a, b) => new Date(a.date) - new Date(b.date));
+    const inP = ws.filter(e => { const d = new Date(e.date); return d >= start && d <= end; });
+    const last = +ws[ws.length - 1].kg;
+    const goal = +HEALTH.goalWeight || 0;
+    let line;
+    if (inP.length >= 1) {
+      const f = +inP[0].kg, l = +inP[inP.length - 1].kg, delta = Math.round((l - f) * 10) / 10;
+      const col = delta <= 0 ? 'var(--green)' : 'var(--red)';
+      line = `${inP.length} pesée${inP.length > 1 ? 's' : ''} · ${f.toLocaleString('fr-FR')} → ${l.toLocaleString('fr-FR')} kg · <span style="color:${col}; font-weight:700;">${delta <= 0 ? '' : '+'}${delta} kg</span>`;
+    } else {
+      line = 'Aucune pesée sur la période — pense à te peser le matin à jeun.';
+    }
+    const goalLine = goal ? ` · objectif ${goal.toLocaleString('fr-FR')} kg (reste ${Math.max(0, Math.round((last - goal) * 10) / 10).toLocaleString('fr-FR')} kg)` : '';
+    return `<div class="card" style="margin-bottom:20px;">
+      <div class="card-header"><span class="card-title">💪 Santé / Sèche</span><span class="muted" style="font-size:11px;">poids ${last.toLocaleString('fr-FR')} kg${goalLine}</span></div>
+      <div class="card-body" style="font-size:13px; color:var(--text-1);">${line}</div>
+    </div>`;
+  }
   function renderWeeklyReport() {
     const c = document.getElementById('weekly-report-body');
     if (!c) return;
@@ -10587,7 +10608,7 @@
     });
 
     if (!weekTrades.length) {
-      c.innerHTML = `<div class="empty-state" style="padding:40px;">Aucun trade ${periodWordLow}.<br><span style="font-size:11px;">Navigue avec ‹ › pour voir les périodes passées.</span></div>` + routinePeriodHTML(monday, sunday) + capitalSynthesisHTML(monday, sunday, periodWord);
+      c.innerHTML = `<div class="empty-state" style="padding:40px;">Aucun trade ${periodWordLow}.<br><span style="font-size:11px;">Navigue avec ‹ › pour voir les périodes passées.</span></div>` + routinePeriodHTML(monday, sunday) + capitalSynthesisHTML(monday, sunday, periodWord) + santePeriodHTML(monday, sunday);
       return;
     }
 
@@ -10740,6 +10761,7 @@
 
       ${routinePeriodHTML(monday, sunday)}
       ${capitalSynthesisHTML(monday, sunday, periodWord)}
+      ${santePeriodHTML(monday, sunday)}
 
       <!-- Ce qui a marché / Ce qui n'a pas marché -->
       <div class="row-2col" style="margin-bottom:20px;">
