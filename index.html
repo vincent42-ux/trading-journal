@@ -3861,6 +3861,17 @@
 
       <!-- ============ DASHBOARD ============ -->
       <section class="view active" id="view-dashboard">
+        <!-- FILTRE D'UNITÉ D'AFFICHAGE (Tout / € / R / %) -->
+        <div style="display:flex; align-items:center; justify-content:flex-end; gap:10px; margin-bottom:14px;">
+          <span style="font-size:11px; color:var(--text-2); text-transform:uppercase; letter-spacing:0.5px;">Afficher en</span>
+          <div class="mode-toggle" style="padding:3px;">
+            <button class="mode-btn active" id="dash-unit-all" onclick="setDashUnit('all')" style="padding:4px 12px; font-size:11px;">Tout</button>
+            <button class="mode-btn" id="dash-unit-money" onclick="setDashUnit('money')" style="padding:4px 12px; font-size:11px;">€</button>
+            <button class="mode-btn" id="dash-unit-R" onclick="setDashUnit('R')" style="padding:4px 12px; font-size:11px;">R</button>
+            <button class="mode-btn" id="dash-unit-pct" onclick="setDashUnit('pct')" style="padding:4px 12px; font-size:11px;">%</button>
+          </div>
+        </div>
+
         <!-- Bandeau d'alertes -->
         <div id="dashboard-alerts"></div>
 
@@ -5379,7 +5390,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-22 · r44</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-25 · r45</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -7295,6 +7306,24 @@
   // ========== HERO KPIs (Gain R par période, Profit Factor, Win Rate gauge, R:R gauge) ==========
   let R_MODE = 'week'; // 'day' | 'week' | 'month' — pilote TOUT le dashboard (stats + courbe)
   try { const _rm = localStorage.getItem('dash_period'); if (_rm) R_MODE = _rm; } catch (e) {}
+
+  // ----- FILTRE D'UNITÉ DU DASHBOARD : 'all' (comme avant) | 'money' | 'R' | 'pct' -----
+  let DASH_UNIT = 'all';
+  try { const _du = localStorage.getItem('dash_unit'); if (_du) DASH_UNIT = _du; } catch (e) {}
+  function dashMasterRisk() { return (ACCOUNTS.find(a => a.role === 'master') || ACCOUNTS[0] || { risk: 62.80 }).risk || 62.80; }
+  function dashTotalCapital() { return ACCOUNTS.reduce((sum, a) => sum + (a.currentBalance || a.size || 0), 0) || 1; }
+  // Formate un montant en $ selon l'unité choisie. 'all'/'money' = $ d'origine (fmt$).
+  function pnlUnit(n) {
+    if (DASH_UNIT === 'R') { const r = n / dashMasterRisk(); return (r >= 0 ? '+' : '') + r.toFixed(2) + 'R'; }
+    if (DASH_UNIT === 'pct') { const p = n / dashTotalCapital() * 100; return (p >= 0 ? '+' : '') + p.toFixed(2) + '%'; }
+    return fmt$(n);
+  }
+  function setDashUnit(u) {
+    DASH_UNIT = u;
+    try { localStorage.setItem('dash_unit', u); } catch (e) {}
+    ['all', 'money', 'R', 'pct'].forEach(k => { const b = document.getElementById('dash-unit-' + k); if (b) b.classList.toggle('active', k === u); });
+    if (typeof render === 'function') render();
+  }
   function dashPeriodStart() {
     const t = new Date();
     if (R_MODE === 'day') { const d = new Date(t); d.setHours(0, 0, 0, 0); return d; }
@@ -7319,6 +7348,8 @@
   function renderHeroKPIs(s) {
     const masterRisk = (ACCOUNTS.find(a => a.role === 'master') || ACCOUNTS[0] || { risk: 62.80 }).risk;
     const logical = (s && s.logical) || [];
+    // Sync visuel des boutons d'unité (au cas où restauré depuis localStorage)
+    ['all', 'money', 'R', 'pct'].forEach(k => { const b = document.getElementById('dash-unit-' + k); if (b) b.classList.toggle('active', k === DASH_UNIT); });
 
     // ----- Gain en R par période -----
     const today = new Date();
@@ -7359,7 +7390,7 @@
       } else {
         rEl.textContent = (periodR >= 0 ? '+' : '') + periodR.toFixed(1) + 'R';
         rEl.className = 'hero-kpi-value ' + (periodR >= 0 ? 'pos' : 'neg');
-        if (rSub) rSub.innerHTML = `${label} · <span class="mono ${periodPnl >= 0 ? 'pos' : 'neg'}">${fmt$(periodPnl)}</span> · ${periodTrades.length} trade${periodTrades.length > 1 ? 's' : ''}`;
+        if (rSub) rSub.innerHTML = `${label} · <span class="mono ${periodPnl >= 0 ? 'pos' : 'neg'}">${pnlUnit(periodPnl)}</span> · ${periodTrades.length} trade${periodTrades.length > 1 ? 's' : ''}`;
       }
     }
 
@@ -7408,16 +7439,16 @@
         if (pnlSub) pnlSub.textContent = 'Aucune donnée';
       } else {
         // Tous les trades sont sur le master → s.totalPnl = P&L du master
-        pnlEl.textContent = fmt$(s.totalPnl);
+        pnlEl.textContent = pnlUnit(s.totalPnl);
         pnlEl.className = 'hero-kpi-value mono ' + (s.totalPnl >= 0 ? 'pos' : 'neg');
         if (pnlSub) {
           const followers = ACCOUNTS.filter(a => a.role === 'follower');
           if (followers.length) {
             const followerMultSum = followers.reduce((sum, a) => sum + (a.multiplier || 1), 0);
             const withFollowers = s.totalPnl * (1 + followerMultSum);
-            pnlSub.innerHTML = `Master seul · avec followers <span class="mono ${withFollowers >= 0 ? 'pos' : 'neg'}">${fmt$(withFollowers)}</span>`;
+            pnlSub.innerHTML = `Master seul · avec followers <span class="mono ${withFollowers >= 0 ? 'pos' : 'neg'}">${pnlUnit(withFollowers)}</span>`;
           } else {
-            pnlSub.innerHTML = `Best <span class="pos mono">${fmt$(s.best)}</span> · Worst <span class="neg mono">${fmt$(s.worst)}</span>`;
+            pnlSub.innerHTML = `Best <span class="pos mono">${pnlUnit(s.best)}</span> · Worst <span class="neg mono">${pnlUnit(s.worst)}</span>`;
           }
         }
       }
