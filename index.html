@@ -4572,6 +4572,17 @@
 
       <!-- ============ STATS AVANCÉES ============ -->
       <section class="view" id="view-stats">
+        <!-- FILTRE D'UNITÉ (Tout / € / R / %) -->
+        <div style="display:flex; align-items:center; justify-content:flex-end; gap:10px; margin-bottom:14px;">
+          <span style="font-size:11px; color:var(--text-2); text-transform:uppercase; letter-spacing:0.5px;">Afficher en</span>
+          <div class="mode-toggle" style="padding:3px;">
+            <button class="mode-btn active" id="stats-unit-all" onclick="setStatsUnit('all')" style="padding:4px 12px; font-size:11px;">Tout</button>
+            <button class="mode-btn" id="stats-unit-money" onclick="setStatsUnit('money')" style="padding:4px 12px; font-size:11px;">€</button>
+            <button class="mode-btn" id="stats-unit-R" onclick="setStatsUnit('R')" style="padding:4px 12px; font-size:11px;">R</button>
+            <button class="mode-btn" id="stats-unit-pct" onclick="setStatsUnit('pct')" style="padding:4px 12px; font-size:11px;">%</button>
+          </div>
+        </div>
+
         <!-- HERO STATS (4 KPI principaux premium) -->
         <div class="row-4col" style="margin-bottom: 18px;">
           <div class="card hero-stat">
@@ -5390,7 +5401,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-25 · r46</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-25 · r47</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -6673,8 +6684,16 @@
     return c;
   }
 
+  function setStatsUnit(u) {
+    STATS_UNIT = u;
+    try { localStorage.setItem('stats_unit', u); } catch (e) {}
+    ['all', 'money', 'R', 'pct'].forEach(k => { const b = document.getElementById('stats-unit-' + k); if (b) b.classList.toggle('active', k === u); });
+    if (typeof render === 'function') render();
+  }
   function renderStatsPage(s) {
     if (!document.getElementById('view-stats')) return;
+    ACTIVE_UNIT = STATS_UNIT; // toute la page Stats suit son unité (fmt$ convertit)
+    ['all', 'money', 'R', 'pct'].forEach(k => { const b = document.getElementById('stats-unit-' + k); if (b) b.classList.toggle('active', k === STATS_UNIT); });
     const logical = (s && s.logical) || [];
 
     // ----- HERO STATS -----
@@ -6866,6 +6885,8 @@
 
     // ----- ÉVOLUTION DISCIPLINE -----
     renderDisciplineEvolution(logical);
+
+    ACTIVE_UNIT = 'all'; // fin du rendu Stats : on relâche le contexte d'unité
   }
 
   // Helpers
@@ -7310,6 +7331,13 @@
   // ----- FILTRE D'UNITÉ DU DASHBOARD : 'all' (comme avant) | 'money' | 'R' | 'pct' -----
   let DASH_UNIT = 'all';
   try { const _du = localStorage.getItem('dash_unit'); if (_du) DASH_UNIT = _du; } catch (e) {}
+
+  // ----- CONTEXTE D'UNITÉ GÉNÉRIQUE (lu par fmt$ pendant le rendu d'une page) -----
+  // 'all' = comportement normal de fmt$. 'R'/'pct' = conversion basée sur le MASTER.
+  let ACTIVE_UNIT = 'all';
+  // Unités propres aux autres pages (un sélecteur par page)
+  let STATS_UNIT = 'all';
+  try { const _su = localStorage.getItem('stats_unit'); if (_su) STATS_UNIT = _su; } catch (e) {}
   function dashMasterRisk() { return (ACCOUNTS.find(a => a.role === 'master') || ACCOUNTS[0] || { risk: 62.80 }).risk || 62.80; }
   function dashTotalCapital() { return ACCOUNTS.reduce((sum, a) => sum + (a.currentBalance || a.size || 0), 0) || 1; }
   // Formate un montant en $ selon l'unité choisie. 'all'/'money' = $ d'origine (fmt$).
@@ -14076,6 +14104,13 @@
   // Override fmt$ to honour preferences (screenshot safe + currency + decimals)
   const _origFmt$ = fmt$;
   fmt$ = function(n) {
+    // Contexte d'unité de page (Stats/Comptes/Journal) — calculs basés sur le master
+    if (typeof ACTIVE_UNIT !== 'undefined' && ACTIVE_UNIT === 'R') {
+      const r = n / dashMasterRisk(); return (r >= 0 ? '+' : '') + r.toFixed(2) + 'R';
+    }
+    if (typeof ACTIVE_UNIT !== 'undefined' && ACTIVE_UNIT === 'pct') {
+      const p = n / dashTotalCapital() * 100; return (p >= 0 ? '+' : '') + p.toFixed(2) + '%';
+    }
     if (PREFS && PREFS.screenshotSafe) {
       // Display in R instead of $: use master risk (default $62.80) or first account risk
       const masterAcc = (ACCOUNTS && ACCOUNTS.find(a => a.role === 'master')) || (ACCOUNTS && ACCOUNTS[0]);
