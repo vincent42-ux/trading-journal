@@ -5390,7 +5390,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-25 · r45</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-25 · r46</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -7318,6 +7318,21 @@
     if (DASH_UNIT === 'pct') { const p = n / dashTotalCapital() * 100; return (p >= 0 ? '+' : '') + p.toFixed(2) + '%'; }
     return fmt$(n);
   }
+  // Version compacte (calendrier) : € à 0 décimale (look actuel), R à 1, % à 2
+  function pnlUnitCompact(n) {
+    if (DASH_UNIT === 'R') { const r = n / dashMasterRisk(); return (r >= 0 ? '+' : '') + r.toFixed(1) + 'R'; }
+    if (DASH_UNIT === 'pct') { const p = n / dashTotalCapital() * 100; return (p >= 0 ? '+' : '') + p.toFixed(2) + '%'; }
+    return (n >= 0 ? '+' : '') + currencySymbol(PREFS.currency || 'USD') + Math.abs(n).toFixed(0);
+  }
+  // Valeur numérique d'un trade dans l'unité courante (pour la courbe cumulée)
+  function tradeValInUnit(t, masterRisk) {
+    if (DASH_UNIT === 'R') return tradeRValue(t, masterRisk);
+    if (DASH_UNIT === 'pct') return (t.pnl || 0) / dashTotalCapital() * 100;
+    return (t.pnl || 0);
+  }
+  // Formatage axe/tooltip de la courbe selon l'unité
+  function unitAxis(v, dec) { if (DASH_UNIT === 'R') return v.toFixed(dec != null ? dec : 1) + 'R'; if (DASH_UNIT === 'pct') return v.toFixed(dec != null ? dec : 1) + '%'; return currencySymbol(PREFS.currency || 'USD') + v.toFixed(0); }
+  function unitSigned(v) { const s = v >= 0 ? '+' : ''; if (DASH_UNIT === 'R') return s + v.toFixed(2) + 'R'; if (DASH_UNIT === 'pct') return s + v.toFixed(2) + '%'; return fmt$(v); }
   function setDashUnit(u) {
     DASH_UNIT = u;
     try { localStorage.setItem('dash_unit', u); } catch (e) {}
@@ -7469,6 +7484,9 @@
     const c = getThemeColors();
     if (window.allCharts.equity) window.allCharts.equity.destroy();
     const masterRisk = (ACCOUNTS.find(a => a.role === 'master') || ACCOUNTS[0] || { risk: 62.80 }).risk;
+    // Le toggle R/$ de la courbe n'a de sens qu'en mode "Tout" : caché si une unité est forcée
+    const _eqToggle = document.getElementById('equity-mode-r');
+    if (_eqToggle && _eqToggle.parentElement) _eqToggle.parentElement.style.display = (DASH_UNIT === 'all') ? '' : 'none';
 
     // La courbe suit la période du dashboard (Jour/Semaine/Mois) via sDash déjà scopé
     const logicalWeek = (s && s.logical) || [];
@@ -7483,6 +7501,30 @@
         type: 'line',
         data: { labels: ['—'], datasets: [{ data: [0], borderColor: c.text, borderWidth: 1 }] },
         options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+      };
+    } else if (DASH_UNIT !== 'all') {
+      // ===== UNITÉ FORCÉE (€ / R / %) : courbe cumulée dans l'unité choisie =====
+      let cum = 0;
+      const data = logicalWeek.map(t => { cum += tradeValInUnit(t, masterRisk); return cum; });
+      const labels = logicalWeek.map((t, i) => t.date ? `${t.date}` : `#${i + 1}`);
+      let ddPeak = 0, ddMax = 0;
+      for (const v of data) { if (v > ddPeak) ddPeak = v; if (ddPeak - v > ddMax) ddMax = ddPeak - v; }
+      const color = cum >= 0 ? c.green : c.red;
+      const ctx = canvas.getContext('2d');
+      const grad = ctx.createLinearGradient(0, 0, 0, 280);
+      grad.addColorStop(0, color + '50'); grad.addColorStop(1, color + '00');
+      totalDisplay = `<span class="${cum >= 0 ? 'pos' : 'neg'}" style="font-weight:700;">${unitSigned(cum)} ${_periodLbl}</span> sur ${logicalWeek.length} trade${logicalWeek.length > 1 ? 's' : ''}${ddMax > 0 ? ` · <span style="color:var(--red);">DD max −${unitAxis(ddMax).replace(/^[+]/, '')}</span>` : ''}`;
+      chartConfig = {
+        type: 'line',
+        data: { labels, datasets: [{ data, borderColor: color, backgroundColor: grad, borderWidth: 2.5, fill: true, tension: 0.35, pointRadius: 0, pointHoverRadius: 5, pointHoverBackgroundColor: color }] },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { backgroundColor: c.tooltipBg, callbacks: { label: ctx => unitSigned(ctx.parsed.y) } } },
+          scales: {
+            x: { grid: { display: false }, ticks: { maxTicksLimit: 8 } },
+            y: { grid: { color: c.grid }, ticks: { callback: v => unitAxis(v) } }
+          }
+        }
       };
     } else if (EQUITY_MODE === 'r') {
       // R cumulé sur les trades
@@ -7632,7 +7674,7 @@
             weekTotal += pnl;
             monthTotal += pnl;
             cls += pnl > 0 ? ' win' : pnl < 0 ? ' loss' : '';
-            content += `<div class="d-pnl ${pnl >= 0 ? 'pos' : 'neg'}">${pnl >= 0 ? '+' : ''}${currencySymbol(PREFS.currency || 'USD')}${Math.abs(pnl).toFixed(0)}</div>`;
+            content += `<div class="d-pnl ${pnl >= 0 ? 'pos' : 'neg'}">${pnlUnitCompact(pnl)}</div>`;
           } else {
             cls += ' empty';
           }
@@ -7641,14 +7683,14 @@
           weekHtml += `<td><div class="${cls}" title="${k}${pnl != null ? ' — cliquer pour voir les trades' : ''}"${clickAttr}>${content}</div></td>`;
         }
       }
-      weekHtml += `<td><div class="pnl-cal-weekly ${weekTotal > 0 ? 'pos' : weekTotal < 0 ? 'neg' : 'muted'}">${hasTrades ? (weekTotal >= 0 ? '+' : '') + currencySymbol(PREFS.currency || 'USD') + Math.abs(weekTotal).toFixed(0) : '—'}</div></td>`;
+      weekHtml += `<td><div class="pnl-cal-weekly ${weekTotal > 0 ? 'pos' : weekTotal < 0 ? 'neg' : 'muted'}">${hasTrades ? pnlUnitCompact(weekTotal) : '—'}</div></td>`;
       weekHtml += '</tr>';
       html += weekHtml;
     }
     html += `</tbody></table>
       <div class="pnl-cal-month-total">
         <span class="lbl">${monthNames[month]} ${year}</span>
-        <span class="val ${monthTotal >= 0 ? 'pos' : 'neg'}">${monthTotal >= 0 ? '+' : ''}${currencySymbol(PREFS.currency || 'USD')}${Math.abs(monthTotal).toFixed(2)}</span>
+        <span class="val ${monthTotal >= 0 ? 'pos' : 'neg'}">${pnlUnitCompact(monthTotal)}</span>
       </div>`;
     container.innerHTML = html;
   }
