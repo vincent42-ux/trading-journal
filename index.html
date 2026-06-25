@@ -4269,6 +4269,15 @@
 
       <!-- ============ JOURNAL ============ -->
       <section class="view" id="view-journal">
+        <div style="display:flex; align-items:center; justify-content:flex-end; gap:10px; margin-bottom:14px;">
+          <span style="font-size:11px; color:var(--text-2); text-transform:uppercase; letter-spacing:0.5px;">Afficher en</span>
+          <div class="mode-toggle" style="padding:3px;">
+            <button class="mode-btn active" id="jnl-unit-all" onclick="setJnlUnit('all')" style="padding:4px 12px; font-size:11px;">Tout</button>
+            <button class="mode-btn" id="jnl-unit-money" onclick="setJnlUnit('money')" style="padding:4px 12px; font-size:11px;">€</button>
+            <button class="mode-btn" id="jnl-unit-R" onclick="setJnlUnit('R')" style="padding:4px 12px; font-size:11px;">R</button>
+            <button class="mode-btn" id="jnl-unit-pct" onclick="setJnlUnit('pct')" style="padding:4px 12px; font-size:11px;">%</button>
+          </div>
+        </div>
         <!-- Bandeau filtres premium -->
         <div class="journal-filters-bar">
           <div class="jf-group">
@@ -4361,6 +4370,15 @@
             <div style="font-size:12px; color:var(--text-2); margin-top:4px;">Tout se joue sur le master — c'est lui que je valide, c'est lui qui paie.</div>
           </div>
           <button class="btn btn-primary" onclick="openAccountModal()">+ Nouveau compte</button>
+        </div>
+        <div style="display:flex; align-items:center; justify-content:flex-end; gap:10px; margin-bottom:14px;">
+          <span style="font-size:11px; color:var(--text-2); text-transform:uppercase; letter-spacing:0.5px;">Afficher en</span>
+          <div class="mode-toggle" style="padding:3px;">
+            <button class="mode-btn active" id="acct-unit-all" onclick="setAcctUnit('all')" style="padding:4px 12px; font-size:11px;">Tout</button>
+            <button class="mode-btn" id="acct-unit-money" onclick="setAcctUnit('money')" style="padding:4px 12px; font-size:11px;">€</button>
+            <button class="mode-btn" id="acct-unit-R" onclick="setAcctUnit('R')" style="padding:4px 12px; font-size:11px;">R</button>
+            <button class="mode-btn" id="acct-unit-pct" onclick="setAcctUnit('pct')" style="padding:4px 12px; font-size:11px;">%</button>
+          </div>
         </div>
         <div id="accounts-summary"></div>
         <div class="account-tabs" id="account-tabs"></div>
@@ -5401,7 +5419,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-25 · r47</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-25 · r48</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -7338,6 +7356,22 @@
   // Unités propres aux autres pages (un sélecteur par page)
   let STATS_UNIT = 'all';
   try { const _su = localStorage.getItem('stats_unit'); if (_su) STATS_UNIT = _su; } catch (e) {}
+  let ACCT_UNIT = 'all';
+  try { const _au = localStorage.getItem('acct_unit'); if (_au) ACCT_UNIT = _au; } catch (e) {}
+  let JNL_UNIT = 'all';
+  try { const _ju = localStorage.getItem('jnl_unit'); if (_ju) JNL_UNIT = _ju; } catch (e) {}
+  // Formatage ciblé d'un P&L signé dans une unité donnée (base master). 'all'/'money' = €.
+  function fmtUnit(n, unit) {
+    if (unit === 'R') { const r = n / dashMasterRisk(); return (r >= 0 ? '+' : '') + r.toFixed(2) + 'R'; }
+    if (unit === 'pct') { const p = n / dashTotalCapital() * 100; return (p >= 0 ? '+' : '') + p.toFixed(2) + '%'; }
+    return fmt$(n);
+  }
+  // Valeur de référence NON signée (objectif, cible) dans une unité (pour "pnl / objectif")
+  function refUnit(n, unit) {
+    if (unit === 'R') { return (n / dashMasterRisk()).toFixed(1) + 'R'; }
+    if (unit === 'pct') { return (n / dashTotalCapital() * 100).toFixed(1) + '%'; }
+    return '$' + Math.round(n).toLocaleString();
+  }
   function dashMasterRisk() { return (ACCOUNTS.find(a => a.role === 'master') || ACCOUNTS[0] || { risk: 62.80 }).risk || 62.80; }
   function dashTotalCapital() { return ACCOUNTS.reduce((sum, a) => sum + (a.currentBalance || a.size || 0), 0) || 1; }
   // Formate un montant en $ selon l'unité choisie. 'all'/'money' = $ d'origine (fmt$).
@@ -11180,8 +11214,15 @@
     return 'off';
   }
 
+  function setJnlUnit(u) {
+    JNL_UNIT = u;
+    try { localStorage.setItem('jnl_unit', u); } catch (e) {}
+    ['all', 'money', 'R', 'pct'].forEach(k => { const b = document.getElementById('jnl-unit-' + k); if (b) b.classList.toggle('active', k === u); });
+    if (typeof render === 'function') render();
+  }
   function renderJournal() {
     const wrapper = document.getElementById('journal-table-wrapper');
+    ['all', 'money', 'R', 'pct'].forEach(k => { const b = document.getElementById('jnl-unit-' + k); if (b) b.classList.toggle('active', k === JNL_UNIT); });
     if (!TRADES.length) {
       wrapper.innerHTML = '<div class="tr-empty-msg">Aucun trade enregistré. Clique <strong>+ Trade</strong> pour saisir ton premier trade.</div>';
       ['journal-count', 'journal-wr', 'journal-r', 'journal-pnl'].forEach(id => {
@@ -11190,6 +11231,7 @@
       });
       return;
     }
+    ACTIVE_UNIT = JNL_UNIT; // toute la liste du Journal suit son unité (fmt$ convertit)
 
     // Dédup : 1 ligne par trade logique
     const seenLinkIds = new Set();
@@ -11392,6 +11434,7 @@
          </div>`
       : '';
     wrapper.innerHTML = banner + html;
+    ACTIVE_UNIT = 'all'; // fin du rendu Journal : on relâche le contexte d'unité
   }
 
   // Base de données des règles prop firms
@@ -11624,9 +11667,16 @@
     render();
   }
 
+  function setAcctUnit(u) {
+    ACCT_UNIT = u;
+    try { localStorage.setItem('acct_unit', u); } catch (e) {}
+    ['all', 'money', 'R', 'pct'].forEach(k => { const b = document.getElementById('acct-unit-' + k); if (b) b.classList.toggle('active', k === u); });
+    if (typeof render === 'function') render();
+  }
   function renderAccounts(s) {
     const container = document.getElementById('accounts-grid-dyn');
     if (!container) return;
+    ['all', 'money', 'R', 'pct'].forEach(k => { const b = document.getElementById('acct-unit-' + k); if (b) b.classList.toggle('active', k === ACCT_UNIT); });
     if (!ACCOUNTS.length) {
       container.innerHTML = '<div class="empty-state" style="padding:40px;">Aucun compte. Clique <strong>+ Nouveau compte</strong> en haut.</div>';
       return;
@@ -11765,7 +11815,7 @@
             <div class="acc-bar-block ${inDrawdown ? 'inactive' : ''}">
               <div class="acc-bar-label">
                 <span>${objLabel}</span>
-                <span class="mono ${validated ? 'pos' : ''}" onclick="event.stopPropagation(); editRealPnl('${acc.id}')" style="cursor:pointer;" title="Cliquer pour saisir ton P&L réel">${fmt$(Math.max(0, pnl)).replace(/^\+/, '')} / $${targetPnl.toLocaleString()} ✏️</span>
+                <span class="mono ${validated ? 'pos' : ''}" onclick="event.stopPropagation(); editRealPnl('${acc.id}')" style="cursor:pointer;" title="Cliquer pour saisir ton P&L réel">${fmtUnit(Math.max(0, pnl), ACCT_UNIT).replace(/^\+/, '')} / ${refUnit(targetPnl, ACCT_UNIT)} ✏️</span>
               </div>
               <div class="acc-bar-track">
                 <div class="acc-bar-fill ${validated ? 'gold' : 'green'}" style="width:${progPct}%;"></div>
@@ -11835,7 +11885,7 @@
               </div>
               <div class="acc-box" onclick="event.stopPropagation(); editRealPnl('${acc.id}')" style="cursor:pointer;" title="Cliquer pour saisir ton P&L réel">
                 <div class="acc-box-label">P&L ✏️</div>
-                <div class="acc-box-value mono ${pnl >= 0 ? 'pos' : 'neg'}">${fmt$(pnl)}</div>
+                <div class="acc-box-value mono ${pnl >= 0 ? 'pos' : 'neg'}">${fmtUnit(pnl, ACCT_UNIT)}</div>
               </div>
             </div>`}
 
