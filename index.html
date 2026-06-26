@@ -5039,6 +5039,9 @@
 
       <!-- ============ OBJECTIVES ============ -->
       <section class="view" id="view-objectives">
+        <!-- NORTH STAR : la destination -->
+        <div id="goals-northstar" style="margin-bottom:20px;"></div>
+
         <!-- COURT TERME : auto-mesuré depuis les trades -->
         <div class="stats-section-title">Maintenant — mesuré automatiquement sur tes trades</div>
         <div class="row-4col" style="margin-bottom:18px;">
@@ -5442,7 +5445,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-25 · r56</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-25 · r57</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -12413,7 +12416,51 @@
     if (count) count.textContent = unlocked + ' / ' + BADGES.length + ' débloqués';
   }
 
+  function renderGoalsNorthStar() {
+    const el = document.getElementById('goals-northstar');
+    if (!el) return;
+    const EXIT = 4000; // condition de sortie : 3 mois consécutifs à 4 000 €+ de payouts
+    const eur = (typeof capEur === 'function') ? capEur : (n => '€' + Math.round(n || 0));
+    const payouts = (typeof CAPITAL !== 'undefined' && CAPITAL.payouts) ? CAPITAL.payouts : [];
+    const byMo = {};
+    for (const p of payouts) { const d = new Date(p.date); if (isNaN(d)) continue; const k = d.getFullYear() * 12 + d.getMonth(); byMo[k] = (byMo[k] || 0) + (+p.amount || 0); }
+    const now = new Date(); const nowK = now.getFullYear() * 12 + now.getMonth();
+    const monthIn = byMo[nowK] || 0;
+    const pct = Math.min(100, monthIn / EXIT * 100);
+    // mois complets consécutifs (avant le mois en cours) à 4000€+
+    let streak = 0;
+    for (let k = nowK - 1; k >= nowK - 36; k--) { if ((byMo[k] || 0) >= EXIT) streak++; else break; }
+    const reached = monthIn >= EXIT;
+    el.innerHTML = `
+      <div class="card" style="position:relative; overflow:hidden; border-left:3px solid var(--accent); background:linear-gradient(135deg, color-mix(in srgb, var(--accent) 10%, var(--bg-1)), var(--bg-1) 60%);">
+        <div style="position:absolute; top:0; left:0; right:0; height:3px; background:linear-gradient(90deg, var(--accent), var(--accent-bright, #d946ef));"></div>
+        <div class="card-body" style="padding:24px 26px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;">
+            <div style="min-width:220px;">
+              <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-3); margin-bottom:6px;">Ma destination</div>
+              <div style="font-size:22px; font-weight:800; letter-spacing:-0.01em;">🏭 → 🏖️ Quitter l'usine</div>
+              <div style="margin-top:8px; font-size:12.5px; color:var(--text-2); line-height:1.5;">Condition de sortie : <strong style="color:var(--text-1);">3 mois consécutifs à ${eur(EXIT)}+</strong> de payouts prouvés.</div>
+            </div>
+            <div style="text-align:center; padding:12px 20px; border-radius:14px; background:var(--bg-2); border:1px solid var(--border);">
+              <div class="mono" style="font-size:30px; font-weight:800; color:${streak >= 3 ? 'var(--green)' : 'var(--accent)'};">${streak}<span style="font-size:16px; color:var(--text-3);">/3</span></div>
+              <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-3); margin-top:2px;">mois prouvés</div>
+            </div>
+          </div>
+          <div style="margin-top:20px;">
+            <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px;">
+              <span style="font-size:12px; color:var(--text-2);">Payouts ce mois-ci</span>
+              <span class="mono" style="font-weight:800; color:${reached ? 'var(--green)' : 'var(--accent)'};">${eur(monthIn)} / ${eur(EXIT)}</span>
+            </div>
+            <div style="height:12px; border-radius:99px; background:var(--bg-2); border:1px solid var(--border); overflow:hidden;">
+              <div style="height:100%; width:${pct}%; border-radius:99px; background:${reached ? 'var(--green)' : 'linear-gradient(90deg, var(--accent), var(--accent-bright, #d946ef))'}; box-shadow:0 0 12px rgba(168,85,247,0.45); transition:width .4s ease;"></div>
+            </div>
+            <div style="font-size:11px; color:var(--text-2); margin-top:9px;">${reached ? '✅ Objectif de sortie atteint ce mois — il faut le tenir 3 mois d\'affilée.' : 'Encore ' + eur(EXIT - monthIn) + ' ce mois-ci pour valider un mois au niveau sortie.'}</div>
+          </div>
+        </div>
+      </div>`;
+  }
   function renderObjectives(s) {
+    renderGoalsNorthStar();
     renderGoalsAuto();
     renderGoalsLadder();
     renderBadges();
