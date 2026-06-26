@@ -3726,12 +3726,12 @@
     background: rgba(255, 255, 255, 0.18); font-size: 14px;
   }
   .sess-go {
-    padding: 9px 16px; border-radius: 10px;
-    font-size: 12.5px; font-weight: 800; letter-spacing: 0.04em;
+    padding: 11px 20px; border-radius: 12px;
+    font-size: 14px; font-weight: 800; letter-spacing: 0.04em;
     font-family: 'JetBrains Mono', monospace;
   }
-  .sess-go.go { background: rgba(34, 211, 154, 0.15); color: var(--green); border: 1px solid rgba(34, 211, 154, 0.4); }
-  .sess-go.nogo { background: rgba(255, 77, 107, 0.13); color: var(--red); border: 1px solid rgba(255, 77, 107, 0.35); }
+  .sess-go.go { background: rgba(34, 211, 154, 0.15); color: var(--green); border: 1px solid rgba(34, 211, 154, 0.45); box-shadow: 0 0 18px rgba(34, 211, 154, 0.28); }
+  .sess-go.nogo { background: rgba(255, 77, 107, 0.13); color: var(--red); border: 1px solid rgba(255, 77, 107, 0.4); }
   .sess-check-item {
     display: flex; align-items: center; gap: 12px;
     padding: 12px 14px; border-radius: 11px;
@@ -4866,18 +4866,24 @@
 
       <!-- ============ SESSION DE TRADING ============ -->
       <section class="view" id="view-session">
-        <!-- Barre de statut session -->
-        <div class="card" style="margin-bottom:16px;">
-          <div class="card-body" style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+        <!-- Cockpit : barre de statut session -->
+        <div class="card" style="margin-bottom:16px; position:relative; overflow:hidden;">
+          <div style="position:absolute; top:0; left:0; right:0; height:3px; background:linear-gradient(90deg, var(--accent), var(--accent-bright, #d946ef));"></div>
+          <div class="card-body" style="display:flex; align-items:center; gap:22px; flex-wrap:wrap;">
             <div id="sess-go-indicator" class="sess-go nogo">⛔ PAS PRÊT</div>
-            <div style="font-size:12px; color:var(--text-2);">
-              Démarrée à <strong class="mono" id="sess-started-at">—</strong>
-            </div>
-            <div style="font-size:12px; color:var(--text-2);">
-              Trades : <strong class="mono" id="sess-trade-count">0</strong>
-            </div>
-            <div style="font-size:12px; color:var(--text-2);">
-              P&L session : <strong class="mono" id="sess-pnl">$0</strong>
+            <div style="display:flex; gap:24px; flex-wrap:wrap; align-items:center;">
+              <div>
+                <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-3); margin-bottom:2px;">Démarrée</div>
+                <div class="mono" id="sess-started-at" style="font-weight:700; font-size:14px;">—</div>
+              </div>
+              <div>
+                <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-3); margin-bottom:2px;">Trades</div>
+                <div class="mono" id="sess-trade-count" style="font-weight:700; font-size:14px;">0</div>
+              </div>
+              <div>
+                <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-3); margin-bottom:2px;">P&L session</div>
+                <div class="mono" id="sess-pnl" style="font-weight:700; font-size:14px;">$0</div>
+              </div>
             </div>
             <div style="margin-left:auto; display:flex; gap:8px;">
               <button class="btn" onclick="endSession()" style="padding:8px 16px; font-size:12px;">✕ Terminer la session</button>
@@ -5445,7 +5451,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-25 · r57</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-25 · r58</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
