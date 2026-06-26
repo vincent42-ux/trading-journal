@@ -3920,6 +3920,9 @@
           </div>
         </div>
 
+        <!-- CARTE MON EDGE — le système marche-t-il ? -->
+        <div id="edge-verdict-card" style="margin-bottom:16px;"></div>
+
         <!-- LIGNE 2 : Equity Curve + Calendrier mensuel -->
         <div class="row-2col" style="margin-bottom: 16px;">
           <div class="card">
@@ -5419,7 +5422,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-25 · r49</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-25 · r50</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -6656,6 +6659,7 @@
     _safe(() => renderTopbar(s), 'renderTopbar');
     _safe(() => renderObjectives(s), 'renderObjectives');
     _safe(() => renderHeroKPIs(sDash), 'renderHeroKPIs');
+    _safe(() => renderEdgeVerdict(s), 'renderEdgeVerdict');
     _safe(() => renderEquityChart(sDash), 'renderEquityChart');
     _safe(() => renderPnlCalendarNew(), 'renderPnlCalendarNew');
     _safe(() => renderDisciplineHistory(s), 'renderDisciplineHistory');
@@ -7530,6 +7534,84 @@
         }
       }
     }
+  }
+
+  // ========== CARTE "MON EDGE" — le système marche-t-il ? ==========
+  function renderEdgeVerdict(s) {
+    const el = document.getElementById('edge-verdict-card');
+    if (!el) return;
+    const logical = (s && s.logical) || [];
+    const N = logical.length;
+    const masterRisk = (ACCOUNTS.find(a => a.role === 'master') || ACCOUNTS[0] || { risk: 62.80 }).risk;
+
+    if (N === 0) { el.innerHTML = ''; return; }
+
+    const rs = logical.map(t => tradeRValue(t, masterRisk));
+    const expectancy = rs.reduce((a, b) => a + b, 0) / N;
+    const wins = logical.filter(isWinTrade).length;
+    const losses = logical.filter(isLossTrade).length;
+    const decided = wins + losses;
+    const winrate = decided ? (wins / decided * 100) : 0;
+    const winRs = logical.filter(isWinTrade).map(t => tradeRValue(t, masterRisk));
+    const lossRs = logical.filter(isLossTrade).map(t => tradeRValue(t, masterRisk));
+    const avgWin = winRs.length ? winRs.reduce((a, b) => a + b, 0) / winRs.length : 0;
+    const avgLoss = lossRs.length ? lossRs.reduce((a, b) => a + b, 0) / lossRs.length : 0;
+
+    // Meilleure config (setup + créneau horaire) — min 3 trades par groupe
+    const groupBest = (keyFn, label) => {
+      const g = {};
+      for (const t of logical) {
+        const k = keyFn(t);
+        if (k == null) continue;
+        if (!g[k]) g[k] = { n: 0, r: 0 };
+        g[k].n++; g[k].r += tradeRValue(t, masterRisk);
+      }
+      let best = null;
+      for (const k in g) { if (g[k].n >= 3) { const e = g[k].r / g[k].n; if (!best || e > best.e) best = { k, e, n: g[k].n }; } }
+      return best ? { label, ...best } : null;
+    };
+    const bestSetup = groupBest(t => { const su = (t.rules || {}).setup; return su === 'absorption' ? 'Absorption' : su === 'exhaustion' ? 'Exhaustion' : null; }, 'setup');
+    const bestHour = groupBest(t => { if (!t.time) return null; const h = parseInt(String(t.time).slice(0, 2), 10); return isNaN(h) ? null : `${h}h–${h + 1}h`; }, 'créneau');
+    const best = [bestSetup, bestHour].filter(Boolean).sort((a, b) => b.e - a.e)[0];
+
+    // Verdict
+    let tier, badge, color, msg;
+    if (N < 20) {
+      tier = 'low'; color = 'var(--text-2)'; badge = `Échantillon en construction (${N}/20)`;
+      msg = `Continue à trader avec discipline — en dessous de 20 trades, tes stats sont trop bruitées pour conclure quoi que ce soit sur ton edge.`;
+    } else if (expectancy >= 0.1) {
+      tier = 'pos'; color = 'var(--green)'; badge = 'Edge positif ✅';
+      msg = `Ton système gagne <strong>${expectancy >= 0 ? '+' : ''}${expectancy.toFixed(2)}R par trade</strong> en moyenne. Il est rentable sur la durée — ta seule mission : garder la discipline.`;
+    } else if (expectancy > -0.05) {
+      tier = 'mid'; color = 'var(--amber)'; badge = 'Edge à confirmer';
+      msg = `Espérance <strong>${expectancy >= 0 ? '+' : ''}${expectancy.toFixed(2)}R/trade</strong> — autour du neutre. Reste discipliné et continue à collecter avant de juger.`;
+    } else {
+      tier = 'neg'; color = 'var(--red)'; badge = 'Edge négatif ⚠️';
+      msg = `Sur cet échantillon tu perds <strong>${expectancy.toFixed(2)}R/trade</strong> en moyenne. Avant d'augmenter le risque : revois tes setups et ton exécution.`;
+    }
+
+    const reco = (N >= 20 && best)
+      ? `<div style="margin-top:12px; padding:10px 12px; background:var(--bg-1); border-radius:10px; font-size:12.5px;">🎯 Ta meilleure config : <strong>${best.k}</strong> → <span class="mono" style="color:var(--green); font-weight:700;">${best.e >= 0 ? '+' : ''}${best.e.toFixed(2)}R/trade</span> sur ${best.n} trades</div>`
+      : '';
+
+    el.innerHTML = `
+      <div class="card" style="border-left:3px solid ${color};">
+        <div class="card-body">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+            <div>
+              <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-2); margin-bottom:4px;">Mon edge</div>
+              <div style="font-size:20px; font-weight:800; color:${color};">${badge}</div>
+            </div>
+            <div style="display:flex; gap:18px; text-align:center;">
+              <div><div class="mono" style="font-size:18px; font-weight:700; color:${color};">${expectancy >= 0 ? '+' : ''}${expectancy.toFixed(2)}R</div><div style="font-size:10px; color:var(--text-2);">/ trade</div></div>
+              <div><div class="mono" style="font-size:18px; font-weight:700;">${winrate.toFixed(0)}%</div><div style="font-size:10px; color:var(--text-2);">win rate</div></div>
+              <div><div class="mono" style="font-size:18px; font-weight:700;">${N}</div><div style="font-size:10px; color:var(--text-2);">trades</div></div>
+            </div>
+          </div>
+          <div style="margin-top:10px; font-size:13px; color:var(--text-1); line-height:1.5;">${msg}</div>
+          ${reco}
+        </div>
+      </div>`;
   }
 
   // ========== EQUITY CHART (R cumulé / $ par jour) ==========
