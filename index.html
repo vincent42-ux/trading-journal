@@ -5442,7 +5442,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-25 · r55</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-25 · r56</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -11029,8 +11029,43 @@
       negatives.push({ icon: '📅', title: `Plus de jours perdants (${losingDays}) que gagnants (${winningDays})`, detail: `Identifier les jours problématiques` });
     }
 
+    // === VERDICT PREMIUM DE LA PÉRIODE (discipline avant le P&L) ===
+    let vCol, vEmoji, vTitle, vMsg;
+    if (tradesWithRules.length && avgDiscScore < 3) {
+      vCol = 'var(--red)'; vEmoji = '🛡️'; vTitle = 'Discipline à reprendre';
+      vMsg = 'Avant le P&L, c\'est la discipline qui compte : ' + tradesDerive + ' trade' + (tradesDerive > 1 ? 's' : '') + ' en dérive. Recale ton plan ' + periodWordLow + ' prochaine.';
+    } else if (totalPnl > 0 && avgDiscScore >= 4) {
+      vCol = 'var(--green)'; vEmoji = '🏆'; vTitle = periodWord + ' exemplaire';
+      vMsg = 'Profitable ET disciplinée — exactement le combo qui prouve ton edge. Continue pareil.';
+    } else if (totalPnl > 0) {
+      vCol = 'var(--green)'; vEmoji = '💰'; vTitle = periodWord + ' profitable';
+      vMsg = 'Tu finis dans le vert. Verrouille la discipline pour rendre ça répétable.';
+    } else if (avgDiscScore >= 4) {
+      vCol = 'var(--amber)'; vEmoji = '🧱'; vTitle = 'Discipline tenue, P&L négatif';
+      vMsg = 'Le plus dur est fait : tu as suivi ton plan. Le P&L suit quand on garde cette rigueur.';
+    } else {
+      vCol = 'var(--amber)'; vEmoji = '⚖️'; vTitle = periodWord + ' mitigée';
+      vMsg = 'Période sans direction claire — vise une discipline ≥ 4/5 ' + periodWordLow + ' prochaine.';
+    }
+
     // === RENDU ===
     c.innerHTML = `
+      <!-- Hero verdict de la période -->
+      <div class="card" style="margin-bottom:20px; position:relative; overflow:hidden; border-left:3px solid ${vCol}; background:linear-gradient(135deg, color-mix(in srgb, ${vCol} 9%, var(--bg-1)), var(--bg-1) 60%);">
+        <div style="position:absolute; top:0; left:0; right:0; height:3px; background:linear-gradient(90deg, var(--accent), var(--accent-bright, #d946ef));"></div>
+        <div class="card-body" style="padding:24px 26px; display:flex; align-items:center; justify-content:space-between; gap:18px; flex-wrap:wrap;">
+          <div style="min-width:200px;">
+            <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-3); margin-bottom:8px;">Bilan ${periodWordLow}</div>
+            <div style="font-size:23px; font-weight:800; color:${vCol}; letter-spacing:-0.01em;">${vEmoji} ${vTitle}</div>
+            <div style="margin-top:10px; font-size:13px; color:var(--text-2); line-height:1.5; max-width:460px;">${vMsg}</div>
+          </div>
+          <div style="text-align:right;">
+            <div class="mono" style="font-size:34px; font-weight:800; color:${totalPnl >= 0 ? 'var(--green)' : 'var(--red)'}; line-height:1;">${fmt$(totalPnl)}</div>
+            <div style="font-size:12px; color:var(--text-2); margin-top:5px;">${totalR >= 0 ? '+' : ''}${totalR.toFixed(1)}R · ${weekTrades.length} trade${weekTrades.length > 1 ? 's' : ''} · disc ${avgDiscScore.toFixed(1)}/5</div>
+          </div>
+        </div>
+      </div>
+
       <!-- 4 KPIs hero (blocs premium, même style que le journal) -->
       <div class="journal-summary" style="margin-bottom:20px;">
         <div class="js-stat">
@@ -11128,7 +11163,7 @@
       <!-- Setups + Mental -->
       <div class="row-2col">
         <div class="card">
-          <div class="card-header"><span class="card-title">Setups de la semaine</span></div>
+          <div class="card-header"><span class="card-title">Setups ${REPORT_MODE === 'month' ? 'du mois' : 'de la semaine'}</span></div>
           <div class="card-body" style="padding:0;">
             <table style="width:100%; font-size:13px;">
               <thead><tr><th>Setup</th><th style="text-align:right;">N</th><th style="text-align:right;">WR</th><th style="text-align:right;">P&L</th></tr></thead>
