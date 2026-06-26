@@ -2712,7 +2712,7 @@
       display: grid !important;
       position: fixed;
       bottom: 0; left: 0; right: 0;
-      grid-template-columns: repeat(5, 1fr);
+      grid-template-columns: 1fr;
       background: var(--bg-1);
       border-top: 1px solid var(--border);
       backdrop-filter: blur(16px);
@@ -5452,7 +5452,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono" id="app-version-full">2026-06-25 · r60</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono" id="app-version-full">2026-06-25 · r61</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -16146,27 +16146,11 @@
   <div id="mobile-menu-grid" style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px;"></div>
 </div>
 
-<!-- Bottom nav mobile -->
+<!-- Bottom nav mobile : un seul bouton Menu (toutes les pages dedans) -->
 <nav class="mobile-bottom-nav">
-  <button data-view="dashboard" onclick="mobileNavTo('dashboard')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
-    Dashboard
-  </button>
-  <button data-view="journal" onclick="mobileNavTo('journal')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
-    Journal
-  </button>
-  <button onclick="openMobileMenu()" aria-label="Menu — toutes les pages">
+  <button onclick="openMobileMenu()" aria-label="Menu — toutes les pages" style="color:var(--accent); position:relative;">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
     Menu
-  </button>
-  <button data-view="stats" onclick="mobileNavTo('stats')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20V10M9 20V4M15 20V14M21 20V7"/></svg>
-    Stats
-  </button>
-  <button data-view="notifications" onclick="mobileNavTo('notifications')" style="position:relative;">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
-    Notifs
     <span class="notif-badge notif-badge-mobile" id="notif-badge-mobile" style="display:none;">0</span>
   </button>
 </nav>
