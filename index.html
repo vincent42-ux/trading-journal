@@ -3838,6 +3838,7 @@
       </button>
     </nav>
     <div class="sidebar-footer">
+      <div id="sidebar-version" onclick="openSettingsModal()" title="Version déployée — cliquer pour les Paramètres" style="text-align:center; font-family:'JetBrains Mono', monospace; font-size:10px; font-weight:700; letter-spacing:0.06em; color:var(--text-3); padding:2px 0 8px; cursor:pointer; opacity:0.75;">r58</div>
       <button onclick="openSettingsModal()" class="sidebar-settings-btn" data-tooltip="Paramètres">
         <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
         <span class="label">Paramètres</span>
@@ -5451,7 +5452,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-25 · r58</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono" id="app-version-full">2026-06-25 · r59</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -16124,6 +16125,19 @@
     <span class="notif-badge notif-badge-mobile" id="notif-badge-mobile" style="display:none;">0</span>
   </button>
 </nav>
+
+<script>
+  // Pastille de version (sidebar) synchronisée sur la version des Paramètres = source unique
+  (function () {
+    function syncVer() {
+      var src = document.getElementById('app-version-full');
+      var dst = document.getElementById('sidebar-version');
+      if (src && dst) { var m = (src.textContent || '').match(/r\d+/i); if (m) dst.textContent = m[0]; }
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', syncVer);
+    else syncVer();
+  })();
+</script>
 
 </body>
 </html>
