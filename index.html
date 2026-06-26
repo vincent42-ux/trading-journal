@@ -5452,7 +5452,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono" id="app-version-full">2026-06-25 · r59</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono" id="app-version-full">2026-06-25 · r60</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -16049,6 +16049,40 @@
   // Au chargement, sync
   setTimeout(syncBottomNav, 100);
 
+  // ========== MENU MOBILE COMPLET (bottom sheet) ==========
+  const MOBILE_PAGES = [
+    ['dashboard', '📊', 'Dashboard'], ['routine', '🔥', 'Ma routine'], ['plan', '📋', 'Plan'],
+    ['journal', '📓', 'Journal'], ['stats', '📈', 'Stats'], ['accounts', '🏦', 'Comptes'],
+    ['capital', '💰', 'Capital'], ['sante', '💪', 'Santé'], ['weekly', '🗓️', 'Rapport'],
+    ['backtest', '🧪', 'Backtest'], ['objectives', '🎯', 'Objectifs'], ['notifications', '🔔', 'Notifs']
+  ];
+  function buildMobileMenu() {
+    const g = document.getElementById('mobile-menu-grid');
+    if (!g) return;
+    const activeView = (document.querySelector('.view.active') || {}).id || '';
+    const cur = activeView.replace('view-', '');
+    const cell = (v, ic, lb, onclick) => {
+      const on = v && v === cur;
+      return `<button onclick="${onclick}" style="display:flex; flex-direction:column; align-items:center; gap:6px; padding:14px 6px; border:1px solid ${on ? 'color-mix(in srgb, var(--accent) 45%, var(--border))' : 'var(--border)'}; border-radius:14px; background:${on ? 'color-mix(in srgb, var(--accent) 12%, var(--bg-2))' : 'var(--bg-2)'}; color:var(--text-1); cursor:pointer; font-size:11px; font-weight:600;"><span style="font-size:22px;">${ic}</span>${lb}</button>`;
+    };
+    g.innerHTML = MOBILE_PAGES.map(([v, ic, lb]) => cell(v, ic, lb, `mobileMenuGo('${v}')`)).join('')
+      + cell('', '⚙️', 'Paramètres', 'closeMobileMenu(); openSettingsModal();');
+    const sv = document.getElementById('mobile-menu-version'), av = document.getElementById('app-version-full');
+    if (sv && av) { const m = (av.textContent || '').match(/r\d+/i); if (m) sv.textContent = m[0]; }
+  }
+  function openMobileMenu() {
+    buildMobileMenu();
+    const o = document.getElementById('mobile-menu-overlay'), s = document.getElementById('mobile-menu-sheet');
+    if (o) o.style.display = 'block';
+    if (s) { s.style.display = 'block'; requestAnimationFrame(() => { s.style.transform = 'translateY(0)'; }); }
+  }
+  function closeMobileMenu() {
+    const o = document.getElementById('mobile-menu-overlay'), s = document.getElementById('mobile-menu-sheet');
+    if (s) { s.style.transform = 'translateY(100%)'; setTimeout(() => { s.style.display = 'none'; }, 260); }
+    if (o) o.style.display = 'none';
+  }
+  function mobileMenuGo(v) { closeMobileMenu(); mobileNavTo(v); }
+
   // ========== DIAGNOSTIC : wrap les fonctions critiques pour attraper les vraies erreurs ==========
   (function () {
     const CRITICAL = [
@@ -16101,7 +16135,18 @@
 <!-- Overlay pour drawer mobile -->
 <div class="mobile-drawer-overlay" onclick="closeMobileDrawer()"></div>
 
-<!-- Bottom nav mobile (5 vues principales) -->
+<!-- Menu mobile complet (bottom sheet déroulant) -->
+<div id="mobile-menu-overlay" onclick="closeMobileMenu()" style="display:none; position:fixed; inset:0; z-index:9998; background:rgba(8,5,20,0.55); -webkit-backdrop-filter:blur(4px); backdrop-filter:blur(4px);"></div>
+<div id="mobile-menu-sheet" style="display:none; position:fixed; left:0; right:0; bottom:0; z-index:9999; background:var(--bg-1); border-top:1px solid var(--border); border-radius:22px 22px 0 0; box-shadow:0 -16px 50px rgba(0,0,0,0.5); padding:8px 16px calc(18px + env(safe-area-inset-bottom)); transform:translateY(100%); transition:transform .26s cubic-bezier(.2,.9,.3,1.1); max-height:82vh; overflow-y:auto;">
+  <div style="height:4px; width:42px; border-radius:99px; background:var(--border-strong); margin:8px auto 14px;"></div>
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+    <span style="font-weight:800; font-size:15px;">Toutes les pages</span>
+    <span id="mobile-menu-version" class="mono" style="font-size:10px; color:var(--text-3); font-weight:700;"></span>
+  </div>
+  <div id="mobile-menu-grid" style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px;"></div>
+</div>
+
+<!-- Bottom nav mobile -->
 <nav class="mobile-bottom-nav">
   <button data-view="dashboard" onclick="mobileNavTo('dashboard')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
@@ -16111,9 +16156,9 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
     Journal
   </button>
-  <button data-view="plan" onclick="mobileNavTo('plan')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 13l2 2 4-4"/></svg>
-    Plan
+  <button onclick="openMobileMenu()" aria-label="Menu — toutes les pages">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+    Menu
   </button>
   <button data-view="stats" onclick="mobileNavTo('stats')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20V10M9 20V4M15 20V14M21 20V7"/></svg>
