@@ -5422,7 +5422,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-25 · r50</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-25 · r51</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -8365,6 +8365,16 @@
       const byT = {}; for (const e of CAPITAL.expenses) { byT[e.type] = (byT[e.type] || 0) + (+e.amount || 0); }
       let topT = null, topV = 0; for (const k in byT) { if (byT[k] > topV) { topV = byT[k]; topT = k; } }
       if (topT && couts > 0 && topV / couts >= 0.6) al.push(['warn', '📊', capCatLabel(topT) + ' pèse ' + Math.round(topV / couts * 100) + '% de tes dépenses.']);
+      // ----- COÛT DES CHALLENGES (protéger le cash) -----
+      const challengeCost = byT['challenge'] || 0;
+      const nChallenges = CAPITAL.expenses.filter(e => e.type === 'challenge').length;
+      if (challengeCost > 0) {
+        if (payouts === 0 && nChallenges >= 2) {
+          al.unshift(['warn', '🎯', nChallenges + ' challenges achetés (' + capEur(challengeCost) + ') pour 0 payout encaissé — protège ton cash, ne crame pas de challenge inutilement.']);
+        } else if (payouts > 0) {
+          al.push(['ok', '🎯', 'Challenges : ' + capEur(challengeCost) + ' investis → ' + capEur(payouts) + ' encaissés (×' + (payouts / challengeCost).toFixed(1) + ').']);
+        }
+      }
       if (bNet > 0) al.push(['ok', '🎉', 'Activité rentable : +' + capEur(bNet) + ' de bénéfice net. Beau travail.']);
       const cols = { err: ['var(--red)', 'rgba(225,29,72,0.10)'], warn: ['var(--amber)', 'rgba(245,158,11,0.10)'], ok: ['var(--green)', 'rgba(16,185,129,0.10)'] };
       alertsEl.innerHTML = al.slice(0, 3).map(([ty, ic, m]) => `<div style="display:flex; align-items:center; gap:10px; padding:10px 14px; border-radius:10px; background:${cols[ty][1]}; border:1px solid ${cols[ty][0]}; font-size:12.5px; color:var(--text); margin-bottom:8px;"><span>${ic}</span><span>${m}</span></div>`).join('');
@@ -10591,19 +10601,23 @@
     const pnl = amountEl ? (parseFloat(amountEl.value) || 0) : 0;
     const rrEl = document.getElementById('sq-rr');
     const rrPlanned = rrEl && rrEl.value !== '' ? parseFloat(rrEl.value) : null;
-    // Garde-fou checklist
-    const total = (PLAN.checklist || []).length;
-    const done = (SESSION.checks || []).filter(Boolean).length;
-    if (total > 0 && done < total) {
-      if (!confirm(`Checklist incomplète (${done}/${total}) — ajouter le trade quand même ?`)) return;
-    }
-    const now = new Date();
-    const date = `${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()}`;
-    const time = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-    const masterAcc = ACCOUNTS.find(a => a.role === 'master') || ACCOUNTS[0];
-    const account = masterAcc ? masterAcc.name : 'MFFU 25K';
-    const comment = (document.getElementById('sq-comment') || { value: '' }).value.trim();
     const rules = getQtRules();
+    // ----- GATE DISCIPLINE (avant le P&L) : on liste les critères du plan non respectés -----
+    const _issues = [];
+    if (!(rules.setup === 'absorption' || rules.setup === 'exhaustion')) _issues.push('setup non défini (ni ABS ni EXH)');
+    if (!rules.bougies) _issues.push(rules.bougiesCount != null ? ('bougies hors 4-11 (' + rules.bougiesCount + ')') : 'bougies non renseignées');
+    if (rules.arcJoli !== 'oui') _issues.push(rules.arcJoli === 'non' ? 'arc pas joli' : 'arc non évalué');
+    if (!rules.tp2rr) _issues.push('TP pas à 2RR');
+    if (rules.mental !== 'calme') _issues.push('mental pas calme');
+    const _ck = (PLAN.checklist || []).length, _ckDone = (SESSION.checks || []).filter(Boolean).length;
+    if (_ck > 0 && _ckDone < _ck) _issues.push('checklist de session ' + _ckDone + '/' + _ck);
+    const commit = () => {
+      const now = new Date();
+      const date = `${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()}`;
+      const time = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+      const masterAcc = ACCOUNTS.find(a => a.role === 'master') || ACCOUNTS[0];
+      const account = masterAcc ? masterAcc.name : 'MFFU 25K';
+      const comment = (document.getElementById('sq-comment') || { value: '' }).value.trim();
     // Création du trade master (même pipeline que le modal complet)
     const newLinkId = Math.max(0, ...TRADES.map(t => t.linkId || 0)) + 1;
     const trade = {
@@ -10647,6 +10661,18 @@
       : '✓ Trade ajouté', 'success');
     // Objectif ou stop atteint ? → verrou de fin de journée
     setTimeout(checkSessionLock, 350);
+    };
+    // Si le trade déroge au plan → confirmation premium avant d'enregistrer
+    if (_issues.length) {
+      uiConfirm({
+        icon: '🛡️', danger: true,
+        title: 'Ce trade déroge à ton plan',
+        message: 'Critères non respectés : <strong>' + _issues.join(' · ') + '</strong>.<br>Discipline avant le P&L — enregistrer ce trade quand même ?',
+        confirmLabel: 'Enregistrer quand même', cancelLabel: 'Revenir'
+      }).then(ok => { if (ok) commit(); });
+      return;
+    }
+    commit();
   }
   loadSession();
 
