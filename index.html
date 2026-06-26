@@ -5422,7 +5422,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-25 · r51</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-25 · r52</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -8018,10 +8018,10 @@
       try { last = parseInt(localStorage.getItem('last_export_ts') || '0', 10) || 0; } catch (e) {}
       const btn = `<button onclick="exportJSON()" style="margin-left:8px; padding:3px 10px; border-radius:6px; border:1px solid var(--accent); background:var(--accent-soft); color:var(--accent); font-weight:600; cursor:pointer; font-size:11px;">⇣ Sauvegarder maintenant</button>`;
       if (!last) {
-        alerts.push({ level: 'warning', icon: '💾', text: `<strong>Aucune sauvegarde téléchargée</strong> — protège ton historique de trades. ${btn}` });
+        alerts.push({ level: 'warning', icon: '💾', key: 'backup-never', text: `<strong>Aucune sauvegarde téléchargée</strong> — protège ton historique de trades. ${btn}` });
       } else {
         const days = Math.floor((Date.now() - last) / 86400000);
-        if (days >= 7) alerts.push({ level: 'warning', icon: '💾', text: `<strong>Dernière sauvegarde il y a ${days} jours</strong> — pense à exporter ton historique. ${btn}` });
+        if (days >= 7) alerts.push({ level: 'warning', icon: '💾', key: 'backup-stale', text: `<strong>Dernière sauvegarde il y a ${days} jours</strong> — pense à exporter ton historique. ${btn}` });
       }
     })();
 
@@ -8360,24 +8360,26 @@
     const alertsEl = document.getElementById('cap-alerts');
     if (alertsEl) {
       const al = [];
-      if (bNet < 0) al.push(['err', '⚠️', 'Tu es dans le négatif de ' + capEur(-bNet) + '. Objectif : encaisser des payouts pour repasser positif.']);
-      if (couts > 0 && payouts === 0) al.push(['warn', '⏳', 'Aucun payout encore encaissé — ' + capEur(couts) + ' déjà dépensés dans l\'activité.']);
+      if (bNet < 0) al.push(['err', '⚠️', 'Tu es dans le négatif de ' + capEur(-bNet) + '. Objectif : encaisser des payouts pour repasser positif.', 'cap-negatif']);
+      if (couts > 0 && payouts === 0) al.push(['warn', '⏳', 'Aucun payout encore encaissé — ' + capEur(couts) + ' déjà dépensés dans l\'activité.', 'cap-nopayout']);
       const byT = {}; for (const e of CAPITAL.expenses) { byT[e.type] = (byT[e.type] || 0) + (+e.amount || 0); }
       let topT = null, topV = 0; for (const k in byT) { if (byT[k] > topV) { topV = byT[k]; topT = k; } }
-      if (topT && couts > 0 && topV / couts >= 0.6) al.push(['warn', '📊', capCatLabel(topT) + ' pèse ' + Math.round(topV / couts * 100) + '% de tes dépenses.']);
+      if (topT && couts > 0 && topV / couts >= 0.6) al.push(['warn', '📊', capCatLabel(topT) + ' pèse ' + Math.round(topV / couts * 100) + '% de tes dépenses.', 'cap-concentration']);
       // ----- COÛT DES CHALLENGES (protéger le cash) -----
       const challengeCost = byT['challenge'] || 0;
       const nChallenges = CAPITAL.expenses.filter(e => e.type === 'challenge').length;
       if (challengeCost > 0) {
         if (payouts === 0 && nChallenges >= 2) {
-          al.unshift(['warn', '🎯', nChallenges + ' challenges achetés (' + capEur(challengeCost) + ') pour 0 payout encaissé — protège ton cash, ne crame pas de challenge inutilement.']);
+          al.unshift(['warn', '🎯', nChallenges + ' challenges achetés (' + capEur(challengeCost) + ') pour 0 payout encaissé — protège ton cash, ne crame pas de challenge inutilement.', 'cap-challenge-warn']);
         } else if (payouts > 0) {
-          al.push(['ok', '🎯', 'Challenges : ' + capEur(challengeCost) + ' investis → ' + capEur(payouts) + ' encaissés (×' + (payouts / challengeCost).toFixed(1) + ').']);
+          al.push(['ok', '🎯', 'Challenges : ' + capEur(challengeCost) + ' investis → ' + capEur(payouts) + ' encaissés (×' + (payouts / challengeCost).toFixed(1) + ').', 'cap-challenge-ok']);
         }
       }
-      if (bNet > 0) al.push(['ok', '🎉', 'Activité rentable : +' + capEur(bNet) + ' de bénéfice net. Beau travail.']);
+      if (bNet > 0) al.push(['ok', '🎉', 'Activité rentable : +' + capEur(bNet) + ' de bénéfice net. Beau travail.', 'cap-rentable']);
       const cols = { err: ['var(--red)', 'rgba(225,29,72,0.10)'], warn: ['var(--amber)', 'rgba(245,158,11,0.10)'], ok: ['var(--green)', 'rgba(16,185,129,0.10)'] };
-      alertsEl.innerHTML = al.slice(0, 3).map(([ty, ic, m]) => `<div style="display:flex; align-items:center; gap:10px; padding:10px 14px; border-radius:10px; background:${cols[ty][1]}; border:1px solid ${cols[ty][0]}; font-size:12.5px; color:var(--text); margin-bottom:8px;"><span>${ic}</span><span>${m}</span></div>`).join('');
+      const _capDay = (typeof todayKey === 'function') ? todayKey() : '';
+      const visibleCap = al.filter(a => !(a[3] && DISMISSED_ALERTS[a[3]] === _capDay));
+      alertsEl.innerHTML = visibleCap.slice(0, 3).map(([ty, ic, m, key]) => `<div style="display:flex; align-items:center; gap:10px; padding:10px 14px; border-radius:10px; background:${cols[ty][1]}; border:1px solid ${cols[ty][0]}; font-size:12.5px; color:var(--text); margin-bottom:8px;"><span>${ic}</span><span style="flex:1;">${m}</span>${key ? `<button onclick="dismissDashAlert('${key}')" title="Masquer pour aujourd'hui" style="background:none; border:none; color:var(--text-2); cursor:pointer; font-size:14px; opacity:0.6; padding:0 2px;">✕</button>` : ''}</div>`).join('');
     }
 
     // ----- Bilan hebdomadaire (entrées / sorties / net par semaine) -----
