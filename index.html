@@ -601,14 +601,16 @@
 
   /* ---- Cards ---- */
   .card {
-    background: var(--bg-1);
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.022), rgba(255,255,255,0) 42%),
+      var(--bg-1);
     border: 1px solid var(--border);
     border-radius: 16px;
     overflow: hidden;
     box-shadow: var(--shadow-soft);
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
   }
-  .card:hover { border-color: var(--border-strong); }
+  .card:hover { border-color: var(--border-strong); box-shadow: 0 10px 30px rgba(0,0,0,0.22); }
   .card-header {
     padding: 18px 22px;
     border-bottom: 1px solid var(--border);
@@ -621,6 +623,17 @@
     font-weight: 600;
     color: var(--text-1);
     letter-spacing: -0.01em;
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+  }
+  .card-title::before {
+    content: '';
+    width: 3px;
+    height: 13px;
+    border-radius: 2px;
+    flex: 0 0 auto;
+    background: linear-gradient(180deg, var(--accent), var(--accent-bright, #d946ef));
   }
   .card-body { padding: 22px; }
 
@@ -888,7 +901,8 @@
   .heatmap-cell.loss.strong { background: rgba(255, 77, 107, 0.35); }
 
   /* ---- Dashboard Hero KPIs ---- */
-  .hero-kpi { min-height: 168px; display: flex; flex-direction: column; justify-content: space-between; }
+  .hero-kpi { min-height: 168px; display: flex; flex-direction: column; justify-content: space-between; position: relative; }
+  .hero-stat::before, .hero-kpi::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, var(--accent), var(--accent-bright, #d946ef)); z-index: 1; }
   .hero-kpi .card-body { padding: 18px 20px; height: 100%; display: flex; flex-direction: column; }
   .hero-kpi-label {
     font-size: 12px;
@@ -5428,7 +5442,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-25 · r54</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-25 · r55</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
