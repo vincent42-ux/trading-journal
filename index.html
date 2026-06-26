@@ -5428,7 +5428,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-25 · r53</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-25 · r54</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -8422,12 +8422,12 @@
           const wnet = w.in - w.out; const sun = new Date(w.monday); sun.setDate(sun.getDate() + 6);
           const cur = w.monday.getTime() === nowM;
           const lbl = 'du ' + w.monday.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' }) + ' au ' + sun.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
-          return `<div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:9px 0; border-bottom:1px solid var(--border);">
+          return `<div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 12px; border-radius:10px; margin-bottom:6px; ${cur ? 'background:color-mix(in srgb, var(--accent) 8%, transparent); border:1px solid color-mix(in srgb, var(--accent) 28%, var(--border));' : 'border-bottom:1px solid var(--border);'}">
             <span style="font-size:12px;">${cur ? '<strong>Cette semaine</strong> <span style="color:var(--text-3);">' + lbl + '</span>' : lbl}</span>
-            <span style="display:flex; gap:14px; align-items:center;">
-              <span class="mono pos" style="font-size:12px;">+${capEur(w.in)}</span>
-              <span class="mono neg" style="font-size:12px;">−${capEur(w.out)}</span>
-              <span class="mono ${wnet >= 0 ? 'pos' : 'neg'}" style="font-weight:700; min-width:66px; text-align:right;">${(wnet >= 0 ? '+' : '−') + capEur(Math.abs(wnet))}</span>
+            <span style="display:flex; gap:8px; align-items:center;">
+              <span class="mono pos" style="font-size:11px; padding:2px 7px; border-radius:6px; background:rgba(16,185,129,0.12);">+${capEur(w.in)}</span>
+              <span class="mono neg" style="font-size:11px; padding:2px 7px; border-radius:6px; background:rgba(225,29,72,0.12);">−${capEur(w.out)}</span>
+              <span class="mono ${wnet >= 0 ? 'pos' : 'neg'}" style="font-weight:800; min-width:66px; text-align:right;">${(wnet >= 0 ? '+' : '−') + capEur(Math.abs(wnet))}</span>
             </span></div>`;
         }).join('');
       }
@@ -8458,15 +8458,15 @@
             const ok = w.in >= mGoal;
             goalTag = `<span class="mono" style="font-size:10.5px; color:${ok ? 'var(--green)' : 'var(--text-3)'};">${ok ? '🎯 objectif atteint' : Math.round(w.in / mGoal * 100) + '% de l’objectif'}</span>`;
           }
-          return `<div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 0; border-bottom:1px solid var(--border);">
+          return `<div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:11px 12px; border-radius:10px; margin-bottom:6px; ${cur ? 'background:color-mix(in srgb, var(--accent) 8%, transparent); border:1px solid color-mix(in srgb, var(--accent) 28%, var(--border));' : 'border-bottom:1px solid var(--border);'}">
             <span style="display:flex; flex-direction:column; gap:3px;">
               <span style="font-size:12.5px;">${cur ? '<strong>Ce mois-ci</strong> · ' : ''}${lbl}</span>
               ${goalTag}
             </span>
-            <span style="display:flex; gap:14px; align-items:center;">
-              <span class="mono pos" style="font-size:12px;">+${capEur(w.in)}</span>
-              <span class="mono neg" style="font-size:12px;">−${capEur(w.out)}</span>
-              <span class="mono ${wnet >= 0 ? 'pos' : 'neg'}" style="font-weight:700; min-width:66px; text-align:right;">${(wnet >= 0 ? '+' : '−') + capEur(Math.abs(wnet))}</span>
+            <span style="display:flex; gap:8px; align-items:center;">
+              <span class="mono pos" style="font-size:11px; padding:2px 7px; border-radius:6px; background:rgba(16,185,129,0.12);">+${capEur(w.in)}</span>
+              <span class="mono neg" style="font-size:11px; padding:2px 7px; border-radius:6px; background:rgba(225,29,72,0.12);">−${capEur(w.out)}</span>
+              <span class="mono ${wnet >= 0 ? 'pos' : 'neg'}" style="font-weight:800; min-width:66px; text-align:right;">${(wnet >= 0 ? '+' : '−') + capEur(Math.abs(wnet))}</span>
             </span></div>`;
         }).join('');
       }
@@ -8485,19 +8485,20 @@
     }
     const ov = document.getElementById('cap-overview');
     if (ov) {
-      const tile = (icon, n, label, cls) => `
-        <div style="text-align:center; padding:14px 8px; border:1px solid var(--border); border-radius:12px; background:var(--bg-2);">
-          <div style="font-size:18px;">${icon}</div>
-          <div class="mono ${cls || ''}" style="font-size:22px; font-weight:800; margin-top:2px;">${n}</div>
-          <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-3); margin-top:2px;">${label}</div>
+      const tile = (icon, n, label, cls, accent) => `
+        <div class="card cap-kpi" style="text-align:center; padding:16px 8px; margin:0; position:relative; overflow:hidden;">
+          <div style="position:absolute; top:0; left:0; right:0; height:2px; background:linear-gradient(90deg, ${accent || 'var(--accent)'}, transparent);"></div>
+          <div style="font-size:20px;">${icon}</div>
+          <div class="mono ${cls || ''}" style="font-size:23px; font-weight:800; margin-top:3px;">${n}</div>
+          <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-3); margin-top:3px;">${label}</div>
         </div>`;
       ov.innerHTML =
-        tile('🔥', enCours, 'En cours') +
-        tile('✅', valides, 'Validés', 'pos') +
-        tile('💎', funded, 'Funded') +
-        tile('💀', crames, 'Cramés', 'neg') +
-        tile('🏛️', capEur(capitalGere), 'Capital géré') +
-        tile('💰', capEur(payouts), 'Payouts reçus', payouts > 0 ? 'pos' : '');
+        tile('🔥', enCours, 'En cours', '', 'var(--accent)') +
+        tile('✅', valides, 'Validés', 'pos', 'var(--green)') +
+        tile('💎', funded, 'Funded', '', 'var(--accent-bright, #d946ef)') +
+        tile('💀', crames, 'Cramés', 'neg', 'var(--red)') +
+        tile('🏛️', capEur(capitalGere), 'Capital géré', '', 'var(--accent)') +
+        tile('💰', capEur(payouts), 'Payouts reçus', payouts > 0 ? 'pos' : '', 'var(--green)');
     }
     const ovCount = document.getElementById('cap-overview-count');
     if (ovCount) ovCount.textContent = ACCOUNTS.length + ' compte' + (ACCOUNTS.length > 1 ? 's' : '');
@@ -8518,11 +8519,12 @@
       if (!window.allCharts) window.allCharts = {};
       if (window.allCharts.capEvolution) window.allCharts.capEvolution.destroy();
       const ctx2d = evCanvas.getContext('2d');
+      const _evCol = '#a855f7';
       const grad = ctx2d.createLinearGradient(0, 0, 0, 220);
-      grad.addColorStop(0, c.green + '40'); grad.addColorStop(1, c.green + '00');
+      grad.addColorStop(0, _evCol + '45'); grad.addColorStop(1, _evCol + '00');
       window.allCharts.capEvolution = new Chart(evCanvas, {
         type: 'line',
-        data: { labels, datasets: [{ data, borderColor: c.green, backgroundColor: grad, fill: true, tension: 0.35, pointRadius: 3, pointBackgroundColor: c.green, borderWidth: 2 }] },
+        data: { labels, datasets: [{ data, borderColor: _evCol, backgroundColor: grad, fill: true, tension: 0.35, pointRadius: 3, pointBackgroundColor: _evCol, borderWidth: 2.5 }] },
         options: {
           responsive: true, maintainAspectRatio: false,
           plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => '€' + ctx.parsed.y.toLocaleString('fr-FR') } } },
@@ -8570,9 +8572,9 @@
         accList.innerHTML = ACCOUNTS.map(a => {
           const pOut = CAPITAL.payouts.filter(p => p.account === a.name).reduce((s, p) => s + (+p.amount || 0), 0);
           const badge = a.status === 'funded' ? '💎 Funded' : a.status === 'blown' ? '💀 Cramé' : '🔥 En cours';
-          return `<div style="display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border);">
-            <span><strong>${a.name}</strong> <span style="font-size:11px; color:var(--text-3);">${badge}</span></span>
-            <span class="mono ${pOut > 0 ? 'pos' : ''}" style="font-weight:600;">${pOut > 0 ? capEur(pOut) + ' reçus' : '—'}</span></div>`;
+          return `<div style="display:flex; align-items:center; justify-content:space-between; padding:9px 0; border-bottom:1px solid var(--border);">
+            <span style="display:flex; align-items:center; gap:8px;"><strong>${a.name}</strong> <span style="font-size:10.5px; color:var(--text-2); padding:2px 8px; border-radius:99px; background:var(--bg-2); border:1px solid var(--border);">${badge}</span></span>
+            <span class="mono ${pOut > 0 ? 'pos' : ''}" style="font-weight:700;">${pOut > 0 ? capEur(pOut) + ' reçus' : '—'}</span></div>`;
         }).join('');
       }
     }
