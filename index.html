@@ -5419,7 +5419,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-25 · r48</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-25 · r49</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -7928,6 +7928,20 @@
     const alerts = [];
     const filtered = filteredTrades();
     const logical = (s && s.logical) || [];
+
+    // ----- RAPPEL DE SAUVEGARDE (sécurité données) — persistant tant que pas exporté -----
+    (function() {
+      if (!TRADES || !TRADES.length) return; // rien à sauvegarder encore
+      let last = 0;
+      try { last = parseInt(localStorage.getItem('last_export_ts') || '0', 10) || 0; } catch (e) {}
+      const btn = `<button onclick="exportJSON()" style="margin-left:8px; padding:3px 10px; border-radius:6px; border:1px solid var(--accent); background:var(--accent-soft); color:var(--accent); font-weight:600; cursor:pointer; font-size:11px;">⇣ Sauvegarder maintenant</button>`;
+      if (!last) {
+        alerts.push({ level: 'warning', icon: '💾', text: `<strong>Aucune sauvegarde téléchargée</strong> — protège ton historique de trades. ${btn}` });
+      } else {
+        const days = Math.floor((Date.now() - last) / 86400000);
+        if (days >= 7) alerts.push({ level: 'warning', icon: '💾', text: `<strong>Dernière sauvegarde il y a ${days} jours</strong> — pense à exporter ton historique. ${btn}` });
+      }
+    })();
 
     // Today P&L per account → alert si proche du DLL
     const todayKey = (function() {
@@ -14367,6 +14381,9 @@
   }
   function exportJSON() {
     downloadFile(`trading-journal_backup_${todayStamp()}.json`, JSON.stringify(buildFullBackup(), null, 2), 'application/json');
+    try { localStorage.setItem('last_export_ts', String(Date.now())); } catch (e) {}
+    if (typeof uiAlert === 'function') uiAlert('✅ Sauvegarde téléchargée. Garde ce fichier en lieu sûr.');
+    if (typeof render === 'function') render();
   }
 
   // ========== SYNCHRO CLOUD (GitHub Gist privé) ==========
