@@ -4390,6 +4390,12 @@
 
       <!-- ============ CAPITAL & MONEY MANAGEMENT ============ -->
       <section class="view" id="view-capital">
+        <style>
+          #view-capital .cap-kpi { transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
+          #view-capital .cap-kpi:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(0,0,0,.28); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
+          #view-capital .cap-hero { position: relative; overflow: hidden; }
+          #view-capital .cap-hero::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:linear-gradient(90deg, var(--accent), var(--accent-bright, #d946ef)); }
+        </style>
         <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:18px; gap:12px; flex-wrap:wrap;">
           <div>
             <div style="font-size:18px; font-weight:700; letter-spacing:-0.02em;">Capital &amp; Money Management</div>
@@ -4403,7 +4409,7 @@
         </div>
 
         <!-- Verdict rentabilité -->
-        <div class="card" style="margin-bottom:14px;"><div class="card-body" id="cap-verdict" style="padding:22px 24px;"></div></div>
+        <div class="card cap-hero" style="margin-bottom:14px;"><div class="card-body" id="cap-verdict" style="padding:26px 26px 24px;"></div></div>
 
         <!-- Objectif payout du mois (relié aux objectifs) -->
         <div class="card" style="margin-bottom:14px;"><div class="card-body" id="cap-month-goal" style="padding:18px 22px;"></div></div>
@@ -5422,7 +5428,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-25 · r52</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono">2026-06-25 · r53</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -8308,10 +8314,17 @@
       else if (bNet > 0) { col = 'var(--green)'; emoji = '🎉'; title = 'Activité rentable'; msg = 'Tu as encaissé plus que tu n\'as dépensé. Continue comme ça.'; }
       else if (bNet === 0) { col = 'var(--amber)'; emoji = '⚖️'; title = 'À l\'équilibre'; msg = 'Tu rentres exactement dans tes frais.'; }
       else { col = 'var(--red)'; emoji = '⚠️'; title = 'Dans le négatif'; msg = 'Il te manque ' + capEur(-bNet) + ' de payouts pour couvrir tes dépenses.'; }
+      const _vcard = verdict.closest('.card');
+      if (_vcard) { _vcard.style.borderLeft = '3px solid ' + col; _vcard.style.background = 'linear-gradient(135deg, color-mix(in srgb, ' + col + ' 9%, var(--bg-1)), var(--bg-1) 60%)'; }
       verdict.innerHTML = `
-        <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-3); margin-bottom:6px;">Résultat net de l'activité</div>
-        <div class="mono" style="font-size:40px; font-weight:800; letter-spacing:-0.02em; color:${col};">${(bNet >= 0 ? '+' : '−') + capEur(Math.abs(bNet)).replace('€', '')} €</div>
-        <div style="display:flex; align-items:center; gap:8px; margin-top:6px; font-size:13px; color:var(--text-1);"><span style="font-size:17px;">${emoji}</span><strong style="color:${col};">${title}</strong> · <span style="color:var(--text-2);">${msg}</span></div>`;
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:18px; flex-wrap:wrap;">
+          <div style="min-width:200px;">
+            <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-3); margin-bottom:8px;">Résultat net de l'activité</div>
+            <div class="mono" style="font-size:46px; font-weight:800; letter-spacing:-0.02em; color:${col}; line-height:1;">${(bNet >= 0 ? '+' : '−') + capEur(Math.abs(bNet)).replace('€', '')} €</div>
+            <div style="margin-top:12px; font-size:13px; color:var(--text-2); line-height:1.5; max-width:420px;"><strong style="color:${col};">${title}</strong> · ${msg}</div>
+          </div>
+          <div style="width:66px; height:66px; flex:0 0 auto; display:flex; align-items:center; justify-content:center; font-size:32px; border-radius:20px; background:color-mix(in srgb, ${col} 14%, transparent); border:1px solid color-mix(in srgb, ${col} 32%, transparent);">${emoji}</div>
+        </div>`;
     }
 
     // ----- Objectif payout du mois (relié à l'escalier d'objectifs) -----
@@ -8327,33 +8340,41 @@
         const pct = Math.min(100, monthIn / goal * 100);
         const reached = monthIn >= goal;
         const col = reached ? 'var(--green)' : 'var(--accent)';
+        const fill = reached ? 'var(--green)' : 'linear-gradient(90deg, var(--accent), var(--accent-bright, #d946ef))';
+        const glow = reached ? 'rgba(16,185,129,0.45)' : 'rgba(168,85,247,0.45)';
         goalEl.innerHTML = `
-          <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px;">
+          <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:10px;">
             <span style="font-size:13px; font-weight:700;">🎯 Objectif payout — ${moName}</span>
-            <span class="mono" style="font-weight:700; color:${col};">${capEur(monthIn)} / ${capEur(goal)}</span>
+            <span class="mono" style="font-weight:800; color:${col};">${capEur(monthIn)} / ${capEur(goal)}</span>
           </div>
-          <div style="height:10px; border-radius:99px; background:var(--bg-2); border:1px solid var(--border); overflow:hidden;">
-            <div style="height:100%; width:${pct}%; border-radius:99px; background:${col};"></div>
+          <div style="height:12px; border-radius:99px; background:var(--bg-2); border:1px solid var(--border); overflow:hidden;">
+            <div style="height:100%; width:${pct}%; border-radius:99px; background:${fill}; box-shadow:0 0 12px ${glow}; transition:width .4s ease;"></div>
           </div>
-          <div style="font-size:11px; color:var(--text-2); margin-top:7px;">${reached ? '✅ Objectif du mois atteint — beau travail.' : 'Il te reste ' + capEur(goal - monthIn) + ' à encaisser ce mois-ci pour ta cible.'}</div>`;
+          <div style="font-size:11px; color:var(--text-2); margin-top:9px;">${reached ? '✅ Objectif du mois atteint — beau travail.' : 'Il te reste ' + capEur(goal - monthIn) + ' à encaisser ce mois-ci pour ta cible.'}</div>`;
       }
     }
 
     // ----- KPIs -----
     const kpis = document.getElementById('cap-kpis');
     if (kpis) {
-      const card = (label, value, cls) => `
-        <div class="card" style="margin:0;"><div class="card-body" style="padding:14px 16px;">
-          <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-3); margin-bottom:5px;">${label}</div>
-          <div class="mono ${cls || ''}" style="font-size:20px; font-weight:700;">${value}</div>
-        </div></div>`;
+      const card = (label, value, cls, icon, accent) => `
+        <div class="card cap-kpi" style="margin:0; position:relative; overflow:hidden;">
+          <div style="position:absolute; top:0; left:0; right:0; height:2px; background:linear-gradient(90deg, ${accent || 'var(--accent)'}, transparent);"></div>
+          <div class="card-body" style="padding:15px 16px;">
+            <div style="display:flex; align-items:center; gap:7px; margin-bottom:8px;">
+              <span style="font-size:14px;">${icon || '•'}</span>
+              <span style="font-size:10px; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-3);">${label}</span>
+            </div>
+            <div class="mono ${cls || ''}" style="font-size:22px; font-weight:800; letter-spacing:-0.01em;">${value}</div>
+          </div>
+        </div>`;
       kpis.innerHTML =
-        card('Capital net', capEur(net), net >= 0 ? '' : 'neg') +
-        card('Encaissé', capEur(payouts), payouts > 0 ? 'pos' : '') +
-        card('Dépensé', capEur(couts), couts > 0 ? 'neg' : '') +
-        card('Résultat net', (bNet >= 0 ? '+' : '−') + capEur(Math.abs(bNet)), bNet >= 0 ? 'pos' : 'neg') +
-        card('Rentabilité', (renta >= 0 ? '+' : '') + renta.toFixed(1) + '%', renta >= 0 ? 'pos' : 'neg') +
-        card('Payouts reçus', CAPITAL.payouts.length);
+        card('Capital net', capEur(net), net >= 0 ? '' : 'neg', '🏦', 'var(--accent)') +
+        card('Encaissé', capEur(payouts), payouts > 0 ? 'pos' : '', '💰', 'var(--green)') +
+        card('Dépensé', capEur(couts), couts > 0 ? 'neg' : '', '💸', 'var(--red)') +
+        card('Résultat net', (bNet >= 0 ? '+' : '−') + capEur(Math.abs(bNet)), bNet >= 0 ? 'pos' : 'neg', '📊', bNet >= 0 ? 'var(--green)' : 'var(--red)') +
+        card('Rentabilité', (renta >= 0 ? '+' : '') + renta.toFixed(1) + '%', renta >= 0 ? 'pos' : 'neg', '📈', 'var(--accent-bright, #d946ef)') +
+        card('Payouts reçus', CAPITAL.payouts.length, '', '🎁', 'var(--accent)');
     }
 
     // ----- Alertes business -----
