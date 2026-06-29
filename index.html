@@ -5469,7 +5469,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono" id="app-version-full">2026-06-25 · r62</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono" id="app-version-full">2026-06-25 · r63</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -15230,12 +15230,14 @@
     if (!scId) { uiAlert('Crée d\'abord un scénario.'); return; }
     BT_SESSION = { id: 'bts-' + Date.now().toString(36), scenarioId: scId, startedAt: new Date().toISOString() };
     BTQ_SIDE = 'LONG'; BTQ_RESULT = 'TP'; BTQ_SETUP = '';
-    saveBtSession(); renderBacktest();
+    saveBtSession(); openBtSessionOverlay(); renderBacktest();
   }
-  function endBtSession() { BT_SESSION = null; saveBtSession(); renderBacktest(); }
-  function btqSetSide(s) { BTQ_SIDE = s; renderBtSessionPanel(); }
-  function btqSetRes(r) { BTQ_RESULT = r; renderBtSessionPanel(); }
-  function btqSetSetup(s) { BTQ_SETUP = s; renderBtSessionPanel(); }
+  function endBtSession() { BT_SESSION = null; saveBtSession(); closeBtSessionOverlay(); renderBacktest(); }
+  function openBtSessionOverlay() { const o = document.getElementById('bt-session-overlay'); if (o) o.style.display = 'block'; document.body.style.overflow = 'hidden'; renderBtSessionCockpit(); }
+  function closeBtSessionOverlay() { const o = document.getElementById('bt-session-overlay'); if (o) o.style.display = 'none'; document.body.style.overflow = ''; }
+  function btqSetSide(s) { BTQ_SIDE = s; renderBtSessionCockpit(); }
+  function btqSetRes(r) { BTQ_RESULT = r; renderBtSessionCockpit(); }
+  function btqSetSetup(s) { BTQ_SETUP = s; renderBtSessionCockpit(); }
   function btQuickAdd() {
     if (!BT_SESSION) return;
     const sc = SCENARIOS.find(s => s.id === BT_SESSION.scenarioId) || { rrTarget: 2 };
@@ -15253,10 +15255,65 @@
       rRealised: r, confirms: BTQ_SETUP ? { setup: BTQ_SETUP } : {}, createdAt: now.toISOString()
     });
     saveBacktestData();
-    if (rEl) rEl.value = '';
     BTQ_RESULT = 'TP';
-    renderBacktest();
-    if (typeof showToast === 'function') showToast('✓ Trade backtest ajouté', 'success');
+    renderBtSessionCockpit();
+    renderBtSessionsList();
+    if (typeof showToast === 'function') showToast('✓ Trade ajouté à la session', 'success');
+  }
+  function btSegBtn(active, label, onclick, col) {
+    return `<button onclick="${onclick}" style="flex:1; padding:10px 6px; border-radius:9px; border:1px solid ${active ? (col || 'var(--accent)') : 'var(--border)'}; background:${active ? (col || 'var(--accent)') + '22' : 'var(--bg-2)'}; color:${active ? 'var(--text-0)' : 'var(--text-2)'}; font-weight:700; font-size:13px; cursor:pointer;">${label}</button>`;
+  }
+  function renderBtSessionCockpit() {
+    const body = document.getElementById('bt-session-overlay-body');
+    if (!body || !BT_SESSION) return;
+    const sc = SCENARIOS.find(s => s.id === BT_SESSION.scenarioId) || { name: '?', rrTarget: 2 };
+    const t = btSessionTally(BT_SESSION.id);
+    const ts = BACKTEST_TRADES.filter(x => x.sessionId === BT_SESSION.id).slice().reverse();
+    body.innerHTML = `
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:18px;">
+        <div>
+          <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-3);">Session de backtest</div>
+          <div style="font-size:19px; font-weight:800;">🎬 ${sc.name}</div>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn" onclick="closeBtSessionOverlay()">↙ Réduire</button>
+          <button class="btn" onclick="endBtSession()" style="border-color:var(--red); color:var(--red);">■ Terminer</button>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:16px; position:relative; overflow:hidden;">
+        <div style="position:absolute; top:0; left:0; right:0; height:3px; background:linear-gradient(90deg, var(--accent), var(--accent-bright, #d946ef));"></div>
+        <div class="card-body" style="display:flex; gap:26px; flex-wrap:wrap;">
+          <div><div class="bt-q-lbl">Trades</div><div class="mono" style="font-size:26px; font-weight:800;">${t.n}</div></div>
+          <div><div class="bt-q-lbl">R session</div><div class="mono" style="font-size:26px; font-weight:800; color:${t.r >= 0 ? 'var(--green)' : 'var(--red)'};">${t.r >= 0 ? '+' : ''}${t.r.toFixed(1)}R</div></div>
+          <div><div class="bt-q-lbl">Win rate</div><div class="mono" style="font-size:26px; font-weight:800;">${t.n ? t.wr.toFixed(0) + '%' : '—'}</div></div>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-header"><span class="card-title">⚡ Trade rapide</span></div>
+        <div class="card-body">
+          <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+            <div style="flex:0 0 100px;"><div class="bt-q-lbl">Heure</div><input type="time" id="btq-time" value="${BTQ_LASTTIME || '13:00'}" style="width:100%; padding:9px 10px;"></div>
+            <div style="flex:1; min-width:160px;"><div class="bt-q-lbl">Sens</div><div style="display:flex; gap:6px;">${btSegBtn(BTQ_SIDE === 'LONG', '▲ Achat', "btqSetSide('LONG')", 'var(--green)')}${btSegBtn(BTQ_SIDE === 'SHORT', '▼ Vente', "btqSetSide('SHORT')", 'var(--red)')}</div></div>
+            <div style="flex:1; min-width:180px;"><div class="bt-q-lbl">Résultat</div><div style="display:flex; gap:6px;">${btSegBtn(BTQ_RESULT === 'TP', 'TP', "btqSetRes('TP')", 'var(--green)')}${btSegBtn(BTQ_RESULT === 'SL', 'SL', "btqSetRes('SL')", 'var(--red)')}${btSegBtn(BTQ_RESULT === 'BE', 'BE', "btqSetRes('BE')", 'var(--amber)')}</div></div>
+            <div style="flex:0 0 100px;"><div class="bt-q-lbl">R réalisé</div><input type="number" step="0.1" id="btq-r" placeholder="auto" style="width:100%; padding:9px 10px;"></div>
+            <div style="flex:1; min-width:160px;"><div class="bt-q-lbl">Setup</div><div style="display:flex; gap:6px;">${btSegBtn(BTQ_SETUP === 'absorption', 'ABS', "btqSetSetup('absorption')")}${btSegBtn(BTQ_SETUP === 'exhaustion', 'EXH', "btqSetSetup('exhaustion')")}${btSegBtn(!BTQ_SETUP, '—', "btqSetSetup('')")}</div></div>
+          </div>
+          <button class="btn btn-primary" style="width:100%; margin-top:14px; padding:13px; font-size:15px;" onclick="btQuickAdd()">➕ Ajouter le trade</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">Trades de cette session</span><span class="muted" style="font-size:11px;">${t.n}</span></div>
+        <div class="card-body" style="padding:0;">
+          ${ts.length ? ts.map(x => {
+            const rc = (+x.rRealised || 0);
+            const setup = (x.confirms && x.confirms.setup) ? (x.confirms.setup === 'absorption' ? 'ABS' : x.confirms.setup === 'exhaustion' ? 'EXH' : '') : '';
+            return `<div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 16px; border-bottom:1px solid var(--border);">
+              <span style="font-size:12.5px;"><span class="mono">${x.time || ''}</span> · <span style="color:${x.side === 'LONG' ? 'var(--green)' : 'var(--red)'};">${x.side === 'LONG' ? '▲' : '▼'}</span> · ${x.result}${setup ? ' · ' + setup : ''}</span>
+              <span class="mono" style="font-weight:700; color:${rc >= 0 ? 'var(--green)' : 'var(--red)'};">${rc >= 0 ? '+' : ''}${rc.toFixed(1)}R</span>
+            </div>`;
+          }).join('') : '<div class="empty-state" style="padding:22px;">Ajoute ton premier trade ci-dessus.</div>'}
+        </div>
+      </div>`;
   }
   function btSessionTally(sid) {
     const ts = BACKTEST_TRADES.filter(t => t.sessionId === sid);
@@ -15280,22 +15337,13 @@
     const sc = SCENARIOS.find(s => s.id === BT_SESSION.scenarioId) || { name: '?', rrTarget: 2 };
     const t = btSessionTally(BT_SESSION.id);
     if (status) status.innerHTML = `<span style="color:var(--green);">● en cours</span> · ${sc.name}`;
-    const seg = (active, label, onclick, col) => `<button onclick="${onclick}" style="flex:1; padding:9px 6px; border-radius:9px; border:1px solid ${active ? (col || 'var(--accent)') : 'var(--border)'}; background:${active ? (col || 'var(--accent)') + '22' : 'var(--bg-2)'}; color:${active ? 'var(--text-0)' : 'var(--text-2)'}; font-weight:700; font-size:12.5px; cursor:pointer;">${label}</button>`;
-    panel.innerHTML = `
-      <div style="display:flex; gap:20px; flex-wrap:wrap; align-items:center; margin-bottom:16px;">
-        <div><div class="bt-q-lbl">Trades</div><div class="mono" style="font-size:21px; font-weight:800;">${t.n}</div></div>
-        <div><div class="bt-q-lbl">R session</div><div class="mono" style="font-size:21px; font-weight:800; color:${t.r >= 0 ? 'var(--green)' : 'var(--red)'};">${t.r >= 0 ? '+' : ''}${t.r.toFixed(1)}R</div></div>
-        <div><div class="bt-q-lbl">Win rate</div><div class="mono" style="font-size:21px; font-weight:800;">${t.n ? t.wr.toFixed(0) + '%' : '—'}</div></div>
-        <button class="btn" style="margin-left:auto;" onclick="endBtSession()">■ Terminer la session</button>
+    panel.innerHTML = `<div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+      <div style="font-size:13px;"><strong>Session en cours</strong> · ${sc.name} — <span class="mono" style="color:${t.r >= 0 ? 'var(--green)' : 'var(--red)'};">${t.r >= 0 ? '+' : ''}${t.r.toFixed(1)}R</span> · ${t.n} trade${t.n > 1 ? 's' : ''}</div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-primary" onclick="openBtSessionOverlay()">↗ Reprendre</button>
+        <button class="btn" onclick="endBtSession()">■ Terminer</button>
       </div>
-      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
-        <div style="flex:0 0 92px;"><div class="bt-q-lbl">Heure</div><input type="time" id="btq-time" value="${BTQ_LASTTIME || '13:00'}" style="width:100%; padding:8px 10px;"></div>
-        <div style="flex:1; min-width:150px;"><div class="bt-q-lbl">Sens</div><div style="display:flex; gap:6px;">${seg(BTQ_SIDE === 'LONG', '▲ Achat', "btqSetSide('LONG')", 'var(--green)')}${seg(BTQ_SIDE === 'SHORT', '▼ Vente', "btqSetSide('SHORT')", 'var(--red)')}</div></div>
-        <div style="flex:1; min-width:170px;"><div class="bt-q-lbl">Résultat</div><div style="display:flex; gap:6px;">${seg(BTQ_RESULT === 'TP', 'TP', "btqSetRes('TP')", 'var(--green)')}${seg(BTQ_RESULT === 'SL', 'SL', "btqSetRes('SL')", 'var(--red)')}${seg(BTQ_RESULT === 'BE', 'BE', "btqSetRes('BE')", 'var(--amber)')}</div></div>
-        <div style="flex:0 0 92px;"><div class="bt-q-lbl">R réalisé</div><input type="number" step="0.1" id="btq-r" placeholder="auto" style="width:100%; padding:8px 10px;"></div>
-        <div style="flex:1; min-width:150px;"><div class="bt-q-lbl">Setup</div><div style="display:flex; gap:6px;">${seg(BTQ_SETUP === 'absorption', 'ABS', "btqSetSetup('absorption')")}${seg(BTQ_SETUP === 'exhaustion', 'EXH', "btqSetSetup('exhaustion')")}${seg(!BTQ_SETUP, '—', "btqSetSetup('')")}</div></div>
-        <button class="btn btn-primary" style="flex:0 0 auto; padding:11px 18px;" onclick="btQuickAdd()">➕ Ajouter</button>
-      </div>`;
+    </div>`;
   }
   function renderBtSessionsList() {
     const el = document.getElementById('bt-sessions-list');
@@ -16262,6 +16310,11 @@
 
 <!-- Overlay pour drawer mobile -->
 <div class="mobile-drawer-overlay" onclick="closeMobileDrawer()"></div>
+
+<!-- Écran de session backtest (plein écran focalisé, comme la session de trading) -->
+<div id="bt-session-overlay" style="display:none; position:fixed; inset:0; z-index:10000; background:var(--bg-1); overflow-y:auto;">
+  <div id="bt-session-overlay-body" style="max-width:780px; margin:0 auto; padding:22px 16px calc(30px + env(safe-area-inset-bottom));"></div>
+</div>
 
 <!-- Menu mobile complet (bottom sheet déroulant) -->
 <div id="mobile-menu-overlay" onclick="closeMobileMenu()" style="display:none; position:fixed; inset:0; z-index:9998; background:rgba(8,5,20,0.55); -webkit-backdrop-filter:blur(4px); backdrop-filter:blur(4px);"></div>
