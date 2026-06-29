@@ -5469,7 +5469,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono" id="app-version-full">2026-06-25 · r65</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono" id="app-version-full">2026-06-25 · r66</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -15223,7 +15223,7 @@
   // ----- Mode session backtest -----
   let BT_SESSION = null;
   try { BT_SESSION = JSON.parse(localStorage.getItem('bt_session') || 'null'); } catch (e) { BT_SESSION = null; }
-  let BTQ_SIDE = 'LONG', BTQ_RESULT = 'TP', BTQ_SETUP = '', BTQ_LASTTIME = '13:00', BTQ_ARC = '', BTQ_ZONE = '';
+  let BTQ_SIDE = 'LONG', BTQ_RESULT = 'TP', BTQ_SETUP = '', BTQ_LASTTIME = '13:00', BTQ_ARC = '', BTQ_ZONE = '', BTQ_LASTDATE = '';
   function saveBtSession() { try { localStorage.setItem('bt_session', JSON.stringify(BT_SESSION)); } catch (e) {} }
   function startBtSession() {
     const scId = CURRENT_SCENARIO_ID || (SCENARIOS[0] && SCENARIOS[0].id);
@@ -15246,6 +15246,9 @@
     const timeEl = document.getElementById('btq-time');
     const time = (timeEl && timeEl.value) ? timeEl.value : '13:00';
     BTQ_LASTTIME = time;
+    const dateEl = document.getElementById('btq-date');
+    const tradeDate = (dateEl && dateEl.value) ? dateEl.value : new Date().toISOString().slice(0, 10);
+    BTQ_LASTDATE = tradeDate;
     const rEl = document.getElementById('btq-r');
     let r = (rEl && rEl.value !== '') ? parseFloat(rEl.value) : (BTQ_RESULT === 'TP' ? (sc.rrTarget || 2) : BTQ_RESULT === 'SL' ? -1 : 0);
     if (isNaN(r)) r = 0;
@@ -15260,7 +15263,7 @@
     BACKTEST_TRADES.push({
       id: 'bt-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
       scenarioId: BT_SESSION.scenarioId, sessionId: BT_SESSION.id,
-      date: now.toISOString().slice(0, 10), time, side: BTQ_SIDE, result: BTQ_RESULT,
+      date: tradeDate, time, side: BTQ_SIDE, result: BTQ_RESULT,
       rRealised: r, confirms, createdAt: now.toISOString()
     });
     saveBacktestData();
@@ -15316,8 +15319,9 @@
           <div class="bt-q-lbl">Résultat</div>
           <div style="display:flex; gap:8px; margin-bottom:14px;">${btBigBtn(BTQ_RESULT === 'TP', 'TP', "btqSetRes('TP')", 'var(--green)')}${btBigBtn(BTQ_RESULT === 'SL', 'SL', "btqSetRes('SL')", 'var(--red)')}${btBigBtn(BTQ_RESULT === 'BE', 'BE', "btqSetRes('BE')", 'var(--amber)')}</div>
           <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px;">
-            <div style="flex:1; min-width:120px;"><div class="bt-q-lbl">Heure</div><input type="time" id="btq-time" value="${BTQ_LASTTIME || '13:00'}" style="width:100%; padding:11px 10px;"></div>
-            <div style="flex:1; min-width:120px;"><div class="bt-q-lbl">R réalisé</div><input type="number" step="0.1" id="btq-r" placeholder="auto (${sc.rrTarget || 2}R)" style="width:100%; padding:11px 10px;"></div>
+            <div style="flex:1; min-width:150px;"><div class="bt-q-lbl">Date du trade</div><input type="date" id="btq-date" value="${BTQ_LASTDATE || new Date().toISOString().slice(0, 10)}" style="width:100%; padding:11px 10px;"></div>
+            <div style="flex:1; min-width:110px;"><div class="bt-q-lbl">Heure</div><input type="time" id="btq-time" value="${BTQ_LASTTIME || '13:00'}" style="width:100%; padding:11px 10px;"></div>
+            <div style="flex:1; min-width:110px;"><div class="bt-q-lbl">R réalisé</div><input type="number" step="0.1" id="btq-r" placeholder="auto (${sc.rrTarget || 2}R)" style="width:100%; padding:11px 10px;"></div>
           </div>
           <div class="bt-q-lbl">Setup</div>
           <div style="display:flex; gap:8px; margin-bottom:14px;">${btBigBtn(BTQ_SETUP === 'absorption', 'ABS', "btqSetSetup('absorption')")}${btBigBtn(BTQ_SETUP === 'exhaustion', 'EXH', "btqSetSetup('exhaustion')")}${btBigBtn(!BTQ_SETUP, '— Aucun', "btqSetSetup('')")}</div>
