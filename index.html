@@ -5469,7 +5469,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono" id="app-version-full">2026-06-25 · r67</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono" id="app-version-full">2026-07-02 · r68</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -15235,11 +15235,86 @@
   function startBtSession() {
     const scId = CURRENT_SCENARIO_ID || (SCENARIOS[0] && SCENARIOS[0].id);
     if (!scId) { uiAlert('Crée d\'abord un scénario.'); return; }
-    BT_SESSION = { id: 'bts-' + Date.now().toString(36), scenarioId: scId, startedAt: new Date().toISOString() };
-    BTQ_SIDE = 'LONG'; BTQ_RESULT = 'TP'; BTQ_SETUP = '';
+    BT_SESSION = { id: 'bts-' + Date.now().toString(36), scenarioId: scId, startedAt: new Date().toISOString(), checks: (PLAN.checklist || []).map(() => false) };
+    BTQ_SIDE = 'LONG'; BTQ_RESULT = 'TP'; BTQ_SETUP = ''; BTQ_ARC = ''; BTQ_ZONE = ''; BTQ_LASTR = ''; BTQ_BOUGIES = '';
     saveBtSession(); openBtSessionOverlay(); renderBacktest();
   }
-  function endBtSession() { BT_SESSION = null; saveBtSession(); closeBtSessionOverlay(); renderBacktest(); }
+  // Fin de session : confirmation → bilan (comme la session live) → fermeture
+  function endBtSession() {
+    if (!BT_SESSION) return;
+    const hasTrades = BACKTEST_TRADES.some(x => x.sessionId === BT_SESSION.id);
+    uiConfirm({
+      icon: '⏹',
+      title: 'Terminer la session backtest ?',
+      message: hasTrades ? 'Ta séance sera clôturée et tu verras ton bilan.' : 'Aucun trade loggé dans cette session.',
+      confirmLabel: 'Terminer la session',
+      cancelLabel: 'Annuler',
+      danger: true,
+    }).then(ok => { if (!ok) return; if (hasTrades) btShowRecap(); else btFinishSession(); });
+  }
+  function btFinishSession() { BT_SESSION = null; saveBtSession(); closeBtSessionOverlay(); renderBacktest(); }
+  function btToggleCheck(i) {
+    if (!BT_SESSION) return;
+    if (!Array.isArray(BT_SESSION.checks)) BT_SESSION.checks = [];
+    BT_SESSION.checks[i] = !BT_SESSION.checks[i];
+    saveBtSession();
+    renderBtSessionCockpit();
+  }
+  // Compteur discipline live du formulaire (setup + bougies 4-11 + arc joli), sans re-render pour garder le focus
+  function btUpdateDisc() {
+    const el = document.getElementById('btq-disc-count'); if (!el) return;
+    const bgEl = document.getElementById('btq-bougies');
+    const v = bgEl ? parseInt(bgEl.value) : NaN;
+    const n = (BTQ_SETUP ? 1 : 0) + ((!isNaN(v) && v >= 4 && v <= 11) ? 1 : 0) + (BTQ_ARC === 'oui' ? 1 : 0);
+    el.textContent = 'Discipline : ' + n + '/3';
+  }
+  // Bilan de fin de séance — juge la QUALITÉ DES DONNÉES d'abord, le R ensuite (esprit backtest)
+  function btShowRecap() {
+    const o = document.getElementById('bt-session-overlay');
+    if (o && o.style.display !== 'block') { o.style.display = 'block'; document.body.style.overflow = 'hidden'; }
+    const body = document.getElementById('bt-session-overlay-body');
+    if (!body || !BT_SESSION) { btFinishSession(); return; }
+    const t = btSessionTally(BT_SESSION.id);
+    const ts = BACKTEST_TRADES.filter(x => x.sessionId === BT_SESSION.id);
+    const discVals = ts.map(x => { const c = x.confirms || {}; return (c.setup ? 1 : 0) + ((c.bougiesCount != null && c.bougiesCount >= 4 && c.bougiesCount <= 11) ? 1 : 0) + (c.arcJoli === 'oui' ? 1 : 0); });
+    const avgDisc = discVals.length ? (discVals.reduce((a, b) => a + b, 0) / discVals.length) : null;
+    const discGood = avgDisc == null || avgDisc >= 2.5;
+    const rStr = (t.r >= 0 ? '+' : '') + t.r.toFixed(1) + 'R';
+    const discStr = avgDisc != null ? avgDisc.toFixed(1) + '/3' : '—';
+    let icon, title, msg;
+    if (t.r > 0 && discGood) {
+      icon = '🎉'; title = 'BELLE SÉANCE DE BACKTEST';
+      msg = `<span style="color:var(--green); font-weight:800;">${rStr}</span> sur ${t.n} trade${t.n > 1 ? 's' : ''} · confirmations <strong>${discStr}</strong>.<br>Des données propres et un résultat vert — c'est exactement comme ça qu'on construit un edge chiffré.`;
+    } else if (t.r > 0) {
+      icon = '🟡'; title = 'VERT… MAIS DONNÉES INCOMPLÈTES';
+      msg = `<span style="color:var(--green); font-weight:800;">${rStr}</span> — bon résultat, mais confirmations à <strong>${discStr}</strong>.<br>Un backtest ne vaut que si chaque trade est loggé avec setup, bougies et arc. Sinon tu ne pourras rien en conclure.`;
+    } else if (t.r === 0) {
+      icon = '😌'; title = 'SÉANCE NEUTRE';
+      msg = `<strong>0.0R</strong> · ${t.n} trade${t.n > 1 ? 's' : ''} · confirmations <strong>${discStr}</strong>.<br>Chaque trade loggé fait avancer l'échantillon — c'est ça l'objectif.`;
+    } else if (discGood) {
+      icon = '💪'; title = 'SÉANCE ROUGE — DONNÉES SOLIDES';
+      msg = `<span style="color:var(--red); font-weight:800;">${rStr}</span> · confirmations <strong>${discStr}</strong>.<br>Un backtest rouge honnête vaut de l'or : c'est la vérité sur ton setup, pas un échec. Continue, l'échantillon décidera.`;
+    } else {
+      icon = '📚'; title = 'SÉANCE À REFAIRE PROPREMENT';
+      msg = `<span style="color:var(--red); font-weight:800;">${rStr}</span> et confirmations à <strong>${discStr}</strong>.<br>Rouge + données incomplètes = rien d'exploitable. À la prochaine séance, coche setup / bougies / arc sur CHAQUE trade.`;
+    }
+    const tiles = [
+      ['Trades', String(t.n), 'var(--text-0)'],
+      ['R séance', rStr, t.r >= 0 ? 'var(--green)' : 'var(--red)'],
+      ['Win rate', t.n ? t.wr.toFixed(0) + '%' : '—', 'var(--text-0)'],
+      ['Confirmations', discStr, discGood ? 'var(--green)' : 'var(--amber)']
+    ];
+    body.innerHTML = `
+      <div style="max-width:600px; margin:36px auto 20px; text-align:center;">
+        <div style="font-size:54px; margin-bottom:8px;">${icon}</div>
+        <div style="font-size:22px; font-weight:800; margin-bottom:16px;">${title}</div>
+        <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin:0 0 20px;">
+          ${tiles.map(([lb, val, col]) => `<div class="card" style="text-align:center; padding:14px 4px;"><div class="mono" style="font-size:20px; font-weight:800; color:${col};">${val}</div><div class="bt-q-lbl" style="margin:5px 0 0;">${lb}</div></div>`).join('')}
+        </div>
+        <div style="font-size:14px; color:var(--text-2); line-height:1.6; margin-bottom:26px;">${msg}</div>
+        <button class="btn btn-primary" style="padding:14px 30px; font-size:15px;" onclick="btFinishSession()">✓ Fermer la session</button>
+      </div>`;
+  }
   function openBtSessionOverlay() { const o = document.getElementById('bt-session-overlay'); if (o) o.style.display = 'block'; document.body.style.overflow = 'hidden'; renderBtSessionCockpit(); }
   function closeBtSessionOverlay() { const o = document.getElementById('bt-session-overlay'); if (o) o.style.display = 'none'; document.body.style.overflow = ''; }
   function btqSetSide(s) { btCaptureInputs(); BTQ_SIDE = s; renderBtSessionCockpit(); }
@@ -15249,6 +15324,12 @@
   function btqSetZone(v) { btCaptureInputs(); BTQ_ZONE = v; renderBtSessionCockpit(); }
   function btQuickAdd() {
     if (!BT_SESSION) return;
+    // Garde-fou : checklist du plan à valider AVANT d'entrer (comme en live)
+    const ckAll = PLAN.checklist || [];
+    if (ckAll.length && (BT_SESSION.checks || []).filter(Boolean).length < ckAll.length) {
+      if (typeof showToast === 'function') showToast("⛔ Coche ta checklist avant d'entrer — comme en live", 'error');
+      return;
+    }
     const sc = SCENARIOS.find(s => s.id === BT_SESSION.scenarioId) || { rrTarget: 2 };
     const timeEl = document.getElementById('btq-time');
     const time = (timeEl && timeEl.value) ? timeEl.value : '13:00';
@@ -15291,10 +15372,20 @@
     const sc = SCENARIOS.find(s => s.id === BT_SESSION.scenarioId) || { name: '?', rrTarget: 2 };
     const t = btSessionTally(BT_SESSION.id);
     const ts = BACKTEST_TRADES.filter(x => x.sessionId === BT_SESSION.id).slice().reverse();
+    // Checklist (comme en live) + garde-fous
+    const ck = PLAN.checklist || [];
+    const checks = BT_SESSION.checks || [];
+    const ckDone = checks.filter(Boolean).length;
+    const ready = ck.length === 0 || ckDone === ck.length;
+    const startedStr = BT_SESSION.startedAt ? new Date(BT_SESSION.startedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '—';
+    const slCount = BACKTEST_TRADES.filter(x => x.sessionId === BT_SESSION.id && x.result === 'SL').length;
+    const bgNow = parseInt(BTQ_BOUGIES);
+    const discNow = (BTQ_SETUP ? 1 : 0) + ((!isNaN(bgNow) && bgNow >= 4 && bgNow <= 11) ? 1 : 0) + (BTQ_ARC === 'oui' ? 1 : 0);
     const tiles = [
       ['Trades', String(t.n), 'var(--text-0)', 'var(--accent)'],
       ['R session', (t.r >= 0 ? '+' : '') + t.r.toFixed(1) + 'R', t.r >= 0 ? 'var(--green)' : 'var(--red)', t.r >= 0 ? 'var(--green)' : 'var(--red)'],
-      ['Win rate', t.n ? t.wr.toFixed(0) + '%' : '—', 'var(--text-0)', 'var(--accent-bright, #d946ef)']
+      ['Win rate', t.n ? t.wr.toFixed(0) + '%' : '—', 'var(--text-0)', 'var(--accent-bright, #d946ef)'],
+      ['SL', slCount + '/2', slCount >= 2 ? 'var(--red)' : 'var(--text-0)', slCount >= 2 ? 'var(--red)' : 'var(--amber)']
     ];
     body.innerHTML = `
       <div style="position:sticky; top:0; z-index:5; margin:-22px -16px 18px; background:var(--bg-1); border-bottom:1px solid var(--border);">
@@ -15303,9 +15394,10 @@
           <div style="display:flex; align-items:center; gap:12px; min-width:0;">
             <div style="width:44px; height:44px; flex:0 0 auto; display:flex; align-items:center; justify-content:center; font-size:22px; border-radius:13px; background:color-mix(in srgb, var(--accent) 14%, transparent); border:1px solid color-mix(in srgb, var(--accent) 30%, transparent);">🎬</div>
             <div style="min-width:0;">
-              <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-3);">Session backtest</div>
+              <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-3);">Session backtest · démarrée ${startedStr}</div>
               <div style="font-size:16px; font-weight:800; line-height:1.15; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${sc.name}</div>
             </div>
+            <div class="sess-go ${ready ? 'go' : 'nogo'}" style="flex:0 0 auto;">${ready ? '✅ GO' : '⛔ PAS PRÊT — ' + (ck.length - ckDone) + ' à cocher'}</div>
           </div>
           <div style="display:flex; gap:8px; flex:0 0 auto;">
             <button class="btn" onclick="closeBtSessionOverlay()">↙ Réduire</button>
@@ -15314,12 +15406,29 @@
         </div>
       </div>
 
-      <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:18px;">
+      <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:18px;">
         ${tiles.map(([lb, val, col, acc]) => `<div class="card" style="position:relative; overflow:hidden; text-align:center; padding:16px 6px;"><div style="position:absolute; top:0; left:0; right:0; height:2px; background:linear-gradient(90deg, ${acc}, transparent);"></div><div class="mono" style="font-size:25px; font-weight:800; color:${col};">${val}</div><div class="bt-q-lbl" style="margin:5px 0 0;">${lb}</div></div>`).join('')}
       </div>
 
+      ${slCount >= 2 ? `<div style="display:flex; align-items:center; gap:12px; padding:13px 16px; margin-bottom:18px; border-radius:12px; border:1px solid var(--red); background:rgba(255,77,107,0.10); font-size:13px; line-height:1.45;"><span style="font-size:20px; flex:0 0 auto;">🛑</span><div><strong>${slCount} SL dans cette session</strong> — en live, ta journée serait TERMINÉE (stop net après 2 SL). Tu peux continuer pour l'échantillon, mais note le réflexe : en réel, à ce stade, tu fermes tout.</div></div>` : ''}
+
       <div class="card" style="margin-bottom:18px;">
-        <div class="card-header"><span class="card-title">⚡ Nouveau trade</span></div>
+        <div class="card-header">
+          <span class="card-title">✅ Checklist avant d'entrer</span>
+          <span class="mono" style="font-weight:700;">${ckDone}/${ck.length}</span>
+        </div>
+        <div class="card-body">
+          <div class="acc-bar-track" style="margin-bottom:14px;"><div class="acc-bar-fill green" style="width:${ck.length ? Math.round(ckDone / ck.length * 100) : 0}%;"></div></div>
+          ${ck.length ? ck.map((item, i) => `
+          <div class="sess-check-item ${checks[i] ? 'checked' : ''}" onclick="btToggleCheck(${i})">
+            <div class="sess-check-box">${checks[i] ? '✓' : ''}</div>
+            <div>${escPlanText(item)}</div>
+          </div>`).join('') : '<div class="empty-state" style="padding:16px;">Ta checklist est vide — remplis-la dans le Plan de trading, elle apparaîtra ici comme en live.</div>'}
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:18px;">
+        <div class="card-header"><span class="card-title">⚡ Nouveau trade</span><span class="muted" style="font-size:11px;" id="btq-disc-count">Discipline : ${discNow}/3</span></div>
         <div class="card-body">
           <div class="bt-q-lbl">Sens</div>
           <div style="display:flex; gap:8px; margin-bottom:14px;">${btBigBtn(BTQ_SIDE === 'LONG', '▲ Achat', "btqSetSide('LONG')", 'var(--green)')}${btBigBtn(BTQ_SIDE === 'SHORT', '▼ Vente', "btqSetSide('SHORT')", 'var(--red)')}</div>
@@ -15333,12 +15442,12 @@
           <div class="bt-q-lbl">Setup</div>
           <div style="display:flex; gap:8px; margin-bottom:14px;">${btBigBtn(BTQ_SETUP === 'absorption', 'ABS', "btqSetSetup('absorption')")}${btBigBtn(BTQ_SETUP === 'exhaustion', 'EXH', "btqSetSetup('exhaustion')")}${btBigBtn(!BTQ_SETUP, '— Aucun', "btqSetSetup('')")}</div>
           <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px;">
-            <div style="flex:1; min-width:120px;"><div class="bt-q-lbl">Bougies (arc)</div><input type="number" min="1" max="50" id="btq-bougies" value="${BTQ_BOUGIES}" placeholder="4–11" style="width:100%; padding:11px 10px;"></div>
+            <div style="flex:1; min-width:120px;"><div class="bt-q-lbl">Bougies (arc)</div><input type="number" min="1" max="50" id="btq-bougies" value="${BTQ_BOUGIES}" placeholder="4–11" oninput="btUpdateDisc()" style="width:100%; padding:11px 10px;"></div>
             <div style="flex:1; min-width:150px;"><div class="bt-q-lbl">Arc joli</div><div style="display:flex; gap:8px;">${btBigBtn(BTQ_ARC === 'oui', '✓ Oui', "btqSetArc('oui')", 'var(--green)')}${btBigBtn(BTQ_ARC === 'non', '✗ Non', "btqSetArc('non')", 'var(--red)')}</div></div>
           </div>
           <div class="bt-q-lbl">Zone</div>
           <div style="display:flex; gap:8px; margin-bottom:18px; flex-wrap:wrap;">${btBigBtn(BTQ_ZONE === 'jaune', '🟨 Jaune', "btqSetZone('jaune')", 'var(--amber)')}${btBigBtn(BTQ_ZONE === 'orange', '🟧 Orange', "btqSetZone('orange')", '#f97316')}${btBigBtn(BTQ_ZONE === 'interdite', '🟥 Interdite', "btqSetZone('interdite')", 'var(--red)')}${btBigBtn(!BTQ_ZONE, '— Aucune', "btqSetZone('')")}</div>
-          <button class="btn btn-primary" style="width:100%; padding:15px; font-size:15px;" onclick="btQuickAdd()">➕ Ajouter le trade</button>
+          <button class="btn btn-primary" style="width:100%; padding:15px; font-size:15px;${ready ? '' : ' opacity:0.45; filter:grayscale(0.4);'}" onclick="btQuickAdd()">${ready ? '➕ Ajouter le trade' : "⛔ Coche ta checklist avant d'entrer"}</button>
         </div>
       </div>
 
