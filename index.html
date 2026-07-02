@@ -145,17 +145,17 @@
 
   /* ===== LIGHT THEME — Lavande premium, miroir du dark ===== */
   [data-theme="light"] {
-    --bg-0: #f2f0f9;
+    --bg-0: #f4f2fa;
     --bg-1: #ffffff;
-    --bg-2: #f7f5fc;
-    --bg-3: #eee9f8;
-    --bg-hover: #f1ecfb;
-    --border: rgba(40, 24, 80, 0.09);
-    --border-strong: rgba(40, 24, 80, 0.18);
-    --text-0: #17102d;
-    --text-1: #3e3559;
-    --text-2: #6f688a;
-    --text-3: #a59fbd;
+    --bg-2: #f8f6fd;
+    --bg-3: #efeaf9;
+    --bg-hover: #f3eefc;
+    --border: rgba(23, 16, 45, 0.08);
+    --border-strong: rgba(23, 16, 45, 0.16);
+    --text-0: #171029;
+    --text-1: #372e55;
+    --text-2: #635b80;
+    --text-3: #9c95b8;
     --accent: #7c3aed;
     --accent-bright: #c026d3;
     --accent-soft: rgba(124, 58, 237, 0.10);
@@ -169,9 +169,9 @@
     --red-soft: rgba(225, 29, 72, 0.10);
     --amber: #d97706;
     --amber-soft: rgba(217, 119, 6, 0.12);
-    --shadow: 0 14px 34px rgba(40, 24, 80, 0.10);
-    --shadow-soft: 0 3px 12px rgba(40, 24, 80, 0.07);
-    --shadow-glow: 0 0 28px rgba(124, 58, 237, 0.16);
+    --shadow: 0 18px 44px rgba(23, 16, 45, 0.10);
+    --shadow-soft: 0 2px 10px rgba(23, 16, 45, 0.06);
+    --shadow-glow: 0 0 30px rgba(124, 58, 237, 0.14);
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -3443,8 +3443,91 @@
     box-shadow: 0 30px 80px rgba(40, 24, 80, 0.25);
   }
   [data-theme="light"] ::-webkit-scrollbar-thumb {
-    background: rgba(40, 24, 80, 0.18);
+    background: rgba(23, 16, 45, 0.16);
   }
+
+  /* ===== r70 — PASSE PREMIUM MODE CLAIR (bordures fines, ombres en couches, champs blancs) ===== */
+  [data-theme="light"] .card {
+    background: #ffffff;
+    border: 1px solid rgba(23, 16, 45, 0.055);
+    box-shadow: 0 1px 2px rgba(23, 16, 45, 0.04), 0 8px 26px rgba(23, 16, 45, 0.055);
+  }
+  [data-theme="light"] .card:hover {
+    box-shadow: 0 2px 4px rgba(23, 16, 45, 0.05), 0 14px 38px rgba(23, 16, 45, 0.09);
+  }
+  /* Champs de saisie : blancs et nets, focus violet doux */
+  [data-theme="light"] .form-field input,
+  [data-theme="light"] .form-field select,
+  [data-theme="light"] .form-field textarea,
+  [data-theme="light"] input[type="date"],
+  [data-theme="light"] input[type="time"],
+  [data-theme="light"] input[type="number"],
+  [data-theme="light"] input[type="text"],
+  [data-theme="light"] input[type="search"] {
+    background: #ffffff;
+    border-color: rgba(23, 16, 45, 0.14);
+    box-shadow: inset 0 1px 2px rgba(23, 16, 45, 0.035);
+    color: var(--text-0);
+  }
+  [data-theme="light"] .form-field input:focus,
+  [data-theme="light"] .form-field select:focus,
+  [data-theme="light"] .form-field textarea:focus,
+  [data-theme="light"] input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.12);
+  }
+  /* Boutons neutres : blanc, bord net, léger relief */
+  [data-theme="light"] .btn {
+    background: #ffffff;
+    border-color: rgba(23, 16, 45, 0.13);
+    box-shadow: 0 1px 2px rgba(23, 16, 45, 0.05);
+  }
+  [data-theme="light"] .btn:hover {
+    background: #faf8ff;
+    border-color: rgba(124, 58, 237, 0.45);
+  }
+  [data-theme="light"] .btn-primary {
+    background: var(--accent-gradient);
+    border-color: transparent;
+    box-shadow: 0 3px 12px rgba(124, 58, 237, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  }
+  /* Navigation : item actif net et lisible */
+  [data-theme="light"] .nav-item.active {
+    background: rgba(124, 58, 237, 0.09);
+    color: var(--accent);
+  }
+  [data-theme="light"] .nav-item.active .icon { color: var(--accent); }
+  [data-theme="light"] .sidebar { border-right: 1px solid rgba(23, 16, 45, 0.07); }
+  [data-theme="light"] .topbar { border-bottom: 1px solid rgba(23, 16, 45, 0.07); }
+  /* Tableaux : en-têtes discrets, survol violet très léger */
+  [data-theme="light"] thead th {
+    color: var(--text-2);
+    border-bottom: 1px solid rgba(23, 16, 45, 0.09);
+    background: #fbfaff;
+  }
+  [data-theme="light"] tbody td { border-bottom: 1px solid rgba(23, 16, 45, 0.05); }
+  [data-theme="light"] tbody tr:hover td { background: rgba(124, 58, 237, 0.045); }
+  /* Boutons segmentés inactifs : blancs, pas gris-lavande */
+  [data-theme="light"] .seg-btn { background: #ffffff; }
+  [data-theme="light"] .seg-btn.active { color: #ffffff; }
+  /* KPI héros : blanc pur avec liseré supérieur dégradé plus visible */
+  [data-theme="light"] .hero-kpi {
+    background: #ffffff;
+    border: 1px solid rgba(23, 16, 45, 0.055);
+    box-shadow: 0 1px 2px rgba(23, 16, 45, 0.04), 0 10px 30px rgba(23, 16, 45, 0.06);
+  }
+  /* Modales : voile lavande + flou, boîte blanche nette */
+  [data-theme="light"] .modal-overlay {
+    background: rgba(30, 20, 60, 0.32);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+  }
+  [data-theme="light"] .modal { background: #ffffff; border: 1px solid rgba(23, 16, 45, 0.06); }
+  /* États vides et chips plus doux */
+  [data-theme="light"] .empty-state { color: var(--text-3); }
+  [data-theme="light"] .sess-check-item { background: #fbfaff; border-color: rgba(23, 16, 45, 0.08); }
+  [data-theme="light"] .sess-check-item.checked { background: rgba(5, 150, 105, 0.07); }
+  [data-theme="light"] .bt-q-lbl { color: var(--text-2); }
 
   /* ========== CARTES COMPTES v2 (inspiré Analyse Avancée) ========== */
   .acc-role-badge {
@@ -5469,7 +5552,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono" id="app-version-full">2026-07-02 · r69</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono" id="app-version-full">2026-07-02 · r70</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
