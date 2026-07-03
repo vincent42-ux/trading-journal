@@ -5587,7 +5587,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono" id="app-version-full">2026-07-03 · r73</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono" id="app-version-full">2026-07-03 · r74</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -15559,6 +15559,28 @@
       ${slCount >= 2 ? `<div style="display:flex; align-items:center; gap:12px; padding:13px 16px; margin-bottom:18px; border-radius:12px; border:1px solid var(--red); background:rgba(255,77,107,0.10); font-size:13px; line-height:1.45;"><span style="font-size:20px; flex:0 0 auto;">🛑</span><div><strong>${slCount} SL sur la journée du ${selDate.split('-').reverse().join('/')}</strong> — en live, cette journée serait TERMINÉE (stop net après 2 SL). Passe à la date suivante pour continuer ton backtest : le compteur repart à zéro.</div></div>` : ''}
 
       <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(360px, 1fr)); gap:16px; align-items:start; margin-bottom:18px;">
+      <div class="card" style="border-color:color-mix(in srgb, var(--accent) 45%, var(--border));">
+        <div class="card-header" style="background:linear-gradient(90deg, color-mix(in srgb, var(--accent) 12%, transparent), transparent);">
+          <span class="card-title">📐 Règles du replay — lecture corrigée</span>
+          <span class="mono" style="font-size:10px; font-weight:700; color:var(--accent-bright, #d946ef);">CALIBRAGE</span>
+        </div>
+        <div class="card-body" style="padding:10px 16px 14px;">
+          ${[
+            ['1', "<strong>High/low de référence D'ABORD</strong> — c'est lui qui définit la divergence (la vidéo fait foi)."],
+            ['2', "<strong>ABS</strong> = le CVD fait le nouvel extrême, le prix refuse · <strong>EXH</strong> = le prix fait le nouvel extrême, le CVD refuse — <strong style='color:var(--accent-bright, #d946ef);'>EXH prioritaire</strong>."],
+            ['3', "Bougies <strong>4–11</strong> · <strong>arc joli</strong> · SL 1 tick derrière le début de la divergence · <strong>TP 2RR</strong> · BE : EXH 1R / ABS 1,5R."],
+            ['4', "<strong>Fenêtre 13h–15h uniquement</strong> — rien en dehors."],
+            ['5', "Décision notée <strong>AVANT</strong> de regarder le bilan STCK — sinon le test est mort."],
+            ['6', "<strong>Stop après 2 SL / jour</strong>, comme en live — puis date suivante."],
+            ['7', "Chaque jour : <strong>Q1</strong> « mon trade d'origine, je le reprends ? » puis <strong>Q2</strong> « qu'est-ce que je prends à la place ? »."],
+            ['8', "<strong>45–60 min max</strong> par séance — yeux frais ou rien."]
+          ].map(([n, txt]) => `<div style="display:flex; gap:10px; align-items:flex-start; padding:7px 0; border-bottom:1px solid color-mix(in srgb, var(--border) 55%, transparent); font-size:12.5px; line-height:1.45;">
+            <span class="mono" style="flex:0 0 auto; width:20px; height:20px; display:flex; align-items:center; justify-content:center; border-radius:6px; font-size:10.5px; font-weight:800; background:color-mix(in srgb, var(--accent) 16%, transparent); color:var(--accent-bright, #d946ef);">${n}</span>
+            <span style="color:var(--text-1);">${txt}</span>
+          </div>`).join('')}
+        </div>
+      </div>
+
       <div class="card">
         <div class="card-header">
           <span class="card-title">✅ Checklist avant d'entrer</span>
