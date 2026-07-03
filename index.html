@@ -5587,7 +5587,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono" id="app-version-full">2026-07-02 · r72</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono" id="app-version-full">2026-07-03 · r73</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -15482,6 +15482,28 @@
     renderBtSessionsList();
     if (typeof showToast === 'function') showToast('✓ Trade ajouté à la session', 'success');
   }
+  function btqDeleteTrade(id) {
+    const t = BACKTEST_TRADES.find(x => x.id === id);
+    if (!t) return;
+    const rV = (+t.rRealised || 0);
+    const dFr = (t.date && /^\d{4}-\d{2}-\d{2}$/.test(t.date)) ? t.date.split('-').reverse().join('/') : (t.date || '');
+    uiConfirm({
+      icon: '🗑',
+      title: 'Supprimer ce trade ?',
+      message: `${dFr} ${t.time || ''} · ${t.side === 'LONG' ? '▲ Achat' : '▼ Vente'} · ${t.result} (${rV >= 0 ? '+' : ''}${rV.toFixed(1)}R) — suppression définitive.`,
+      confirmLabel: 'Supprimer',
+      cancelLabel: 'Annuler',
+      danger: true,
+    }).then(ok => {
+      if (!ok) return;
+      BACKTEST_TRADES = BACKTEST_TRADES.filter(x => x.id !== id);
+      saveBacktestData();
+      renderBtSessionCockpit();
+      renderBtSessionsList();
+      if (typeof renderBtSessionPanel === 'function') renderBtSessionPanel();
+      if (typeof showToast === 'function') showToast('🗑 Trade supprimé', 'success');
+    });
+  }
   function btSegBtn(active, label, onclick, col) {
     return `<button onclick="${onclick}" style="flex:1; padding:10px 6px; border-radius:9px; border:1px solid ${active ? (col || 'var(--accent)') : 'var(--border)'}; background:${active ? (col || 'var(--accent)') + '22' : 'var(--bg-2)'}; color:${active ? 'var(--text-0)' : 'var(--text-2)'}; font-weight:700; font-size:13px; cursor:pointer;">${label}</button>`;
   }
@@ -15599,6 +15621,7 @@
                 <span style="width:9px; height:9px; border-radius:99px; background:${dot}; flex:0 0 auto;"></span>
                 <span style="flex:1; font-size:12.5px;"><span class="mono" style="color:var(--text-2);">${x.time || ''}</span> · <span style="color:${x.side === 'LONG' ? 'var(--green)' : 'var(--red)'};">${x.side === 'LONG' ? '▲ Achat' : '▼ Vente'}</span> · ${x.result}${tags}</span>
                 <span class="mono" style="font-weight:800; color:${rc >= 0 ? 'var(--green)' : 'var(--red)'};">${rc >= 0 ? '+' : ''}${rc.toFixed(1)}R</span>
+                <button onclick="btqDeleteTrade('${x.id}')" title="Supprimer ce trade" style="flex:0 0 auto; background:none; border:none; color:var(--text-3); font-size:14px; cursor:pointer; padding:4px 7px; border-radius:7px; transition:all .15s;" onmouseover="this.style.color='var(--red)'; this.style.background='rgba(255,77,107,0.12)';" onmouseout="this.style.color='var(--text-3)'; this.style.background='none';">🗑</button>
               </div>`;
             };
             return days.map(d => {
