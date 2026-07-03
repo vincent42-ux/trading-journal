@@ -3117,6 +3117,41 @@
     transition: all 0.15s; flex-shrink: 0;
   }
   .plan-list-item .plan-item-del:hover { color: var(--red); background: rgba(255, 77, 107, 0.12); }
+
+  /* ===== r72 — PLAN DE TRADING PREMIUM : chaque section a sa couleur ===== */
+  .plan-sec { position: relative; overflow: hidden; }
+  .plan-sec::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: var(--sec-grad, var(--accent-gradient)); z-index: 1;
+  }
+  .plan-sec > .card-header {
+    background: color-mix(in srgb, var(--sec-col, var(--accent)) 6%, transparent);
+    border-bottom: 1px solid color-mix(in srgb, var(--sec-col, var(--accent)) 14%, transparent);
+  }
+  .plan-sec > .card-header .card-title { color: var(--sec-col, var(--text-0)); }
+  .plan-sec-strategy { --sec-col: #a855f7; --sec-grad: linear-gradient(90deg, #a855f7, #d946ef); }
+  .plan-sec-risk { --sec-col: #f59e0b; --sec-grad: linear-gradient(90deg, #f59e0b, #fbbf24); }
+  .plan-sec-limits { --sec-col: #ff4d6b; --sec-grad: linear-gradient(90deg, #ff4d6b, #ff7a92); }
+  .plan-sec-routine { --sec-col: #22d39a; --sec-grad: linear-gradient(90deg, #22d39a, #4ae6b3); }
+  .plan-sec-rules { --sec-col: #d946ef; --sec-grad: linear-gradient(90deg, #d946ef, #a855f7); }
+  [data-theme="light"] .plan-sec-strategy { --sec-col: #7c3aed; }
+  [data-theme="light"] .plan-sec-risk { --sec-col: #b45309; }
+  [data-theme="light"] .plan-sec-limits { --sec-col: #e11d48; }
+  [data-theme="light"] .plan-sec-routine { --sec-col: #047857; }
+  [data-theme="light"] .plan-sec-rules { --sec-col: #c026d3; }
+  /* Règles d'or : items avec liseré magenta et numéro en dégradé */
+  #plan-golden-rules .plan-list-item {
+    background: linear-gradient(90deg, color-mix(in srgb, #d946ef 8%, var(--bg-2)) 0%, var(--bg-2) 55%);
+    border-left: 3px solid #d946ef;
+    font-weight: 600;
+  }
+  #plan-golden-rules .plan-item-num {
+    background: linear-gradient(135deg, #a855f7, #d946ef);
+    color: #fff;
+  }
+  /* Routine : liseré vert, numéros verts */
+  #plan-checklist .plan-list-item { border-left: 3px solid var(--green); }
+  #plan-checklist .plan-item-num { background: var(--green-soft); color: var(--green); }
   .seg-btn.plan-on {
     background: linear-gradient(135deg, var(--accent), #d946ef);
     color: #fff; border-color: transparent !important;
@@ -4214,7 +4249,7 @@
 
         <div class="row-2col" style="margin-bottom:16px;">
           <!-- Stratégie & entrée -->
-          <div class="card">
+          <div class="card plan-sec plan-sec-strategy">
             <div class="card-header"><span class="card-title" data-plan-label="sec-strategy">🎯 Stratégie &amp; entrée</span></div>
             <div class="card-body">
               <div class="form-field" style="margin-bottom:14px;">
@@ -4252,7 +4287,7 @@
           </div>
 
           <!-- Risque & objectifs -->
-          <div class="card">
+          <div class="card plan-sec plan-sec-risk">
             <div class="card-header"><span class="card-title" data-plan-label="sec-risk">💰 Risque &amp; objectifs</span></div>
             <div class="card-body">
               <div class="form-row">
@@ -4291,7 +4326,7 @@
 
         <div class="row-2col" style="margin-bottom:16px;">
           <!-- Limites & garde-fous -->
-          <div class="card">
+          <div class="card plan-sec plan-sec-limits">
             <div class="card-header">
               <span class="card-title" data-plan-label="sec-limits">🛑 Limites &amp; garde-fous</span>
               <span class="muted" style="font-size:11px;">surveillés sur le Dashboard</span>
@@ -4331,7 +4366,7 @@
           </div>
 
           <!-- Routine avant session -->
-          <div class="card">
+          <div class="card plan-sec plan-sec-routine">
             <div class="card-header">
               <span class="card-title" data-plan-label="sec-routine">🧘 Routine avant session</span>
               <span class="muted" style="font-size:11px;" id="plan-checklist-count">—</span>
@@ -4347,7 +4382,7 @@
         </div>
 
         <!-- Règles d'or -->
-        <div class="card" style="margin-bottom:16px;">
+        <div class="card plan-sec plan-sec-rules" style="margin-bottom:16px;">
           <div class="card-header">
             <span class="card-title" data-plan-label="sec-rules">📜 Mes règles d'or</span>
             <span class="muted" style="font-size:11px;" id="plan-rules-count">—</span>
@@ -5552,7 +5587,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono" id="app-version-full">2026-07-02 · r71</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono" id="app-version-full">2026-07-02 · r72</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -15639,9 +15674,29 @@
           <div style="font-size:13px; font-weight:700;">${dateLbl}${live ? ' <span style="color:var(--green); font-size:11px;">● en cours</span>' : ''}</div>
           <div style="font-size:11px; color:var(--text-2); margin-top:2px;">${sc.name} · ${tally.n} trade${tally.n > 1 ? 's' : ''} · WR ${tally.n ? tally.wr.toFixed(0) + '%' : '—'}</div>
         </div>
-        <div class="mono" style="font-size:17px; font-weight:800; color:${tally.r >= 0 ? 'var(--green)' : 'var(--red)'};">${tally.r >= 0 ? '+' : ''}${tally.r.toFixed(1)}R</div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div class="mono" style="font-size:17px; font-weight:800; color:${tally.r >= 0 ? 'var(--green)' : 'var(--red)'};">${tally.r >= 0 ? '+' : ''}${tally.r.toFixed(1)}R</div>
+          ${live ? '' : `<button onclick="btDeleteSession('${id}')" title="Supprimer cette session et ses trades" style="background:none; border:none; color:var(--text-3); font-size:14px; cursor:pointer; padding:4px 7px; border-radius:7px; transition:all .15s;" onmouseover="this.style.color='var(--red)'; this.style.background='rgba(255,77,107,0.12)';" onmouseout="this.style.color='var(--text-3)'; this.style.background='none';">🗑</button>`}
+        </div>
       </div>`;
     }).join('');
+  }
+  function btDeleteSession(sid) {
+    const ts = BACKTEST_TRADES.filter(t => t.sessionId === sid);
+    uiConfirm({
+      icon: '🗑',
+      title: 'Supprimer cette session de backtest ?',
+      message: `Les ${ts.length} trade${ts.length > 1 ? 's' : ''} de cette session seront supprimés définitivement.`,
+      confirmLabel: 'Supprimer',
+      cancelLabel: 'Annuler',
+      danger: true,
+    }).then(ok => {
+      if (!ok) return;
+      BACKTEST_TRADES = BACKTEST_TRADES.filter(t => t.sessionId !== sid);
+      saveBacktestData();
+      renderBacktest();
+      if (typeof showToast === 'function') showToast(`🗑 Session supprimée (${ts.length} trade${ts.length > 1 ? 's' : ''})`, 'success');
+    });
   }
   function renderBacktestSessionAll() { renderBtSessionPanel(); renderBtSessionsList(); }
   let CURRENT_SCENARIO_ID = null;
