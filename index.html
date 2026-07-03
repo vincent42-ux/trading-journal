@@ -5552,7 +5552,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono" id="app-version-full">2026-07-02 · r70</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono" id="app-version-full">2026-07-02 · r71</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -14713,6 +14713,9 @@
     if (typeof renderGoalsLadder === 'function') renderGoalsLadder();
     if (typeof updateNotifBadge === 'function') updateNotifBadge();
     render();
+    // FIX r71 : le cloud renvoie les trades SANS photos (photo:null + hasPhoto) —
+    // on recharge les screenshots depuis IndexedDB, sinon ils disparaissent après chaque synchro
+    if (typeof rehydratePhotos === 'function') rehydratePhotos();
     } finally { window.__syncApplying = false; }
   }
   function exportJSON() {
@@ -15400,6 +15403,7 @@
   }
   function openBtSessionOverlay() { const o = document.getElementById('bt-session-overlay'); if (o) o.style.display = 'block'; document.body.style.overflow = 'hidden'; renderBtSessionCockpit(); }
   function closeBtSessionOverlay() { const o = document.getElementById('bt-session-overlay'); if (o) o.style.display = 'none'; document.body.style.overflow = ''; }
+  function btqDateChanged() { btCaptureInputs(); renderBtSessionCockpit(); } // nouvelle date = compteur SL du jour remis à zéro
   function btqSetSide(s) { btCaptureInputs(); BTQ_SIDE = s; renderBtSessionCockpit(); }
   function btqSetRes(r) { btCaptureInputs(); BTQ_RESULT = r; renderBtSessionCockpit(); }
   function btqSetSetup(s) { btCaptureInputs(); BTQ_SETUP = s; renderBtSessionCockpit(); }
@@ -15461,14 +15465,16 @@
     const ckDone = checks.filter(Boolean).length;
     const ready = ck.length === 0 || ckDone === ck.length;
     const startedStr = BT_SESSION.startedAt ? new Date(BT_SESSION.startedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '—';
-    const slCount = BACKTEST_TRADES.filter(x => x.sessionId === BT_SESSION.id && x.result === 'SL').length;
+    // SL comptés PAR JOURNÉE (la date du formulaire) — nouvelle date = compteur remis à zéro, comme en live
+    const selDate = BTQ_LASTDATE || new Date().toISOString().slice(0, 10);
+    const slCount = BACKTEST_TRADES.filter(x => x.sessionId === BT_SESSION.id && x.result === 'SL' && x.date === selDate).length;
     const bgNow = parseInt(BTQ_BOUGIES);
     const discNow = (BTQ_SETUP ? 1 : 0) + ((!isNaN(bgNow) && bgNow >= 4 && bgNow <= 11) ? 1 : 0) + (BTQ_ARC === 'oui' ? 1 : 0);
     const tiles = [
       ['Trades', String(t.n), 'var(--text-0)', 'var(--accent)'],
       ['R session', (t.r >= 0 ? '+' : '') + t.r.toFixed(1) + 'R', t.r >= 0 ? 'var(--green)' : 'var(--red)', t.r >= 0 ? 'var(--green)' : 'var(--red)'],
       ['Win rate', t.n ? t.wr.toFixed(0) + '%' : '—', 'var(--text-0)', 'var(--accent-bright, #d946ef)'],
-      ['SL', slCount + '/2', slCount >= 2 ? 'var(--red)' : 'var(--text-0)', slCount >= 2 ? 'var(--red)' : 'var(--amber)']
+      ['SL (jour)', slCount + '/2', slCount >= 2 ? 'var(--red)' : 'var(--text-0)', slCount >= 2 ? 'var(--red)' : 'var(--amber)']
     ];
     body.innerHTML = `
       <div style="position:sticky; top:0; z-index:5; margin:-22px -16px 18px; background:var(--bg-1); border-bottom:1px solid var(--border);">
@@ -15493,7 +15499,7 @@
         ${tiles.map(([lb, val, col, acc]) => `<div class="card" style="position:relative; overflow:hidden; text-align:center; padding:16px 6px;"><div style="position:absolute; top:0; left:0; right:0; height:2px; background:linear-gradient(90deg, ${acc}, transparent);"></div><div class="mono" style="font-size:25px; font-weight:800; color:${col};">${val}</div><div class="bt-q-lbl" style="margin:5px 0 0;">${lb}</div></div>`).join('')}
       </div>
 
-      ${slCount >= 2 ? `<div style="display:flex; align-items:center; gap:12px; padding:13px 16px; margin-bottom:18px; border-radius:12px; border:1px solid var(--red); background:rgba(255,77,107,0.10); font-size:13px; line-height:1.45;"><span style="font-size:20px; flex:0 0 auto;">🛑</span><div><strong>${slCount} SL dans cette session</strong> — en live, ta journée serait TERMINÉE (stop net après 2 SL). Tu peux continuer pour l'échantillon, mais note le réflexe : en réel, à ce stade, tu fermes tout.</div></div>` : ''}
+      ${slCount >= 2 ? `<div style="display:flex; align-items:center; gap:12px; padding:13px 16px; margin-bottom:18px; border-radius:12px; border:1px solid var(--red); background:rgba(255,77,107,0.10); font-size:13px; line-height:1.45;"><span style="font-size:20px; flex:0 0 auto;">🛑</span><div><strong>${slCount} SL sur la journée du ${selDate.split('-').reverse().join('/')}</strong> — en live, cette journée serait TERMINÉE (stop net après 2 SL). Passe à la date suivante pour continuer ton backtest : le compteur repart à zéro.</div></div>` : ''}
 
       <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(360px, 1fr)); gap:16px; align-items:start; margin-bottom:18px;">
       <div class="card">
@@ -15519,7 +15525,7 @@
           <div class="bt-q-lbl">Résultat</div>
           <div style="display:flex; gap:8px; margin-bottom:14px;">${btBigBtn(BTQ_RESULT === 'TP', 'TP', "btqSetRes('TP')", 'var(--green)')}${btBigBtn(BTQ_RESULT === 'SL', 'SL', "btqSetRes('SL')", 'var(--red)')}${btBigBtn(BTQ_RESULT === 'BE', 'BE', "btqSetRes('BE')", 'var(--amber)')}</div>
           <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px;">
-            <div style="flex:1; min-width:150px;"><div class="bt-q-lbl">Date du trade</div><input type="date" id="btq-date" value="${BTQ_LASTDATE || new Date().toISOString().slice(0, 10)}" style="width:100%; padding:11px 10px;"></div>
+            <div style="flex:1; min-width:150px;"><div class="bt-q-lbl">Date du trade</div><input type="date" id="btq-date" value="${BTQ_LASTDATE || new Date().toISOString().slice(0, 10)}" onchange="btqDateChanged()" style="width:100%; padding:11px 10px;"></div>
             <div style="flex:1; min-width:110px;"><div class="bt-q-lbl">Heure</div><input type="time" id="btq-time" value="${BTQ_LASTTIME || '13:00'}" style="width:100%; padding:11px 10px;"></div>
             <div style="flex:1; min-width:110px;"><div class="bt-q-lbl">R réalisé</div><input type="number" step="0.1" id="btq-r" value="${BTQ_LASTR}" placeholder="auto (${sc.rrTarget || 2}R)" style="width:100%; padding:11px 10px;"></div>
           </div>
@@ -15540,21 +15546,39 @@
       <div class="card">
         <div class="card-header"><span class="card-title">Trades de la session</span><span class="muted" style="font-size:11px;">${t.n}</span></div>
         <div class="card-body" style="padding:0;">
-          ${ts.length ? ts.map(x => {
-            const rc = (+x.rRealised || 0);
-            const dot = x.result === 'TP' ? 'var(--green)' : x.result === 'SL' ? 'var(--red)' : 'var(--amber)';
-            const cf = x.confirms || {};
-            const setup = cf.setup ? (cf.setup === 'absorption' ? 'ABS' : cf.setup === 'exhaustion' ? 'EXH' : '') : '';
-            const bg = (cf.bougiesCount != null) ? cf.bougiesCount + 'b' : '';
-            const arc = cf.arcJoli === 'oui' ? '✓arc' : cf.arcJoli === 'non' ? '✗arc' : '';
-            const zone = cf.zone === 'interdite' ? '🟥' : cf.zone === 'orange' ? '🟧' : cf.zone === 'jaune' ? '🟨' : '';
-            const tags = [setup, bg, arc].filter(Boolean).map(s => ' · ' + s).join('') + (zone ? ' ' + zone : '');
-            return `<div style="display:flex; align-items:center; gap:12px; padding:11px 16px; border-bottom:1px solid var(--border);">
-              <span style="width:9px; height:9px; border-radius:99px; background:${dot}; flex:0 0 auto;"></span>
-              <span style="flex:1; font-size:12.5px;"><span class="mono" style="color:var(--text-2);">${x.time || ''}</span> · <span style="color:${x.side === 'LONG' ? 'var(--green)' : 'var(--red)'};">${x.side === 'LONG' ? '▲ Achat' : '▼ Vente'}</span> · ${x.result}${tags}</span>
-              <span class="mono" style="font-weight:800; color:${rc >= 0 ? 'var(--green)' : 'var(--red)'};">${rc >= 0 ? '+' : ''}${rc.toFixed(1)}R</span>
-            </div>`;
-          }).join('') : '<div class="empty-state" style="padding:24px;">Ajoute ton premier trade ci-dessus.</div>'}
+          ${ts.length ? (() => {
+            // Groupement PAR JOURNÉE : chaque jour de backtest a son bandeau (R du jour, SL du jour)
+            const byDay = {};
+            ts.forEach(x => { const d = x.date || '—'; (byDay[d] = byDay[d] || []).push(x); });
+            const days = Object.keys(byDay).sort().reverse();
+            const rowHtml = x => {
+              const rc = (+x.rRealised || 0);
+              const dot = x.result === 'TP' ? 'var(--green)' : x.result === 'SL' ? 'var(--red)' : 'var(--amber)';
+              const cf = x.confirms || {};
+              const setup = cf.setup ? (cf.setup === 'absorption' ? 'ABS' : cf.setup === 'exhaustion' ? 'EXH' : '') : '';
+              const bg = (cf.bougiesCount != null) ? cf.bougiesCount + 'b' : '';
+              const arc = cf.arcJoli === 'oui' ? '✓arc' : cf.arcJoli === 'non' ? '✗arc' : '';
+              const zone = cf.zone === 'interdite' ? '🟥' : cf.zone === 'orange' ? '🟧' : cf.zone === 'jaune' ? '🟨' : '';
+              const tags = [setup, bg, arc].filter(Boolean).map(s => ' · ' + s).join('') + (zone ? ' ' + zone : '');
+              return `<div style="display:flex; align-items:center; gap:12px; padding:10px 16px; border-bottom:1px solid var(--border);">
+                <span style="width:9px; height:9px; border-radius:99px; background:${dot}; flex:0 0 auto;"></span>
+                <span style="flex:1; font-size:12.5px;"><span class="mono" style="color:var(--text-2);">${x.time || ''}</span> · <span style="color:${x.side === 'LONG' ? 'var(--green)' : 'var(--red)'};">${x.side === 'LONG' ? '▲ Achat' : '▼ Vente'}</span> · ${x.result}${tags}</span>
+                <span class="mono" style="font-weight:800; color:${rc >= 0 ? 'var(--green)' : 'var(--red)'};">${rc >= 0 ? '+' : ''}${rc.toFixed(1)}R</span>
+              </div>`;
+            };
+            return days.map(d => {
+              const list = byDay[d].slice().sort((a, b) => (b.time || '').localeCompare(a.time || ''));
+              const rDay = list.reduce((s, x) => s + (+x.rRealised || 0), 0);
+              const slDay = list.filter(x => x.result === 'SL').length;
+              const dFr = /^\d{4}-\d{2}-\d{2}$/.test(d) ? d.split('-').reverse().join('/') : d;
+              return `<div style="display:flex; align-items:center; gap:10px; padding:9px 16px; background:var(--bg-2); border-bottom:1px solid var(--border); position:sticky;">
+                <span style="font-size:11px; font-weight:800; letter-spacing:0.05em; text-transform:uppercase; color:var(--text-1);">📅 ${dFr}</span>
+                <span class="mono" style="font-size:11px; font-weight:800; color:${rDay >= 0 ? 'var(--green)' : 'var(--red)'};">${rDay >= 0 ? '+' : ''}${rDay.toFixed(1)}R</span>
+                <span style="font-size:10.5px; color:var(--text-3);">· ${list.length} trade${list.length > 1 ? 's' : ''}</span>
+                <span class="mono" style="margin-left:auto; font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:99px; ${slDay >= 2 ? 'background:rgba(255,77,107,0.14); color:var(--red);' : 'color:var(--text-3);'}">SL ${slDay}/2${slDay >= 2 ? ' · journée finie' : ''}</span>
+              </div>` + list.map(rowHtml).join('');
+            }).join('');
+          })() : '<div class="empty-state" style="padding:24px;">Ajoute ton premier trade ci-dessus.</div>'}
         </div>
       </div>`;
   }
