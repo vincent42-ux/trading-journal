@@ -5620,7 +5620,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono" id="app-version-full">2026-07-06 · r77</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono" id="app-version-full">2026-07-06 · r78</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -14957,6 +14957,36 @@
     saveSyncConfig();
     renderSyncUI();
   }
+  // ===== r78 — BATTEMENT DE CŒUR : la synchro tourne CONSTAMMENT tant que l'app est ouverte =====
+  // 1. Pull/push automatique toutes les 5 minutes (le plus récent gagne, fusion par id — rien ne se perd)
+  setInterval(() => { if (syncEnabled()) syncPull(true); }, 5 * 60 * 1000);
+  // 2. Re-synchro immédiate quand on revient sur l'onglet (Safari/iPhone endorment les onglets)
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && syncEnabled()) syncPull(true); });
+  // 3. SENTINELLE : si la synchro est activée mais n'a pas RÉUSSI depuis > 30 min → bannière rouge impossible à rater
+  function checkSyncHealth() {
+    if (!syncEnabled()) return;
+    const silent = Date.now() - (SYNC.lastSync || 0);
+    let banner = document.getElementById('sync-dead-banner');
+    if (silent > 30 * 60 * 1000) {
+      const mins = Math.round(silent / 60000);
+      const ago = mins > 5940 ? Math.round(mins / 1440) + ' j' : mins > 120 ? Math.round(mins / 60) + ' h' : mins + ' min';
+      const msg = '⚠️ SYNCHRO CLOUD EN PANNE — dernière réussite il y a ' + ago + '. Tes trades ne sont plus sauvegardés dans le cloud. Clique ici : Paramètres → Données → recolle un token GitHub (scope gist).';
+      if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'sync-dead-banner';
+        banner.style.cssText = 'position:fixed; top:0; left:0; right:0; z-index:99998; background:linear-gradient(90deg,#e11d48,#f43f5e); color:#fff; padding:10px 18px; font:700 12.5px Inter,sans-serif; text-align:center; cursor:pointer; box-shadow:0 4px 18px rgba(0,0,0,0.35);';
+        banner.onclick = () => { try { openSettingsModal(); } catch (e) {} };
+        document.body.appendChild(banner);
+        if (typeof pushNotif === 'function') pushNotif('danger', '☁️', '<strong>Synchro cloud en panne</strong> — token à recoller dans Paramètres → Données.', 'sync-dead-' + new Date().toISOString().slice(0, 10));
+      }
+      banner.textContent = msg;
+    } else if (banner) {
+      banner.remove();
+    }
+  }
+  setInterval(checkSyncHealth, 60 * 1000);
+  setTimeout(checkSyncHealth, 15 * 1000); // premier contrôle 15 s après l'ouverture (laisse le pull initial passer)
+
   function renderSyncUI() {
     const on = syncEnabled();
     const setup = document.getElementById('sync-setup');
