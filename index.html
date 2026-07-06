@@ -1101,8 +1101,7 @@
     margin-bottom: 16px;
   }
   .bt-hour-cell {
-    aspect-ratio: 1;
-    border-radius: 6px;
+    border-radius: 5px;
     background: var(--bg-2);
     border: 1px solid var(--border);
     display: flex;
@@ -1114,9 +1113,10 @@
     color: var(--text-2);
     cursor: default;
     transition: all 0.15s ease;
-    padding: 4px 2px;
-    min-height: 60px;
+    padding: 3px 1px;
+    min-height: 34px;
   }
+  .bt-hour-cell:not(.has-data) { opacity: 0.42; min-height: 26px; }
   .bt-hour-cell:hover {
     transform: scale(1.12);
     z-index: 2;
@@ -5620,7 +5620,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono" id="app-version-full">2026-07-06 · r76</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono" id="app-version-full">2026-07-06 · r77</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -15074,7 +15074,7 @@
       timestamp: new Date().toISOString(),
       reason: reason || 'auto',
       tradesCount: TRADES.length,
-      data: { trades: lightTrades, accounts: ACCOUNTS, rotationWeeks: ROTATION_WEEKS },
+      data: { trades: lightTrades, accounts: ACCOUNTS, rotationWeeks: ROTATION_WEEKS, backtestTrades: (typeof BACKTEST_TRADES !== 'undefined' ? BACKTEST_TRADES : []), backtestScenarios: (typeof SCENARIOS !== 'undefined' ? SCENARIOS : []), btSessMeta: (typeof BT_SESS_META !== 'undefined' ? BT_SESS_META : {}) },
     });
     while (backups.length > (PREFS.keepBackups || 10)) backups.shift();
     saveBackups(backups);
@@ -15143,6 +15143,11 @@
     if (b.data.trades) TRADES = b.data.trades;
     if (b.data.accounts) ACCOUNTS = b.data.accounts;
     if (b.data.rotationWeeks) ROTATION_WEEKS = b.data.rotationWeeks;
+    // r77 : les sauvegardes incluent désormais le BACKTEST — on le restaure aussi
+    if (Array.isArray(b.data.backtestTrades) && b.data.backtestTrades.length) BACKTEST_TRADES = b.data.backtestTrades;
+    if (Array.isArray(b.data.backtestScenarios) && b.data.backtestScenarios.length) SCENARIOS = b.data.backtestScenarios;
+    if (b.data.btSessMeta && typeof BT_SESS_META !== 'undefined') { BT_SESS_META = b.data.btSessMeta; saveBtSessMeta(); }
+    if (typeof saveBacktestData === 'function') saveBacktestData();
     saveTrades(); saveAccountsAndRotation();
     if (typeof rehydratePhotos === 'function') rehydratePhotos(); // récupère les screenshots depuis IndexedDB
     closeSettingsModal();
@@ -15745,6 +15750,37 @@
     const dateLbl = d0.toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' });
     const nm = btSessName(sid, '') || 'Session du ' + dateLbl;
     const exp = t.n ? (t.r / t.n) : 0;
+    // r77 — analyse par caractéristique : setup, arc, zone, sens, bougies, mots-clés
+    const dimStats = (key, getter) => {
+      const groups = {};
+      ts.forEach(x => { const v = getter(x); if (v == null || v === '') return; (groups[v] = groups[v] || []).push(x); });
+      return Object.entries(groups).map(([k, list]) => {
+        const r = list.reduce((s, x) => s + (+x.rRealised || 0), 0);
+        const w = list.filter(x => x.result === 'TP').length;
+        const dcd = list.filter(x => x.result === 'TP' || x.result === 'SL').length;
+        return { key: k, n: list.length, r, wr: dcd ? Math.round(w / dcd * 100) : null };
+      });
+    };
+    const cfOf = x => x.confirms || {};
+    let dims = [
+      ...dimStats('setup', x => cfOf(x).setup === 'absorption' ? '🅰 ABS' : cfOf(x).setup === 'exhaustion' ? '🅴 EXH' : null),
+      ...dimStats('arc', x => cfOf(x).arcJoli === 'oui' ? 'Arc joli ✓' : cfOf(x).arcJoli === 'non' ? 'Arc moche ✗' : null),
+      ...dimStats('zone', x => cfOf(x).zone ? ({ jaune: '🟨 Zone jaune', orange: '🟧 Zone orange', interdite: '🟥 Zone interdite' })[cfOf(x).zone] : null),
+      ...dimStats('side', x => x.side === 'LONG' ? '▲ Achat' : '▼ Vente'),
+      ...dimStats('bougies', x => { const b = cfOf(x).bougiesCount; return b == null ? null : (b >= 4 && b <= 11 ? 'Bougies 4–11 ✓' : 'Bougies hors range'); })
+    ];
+    const tagGroups = {};
+    ts.forEach(x => (cfOf(x).tags || []).forEach(tg => (tagGroups[tg] = tagGroups[tg] || []).push(x)));
+    Object.entries(tagGroups).forEach(([k, list]) => {
+      const r = list.reduce((s, x) => s + (+x.rRealised || 0), 0);
+      const w = list.filter(x => x.result === 'TP').length;
+      const dcd = list.filter(x => x.result === 'TP' || x.result === 'SL').length;
+      dims.push({ key: '🏷 ' + k, n: list.length, r, wr: dcd ? Math.round(w / dcd * 100) : null });
+    });
+    dims = dims.sort((a, b) => b.r - a.r);
+    const sig = dims.filter(g => g.n >= 2);
+    const bestDims = sig.filter(g => g.r > 0).slice(0, 2);
+    const worstDims = sig.filter(g => g.r < 0).sort((a, b) => a.r - b.r).slice(0, 2);
     const tiles = [
       ['Trades', String(t.n), 'var(--text-0)', 'var(--accent)'],
       ['Gagnants (TP)', String(t.wins), 'var(--green)', 'var(--green)'],
@@ -15795,6 +15831,33 @@
         ${tiles.map(([lb, val, col, acc]) => `<div class="card" style="position:relative; overflow:hidden; text-align:center; padding:15px 6px;"><div style="position:absolute; top:0; left:0; right:0; height:2px; background:linear-gradient(90deg, ${acc}, transparent);"></div><div class="mono" style="font-size:23px; font-weight:800; color:${col};">${val}</div><div class="bt-q-lbl" style="margin:5px 0 0;">${lb}</div></div>`).join('')}
       </div>
       <div style="text-align:center; font-size:11.5px; color:var(--text-3); margin-bottom:16px;">Expectancy : <span class="mono" style="font-weight:800; color:${exp >= 0 ? 'var(--green)' : 'var(--red)'};">${exp >= 0 ? '+' : ''}${exp.toFixed(2)}R / trade</span></div>
+
+      ${(bestDims.length || worstDims.length) ? `<div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px;">
+        ${bestDims.map(g => `<div style="flex:1; min-width:220px; display:flex; align-items:center; gap:10px; padding:11px 14px; border-radius:12px; border:1px solid var(--green); background:var(--green-soft); font-size:12.5px;"><span style="font-size:17px;">✅</span><div><strong>${g.key}</strong> te rapporte : <span class="mono" style="font-weight:800; color:var(--green);">+${g.r.toFixed(1)}R</span> sur ${g.n} trades${g.wr != null ? ' · WR ' + g.wr + '%' : ''}</div></div>`).join('')}
+        ${worstDims.map(g => `<div style="flex:1; min-width:220px; display:flex; align-items:center; gap:10px; padding:11px 14px; border-radius:12px; border:1px solid var(--red); background:var(--red-soft); font-size:12.5px;"><span style="font-size:17px;">⚠️</span><div><strong>${g.key}</strong> te coûte : <span class="mono" style="font-weight:800; color:var(--red);">${g.r.toFixed(1)}R</span> sur ${g.n} trades${g.wr != null ? ' · WR ' + g.wr + '%' : ''}</div></div>`).join('')}
+      </div>` : ''}
+
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-header"><span class="card-title">📈 Évolution R de la session</span><span class="muted" style="font-size:11px;">point vert = TP · rouge = SL · ambre = BE</span></div>
+        <div class="card-body"><div style="height:210px;"><canvas id="bt-review-chart"></canvas></div></div>
+      </div>
+
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-header"><span class="card-title">🔬 Ce qui marche / ce qui pèche</span><span class="muted" style="font-size:11px;">R cumulé par caractéristique</span></div>
+        <div class="card-body" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(185px, 1fr)); gap:10px;">
+          ${dims.length ? dims.map(g => {
+            const col = g.r > 0 ? 'var(--green)' : g.r < 0 ? 'var(--red)' : 'var(--text-3)';
+            return `<div style="padding:11px 13px; border-radius:11px; background:var(--bg-2); border:1px solid var(--border); border-left:3px solid ${col};">
+              <div style="font-size:12px; font-weight:700; margin-bottom:4px;">${g.key}</div>
+              <div style="display:flex; align-items:baseline; gap:8px;">
+                <span class="mono" style="font-size:17px; font-weight:800; color:${col};">${g.r >= 0 ? '+' : ''}${g.r.toFixed(1)}R</span>
+                <span style="font-size:10.5px; color:var(--text-3);">${g.n} trade${g.n > 1 ? 's' : ''}${g.wr != null ? ' · WR ' + g.wr + '%' : ''}</span>
+              </div>
+            </div>`;
+          }).join('') : '<div class="empty-state" style="padding:16px;">Renseigne setup / arc / zone / mots-clés sur tes trades pour voir l’analyse ici.</div>'}
+        </div>
+      </div>
+
       <div class="card">
         <div class="card-header"><span class="card-title">Trades de la session</span><span class="muted" style="font-size:11px;">${t.n}</span></div>
         <div class="card-body" style="padding:0;">
@@ -15812,6 +15875,39 @@
           }).join('')}
         </div>
       </div>`;
+    // Courbe R cumulé de la session (points colorés par résultat)
+    setTimeout(() => {
+      try {
+        if (window.__btRevChart) { window.__btRevChart.destroy(); window.__btRevChart = null; }
+        const cv = document.getElementById('bt-review-chart');
+        if (!cv || typeof Chart === 'undefined') return;
+        const ordered = ts.slice().sort((a, b) => ((a.date || '') + (a.time || '')).localeCompare((b.date || '') + (b.time || '')));
+        let cum = 0;
+        const pts = ordered.map(x => { cum += (+x.rRealised || 0); return +cum.toFixed(2); });
+        const c = getThemeColors();
+        window.__btRevChart = new Chart(cv, {
+          type: 'line',
+          data: {
+            labels: ordered.map((x, i) => '#' + (i + 1)),
+            datasets: [{
+              data: pts, borderColor: c.accent, borderWidth: 2.5,
+              backgroundColor: 'rgba(168, 85, 247, 0.10)', fill: true, tension: 0.3,
+              pointRadius: 4.5, pointHoverRadius: 6,
+              pointBackgroundColor: ordered.map(x => x.result === 'TP' ? c.green : x.result === 'SL' ? c.red : c.amber),
+              pointBorderColor: 'transparent'
+            }]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: { callbacks: { label: (it) => { const x = ordered[it.dataIndex]; const dFr = (x.date || '').split('-').reverse().join('/'); return `${dFr} ${x.time || ''} · ${x.result} · cumul ${it.parsed.y >= 0 ? '+' : ''}${it.parsed.y}R`; } } }
+            },
+            scales: { x: { grid: { display: false } }, y: { grid: { color: c.grid }, ticks: { callback: v => v + 'R' } } }
+          }
+        });
+      } catch (e) { console.warn('[bt review chart]', e); }
+    }, 40);
   }
   function renderBtSessionPanel() {
     const panel = document.getElementById('bt-session-panel');
@@ -15917,6 +16013,12 @@
       localStorage.setItem('backtest_scenarios', JSON.stringify(SCENARIOS));
       localStorage.setItem('backtest_trades', JSON.stringify(BACKTEST_TRADES));
       localStorage.setItem('backtest_current_scenario', CURRENT_SCENARIO_ID);
+      // r77 — filet anti-perte : un instantané par jour (on garde le plus fourni du jour, 7 jours max)
+      const bk = 'bt_backup_' + new Date().toISOString().slice(0, 10);
+      let prev = null;
+      try { prev = JSON.parse(localStorage.getItem(bk) || 'null'); } catch (e2) {}
+      if (!prev || (Array.isArray(prev) && prev.length <= BACKTEST_TRADES.length)) localStorage.setItem(bk, JSON.stringify(BACKTEST_TRADES));
+      Object.keys(localStorage).filter(k => k.startsWith('bt_backup_')).sort().slice(0, -7).forEach(k => localStorage.removeItem(k));
     } catch (e) {}
     // FIX r75 : les changements backtest déclenchent la synchro cloud (avant, seuls les trades live la déclenchaient)
     if (typeof markLocalChange === 'function') markLocalChange();
