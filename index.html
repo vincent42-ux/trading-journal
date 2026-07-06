@@ -5620,7 +5620,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono" id="app-version-full">2026-07-06 · r78</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono" id="app-version-full">2026-07-06 · r79</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -14903,6 +14903,10 @@
       } else if (localTs > remoteTs) {
         syncPush(); // le local est plus récent → on pousse
       } else {
+        // r79 : un pull réussi = la synchro est VIVANTE, même si rien n'a changé.
+        // Sans ça, lastSync restait à 0 sur un appareil « déjà à jour » → fausse bannière « en panne depuis 20641 j » (calcul depuis 1970).
+        SYNC.lastSync = Date.now();
+        saveSyncConfig();
         setSyncStatus('☁️ Synchronisé · à jour', 'ok');
       }
     } catch (e) {
@@ -14963,13 +14967,19 @@
   // 2. Re-synchro immédiate quand on revient sur l'onglet (Safari/iPhone endorment les onglets)
   document.addEventListener('visibilitychange', () => { if (!document.hidden && syncEnabled()) syncPull(true); });
   // 3. SENTINELLE : si la synchro est activée mais n'a pas RÉUSSI depuis > 30 min → bannière rouge impossible à rater
+  const SYNC_BOOT = Date.now(); // r79 : point de départ de session pour la sentinelle
   function checkSyncHealth() {
     if (!syncEnabled()) return;
-    const silent = Date.now() - (SYNC.lastSync || 0);
+    // r79 : jamais d'alarme calculée depuis 1970 — l'alarme ne part que si AUCUN succès depuis 30 min
+    // À LA FOIS depuis le dernier succès enregistré ET depuis l'ouverture de l'app (laisse le temps au premier pull).
+    const sinceSuccess = Date.now() - (SYNC.lastSync || 0);
+    const sinceBoot = Date.now() - SYNC_BOOT;
+    const silent = Math.min(sinceSuccess, sinceBoot);
     let banner = document.getElementById('sync-dead-banner');
     if (silent > 30 * 60 * 1000) {
-      const mins = Math.round(silent / 60000);
-      const ago = mins > 5940 ? Math.round(mins / 1440) + ' j' : mins > 120 ? Math.round(mins / 60) + ' h' : mins + ' min';
+      const mins = Math.round(sinceSuccess / 60000);
+      // Sans succès enregistré sur cet appareil, on ne prétend pas connaître la date de la dernière réussite
+      const ago = !SYNC.lastSync ? 'un moment (jamais réussi sur cet appareil)' : mins > 5940 ? Math.round(mins / 1440) + ' j' : mins > 120 ? Math.round(mins / 60) + ' h' : mins + ' min';
       const msg = '⚠️ SYNCHRO CLOUD EN PANNE — dernière réussite il y a ' + ago + '. Tes trades ne sont plus sauvegardés dans le cloud. Clique ici : Paramètres → Données → recolle un token GitHub (scope gist).';
       if (!banner) {
         banner = document.createElement('div');
