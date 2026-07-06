@@ -4631,20 +4631,17 @@
 
       <!-- ============ BACKTEST ============ -->
       <section class="view" id="view-backtest">
+        <!-- Barre scénario compacte (r73) -->
         <div class="card" style="margin-bottom: 16px;">
-          <div class="card-body">
-            <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
-              <label class="muted" style="font-size:11px;">Scénario actif</label>
-              <select id="backtest-scenario-select" onchange="selectScenario(this.value)" style="flex:1; min-width:220px; background:var(--bg-2); border:1px solid var(--border); color:var(--text-0); padding:9px 12px; border-radius:10px; font-size:13px; font-weight:500;"></select>
-              <button class="btn" onclick="openScenarioModal()">+ Nouveau scénario</button>
-              <button class="btn" onclick="editCurrentScenario()">⚙ Modifier</button>
-              <button class="btn" onclick="openCompareModal()">⇆ Comparer</button>
-              <button class="btn" onclick="loadBacktestDemoTrades()">🎲 15 trades démo</button>
-              <button class="btn btn-primary" onclick="openBacktestTradeModal()">+ Trade backtest</button>
-            </div>
-            <div id="backtest-scenario-meta" style="margin-top:14px; font-size:12px; color:var(--text-2);"></div>
-            <div style="margin-top:8px; padding:8px 12px; background:var(--accent-soft); border-radius:8px; font-size:11px; color:var(--accent);">
-              ⚗ Module backtest <strong>isolé</strong> du journal live — données et stats séparées
+          <div class="card-body" style="padding:10px 14px;">
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+              <span style="font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.07em; color:var(--accent); background:var(--accent-soft); padding:4px 9px; border-radius:99px;">⚗ Scénario</span>
+              <select id="backtest-scenario-select" onchange="selectScenario(this.value)" style="flex:1; min-width:170px; max-width:320px; background:var(--bg-2); border:1px solid var(--border); color:var(--text-0); padding:7px 10px; border-radius:9px; font-size:12px; font-weight:600;"></select>
+              <span id="backtest-scenario-meta" style="font-size:11px; color:var(--text-3); flex:1; min-width:120px;"></span>
+              <button class="btn" onclick="openScenarioModal()" title="Nouveau scénario" style="padding:6px 10px; font-size:11px;">＋</button>
+              <button class="btn" onclick="editCurrentScenario()" title="Modifier le scénario" style="padding:6px 10px; font-size:11px;">⚙</button>
+              <button class="btn" onclick="openCompareModal()" title="Comparer les scénarios" style="padding:6px 10px; font-size:11px;">⇆</button>
+              <button class="btn btn-primary" onclick="openBacktestTradeModal()" style="padding:7px 14px; font-size:12px;">+ Trade backtest</button>
             </div>
           </div>
         </div>
@@ -5587,7 +5584,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono" id="app-version-full">2026-07-03 · r74</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono" id="app-version-full">2026-07-06 · r75</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -5799,7 +5796,7 @@
 </div>
 
 <!-- ============ BACKTEST TRADE MODAL ============ -->
-<div class="modal-backdrop" id="bt-trade-modal-backdrop" onclick="if(event.target===this) closeBtmModal()">
+<div class="modal-backdrop" id="bt-trade-modal-backdrop" style="z-index:20000;" onclick="if(event.target===this) closeBtmModal()">
   <div class="modal modal-lg">
     <div class="modal-header">
       <span class="modal-title" id="bt-trade-modal-title">Nouveau trade backtest</span>
@@ -14718,11 +14715,27 @@
         try { localStorage.setItem('notifications', JSON.stringify(NOTIFS)); } catch (e2) {}
       }
       if (Array.isArray(data.backtestScenarios)) {
-        SCENARIOS = data.backtestScenarios;
+        // FIX r75 : fusion par id (comme les trades live) — un cloud en retard n'efface plus les scénarios locaux
+        if (mergeTrades && Array.isArray(SCENARIOS) && SCENARIOS.length) {
+          const incSc = new Map(data.backtestScenarios.filter(s => s && s.id).map(s => [s.id, s]));
+          const localOnlySc = SCENARIOS.filter(s => s && s.id && !incSc.has(s.id));
+          SCENARIOS = data.backtestScenarios.concat(localOnlySc);
+          window.__lastMergeLocalOnly = (window.__lastMergeLocalOnly || 0) + localOnlySc.length;
+        } else {
+          SCENARIOS = data.backtestScenarios;
+        }
         try { localStorage.setItem('backtest_scenarios', JSON.stringify(SCENARIOS)); } catch (e2) {}
       }
       if (Array.isArray(data.backtestTrades)) {
-        BACKTEST_TRADES = data.backtestTrades;
+        // FIX r75 : fusion par id — les trades backtest locaux (replays) ne sont plus écrasés par un cloud en retard
+        if (mergeTrades && Array.isArray(BACKTEST_TRADES) && BACKTEST_TRADES.length) {
+          const incBt = new Map(data.backtestTrades.filter(t => t && t.id).map(t => [t.id, t]));
+          const localOnlyBt = BACKTEST_TRADES.filter(t => t && t.id && !incBt.has(t.id));
+          BACKTEST_TRADES = data.backtestTrades.concat(localOnlyBt);
+          window.__lastMergeLocalOnly = (window.__lastMergeLocalOnly || 0) + localOnlyBt.length;
+        } else {
+          BACKTEST_TRADES = data.backtestTrades;
+        }
         try { localStorage.setItem('backtest_trades', JSON.stringify(BACKTEST_TRADES)); } catch (e2) {}
       }
       if (data.capital && typeof data.capital === 'object') {
@@ -15345,6 +15358,31 @@
   let BT_SESSION = null;
   try { BT_SESSION = JSON.parse(localStorage.getItem('bt_session') || 'null'); } catch (e) { BT_SESSION = null; }
   let BTQ_SIDE = 'LONG', BTQ_RESULT = 'TP', BTQ_SETUP = '', BTQ_LASTTIME = '13:00', BTQ_ARC = '', BTQ_ZONE = '', BTQ_LASTDATE = '', BTQ_LASTR = '', BTQ_BOUGIES = '';
+  // r73 — mots-clés cliquables, noms de sessions, revue de sessions passées
+  let BTQ_TAGS = [];
+  let BT_TAG_PRESETS = [];
+  try { BT_TAG_PRESETS = JSON.parse(localStorage.getItem('bt_tag_presets') || 'null') || []; } catch (e) { BT_TAG_PRESETS = []; }
+  if (!BT_TAG_PRESETS.length) BT_TAG_PRESETS = ['2e mèche', 'bulle', 'news', 'rapide', 'lent', 'contre-tendance', 're-test', 'hésitation'];
+  let BT_SESS_META = {};
+  try { BT_SESS_META = JSON.parse(localStorage.getItem('bt_sess_meta') || '{}'); } catch (e) { BT_SESS_META = {}; }
+  function saveBtSessMeta() { try { localStorage.setItem('bt_sess_meta', JSON.stringify(BT_SESS_META)); } catch (e) {} }
+  let BT_REVIEW_ID = null;
+  function btSessName(sid, fallback) { return (BT_SESS_META[sid] && BT_SESS_META[sid].name) || fallback || ''; }
+  function btRenameSession(sid) {
+    const cur = btSessName(sid, '');
+    const v = prompt('Nom de la session :', cur);
+    if (v === null) return;
+    BT_SESS_META[sid] = { ...(BT_SESS_META[sid] || {}), name: v.trim() };
+    saveBtSessMeta();
+    renderBtSessionsList();
+    btRefreshOverlay();
+  }
+  function btRefreshOverlay() {
+    const o = document.getElementById('bt-session-overlay');
+    if (!o || o.style.display !== 'block') return;
+    if (BT_REVIEW_ID) openBtSessionReview(BT_REVIEW_ID);
+    else if (BT_SESSION) renderBtSessionCockpit();
+  }
   // Capture les champs libres (date/heure/R/bougies) avant un redessin du formulaire, pour ne pas perdre la saisie
   function btCaptureInputs() {
     const tEl = document.getElementById('btq-time'); if (tEl && tEl.value) BTQ_LASTTIME = tEl.value;
@@ -15356,8 +15394,12 @@
   function startBtSession() {
     const scId = CURRENT_SCENARIO_ID || (SCENARIOS[0] && SCENARIOS[0].id);
     if (!scId) { uiAlert('Crée d\'abord un scénario.'); return; }
-    BT_SESSION = { id: 'bts-' + Date.now().toString(36), scenarioId: scId, startedAt: new Date().toISOString(), checks: (PLAN.checklist || []).map(() => false) };
-    BTQ_SIDE = 'LONG'; BTQ_RESULT = 'TP'; BTQ_SETUP = ''; BTQ_ARC = ''; BTQ_ZONE = ''; BTQ_LASTR = ''; BTQ_BOUGIES = '';
+    BT_SESSION = { id: 'bts-' + Date.now().toString(36), scenarioId: scId, startedAt: new Date().toISOString() };
+    BTQ_SIDE = 'LONG'; BTQ_RESULT = 'TP'; BTQ_SETUP = ''; BTQ_ARC = ''; BTQ_ZONE = ''; BTQ_LASTR = ''; BTQ_BOUGIES = ''; BTQ_TAGS = [];
+    // Nom de session (optionnel — vide = date auto)
+    const nm = (prompt('Nom de la session (ex : « EXH — semaine du 12 juin ») — laisse vide pour la date auto :', '') || '').trim();
+    if (nm) { BT_SESS_META[BT_SESSION.id] = { name: nm }; saveBtSessMeta(); }
+    BT_REVIEW_ID = null;
     saveBtSession(); openBtSessionOverlay(); renderBacktest();
   }
   // Fin de session : confirmation → bilan (comme la session live) → fermeture
@@ -15436,8 +15478,8 @@
         <button class="btn btn-primary" style="padding:14px 30px; font-size:15px;" onclick="btFinishSession()">✓ Fermer la session</button>
       </div>`;
   }
-  function openBtSessionOverlay() { const o = document.getElementById('bt-session-overlay'); if (o) o.style.display = 'block'; document.body.style.overflow = 'hidden'; renderBtSessionCockpit(); }
-  function closeBtSessionOverlay() { const o = document.getElementById('bt-session-overlay'); if (o) o.style.display = 'none'; document.body.style.overflow = ''; }
+  function openBtSessionOverlay() { BT_REVIEW_ID = null; const o = document.getElementById('bt-session-overlay'); if (o) o.style.display = 'block'; document.body.style.overflow = 'hidden'; renderBtSessionCockpit(); }
+  function closeBtSessionOverlay() { BT_REVIEW_ID = null; const o = document.getElementById('bt-session-overlay'); if (o) o.style.display = 'none'; document.body.style.overflow = ''; }
   function btqDateChanged() { btCaptureInputs(); renderBtSessionCockpit(); } // nouvelle date = compteur SL du jour remis à zéro
   function btqSetSide(s) { btCaptureInputs(); BTQ_SIDE = s; renderBtSessionCockpit(); }
   function btqSetRes(r) { btCaptureInputs(); BTQ_RESULT = r; renderBtSessionCockpit(); }
@@ -15446,12 +15488,6 @@
   function btqSetZone(v) { btCaptureInputs(); BTQ_ZONE = v; renderBtSessionCockpit(); }
   function btQuickAdd() {
     if (!BT_SESSION) return;
-    // Garde-fou : checklist du plan à valider AVANT d'entrer (comme en live)
-    const ckAll = PLAN.checklist || [];
-    if (ckAll.length && (BT_SESSION.checks || []).filter(Boolean).length < ckAll.length) {
-      if (typeof showToast === 'function') showToast("⛔ Coche ta checklist avant d'entrer — comme en live", 'error');
-      return;
-    }
     const sc = SCENARIOS.find(s => s.id === BT_SESSION.scenarioId) || { rrTarget: 2 };
     const timeEl = document.getElementById('btq-time');
     const time = (timeEl && timeEl.value) ? timeEl.value : '13:00';
@@ -15469,6 +15505,7 @@
     if (bougiesCount != null) { confirms.bougiesCount = bougiesCount; confirms.bougies = (bougiesCount >= 4 && bougiesCount <= 11); }
     if (BTQ_ARC) confirms.arcJoli = BTQ_ARC;
     if (BTQ_ZONE) confirms.zone = BTQ_ZONE;
+    if (BTQ_TAGS.length) confirms.tags = BTQ_TAGS.slice();
     const now = new Date();
     BACKTEST_TRADES.push({
       id: 'bt-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
@@ -15477,7 +15514,7 @@
       rRealised: r, confirms, createdAt: now.toISOString()
     });
     saveBacktestData();
-    BTQ_RESULT = 'TP'; BTQ_ARC = ''; BTQ_ZONE = ''; BTQ_LASTR = ''; BTQ_BOUGIES = '';
+    BTQ_RESULT = 'TP'; BTQ_ARC = ''; BTQ_ZONE = ''; BTQ_LASTR = ''; BTQ_BOUGIES = ''; BTQ_TAGS = [];
     renderBtSessionCockpit();
     renderBtSessionsList();
     if (typeof showToast === 'function') showToast('✓ Trade ajouté à la session', 'success');
@@ -15773,6 +15810,8 @@
       localStorage.setItem('backtest_trades', JSON.stringify(BACKTEST_TRADES));
       localStorage.setItem('backtest_current_scenario', CURRENT_SCENARIO_ID);
     } catch (e) {}
+    // FIX r75 : les changements backtest déclenchent la synchro cloud (avant, seuls les trades live la déclenchaient)
+    if (typeof markLocalChange === 'function') markLocalChange();
   }
 
   // ----- Scenario CRUD -----
