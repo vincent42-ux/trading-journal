@@ -3564,6 +3564,42 @@
   [data-theme="light"] .sess-check-item.checked { background: rgba(5, 150, 105, 0.07); }
   [data-theme="light"] .bt-q-lbl { color: var(--text-2); }
 
+  /* ===== r73 — MODE CLAIR : finitions (KPIs, filtres, toggles, listes, backtest) ===== */
+  [data-theme="light"] .kpi {
+    background: #ffffff;
+    border: 1px solid rgba(23, 16, 45, 0.055);
+    box-shadow: 0 1px 2px rgba(23, 16, 45, 0.04), 0 8px 26px rgba(23, 16, 45, 0.05);
+  }
+  [data-theme="light"] .journal-filters-bar,
+  [data-theme="light"] .journal-summary {
+    background: #ffffff;
+    border: 1px solid rgba(23, 16, 45, 0.055);
+    box-shadow: 0 1px 2px rgba(23, 16, 45, 0.04);
+  }
+  [data-theme="light"] .segmented,
+  [data-theme="light"] .mode-toggle {
+    background: #efeaf9;
+    border: 1px solid rgba(23, 16, 45, 0.07);
+  }
+  [data-theme="light"] .mode-btn.active {
+    background: #ffffff;
+    color: var(--accent);
+    box-shadow: 0 1px 4px rgba(23, 16, 45, 0.10);
+  }
+  [data-theme="light"] .js-stat { background: #ffffff; border-color: rgba(23, 16, 45, 0.06); }
+  [data-theme="light"] .account-tab { background: #ffffff; }
+  [data-theme="light"] .badge-card { background: #ffffff; border-color: rgba(23, 16, 45, 0.07); }
+  [data-theme="light"] .bt-trade-card {
+    background: #ffffff;
+    border-color: rgba(23, 16, 45, 0.07);
+    box-shadow: 0 1px 2px rgba(23, 16, 45, 0.04);
+  }
+  [data-theme="light"] .sess-check-box { background: #ffffff; }
+  [data-theme="light"] .day-popup-trade { border-color: rgba(23, 16, 45, 0.07); }
+  [data-theme="light"] .streak-row { background: #ffffff; }
+  [data-theme="light"] #bt-session-overlay { background: var(--bg-0); }
+  [data-theme="light"] .topbar-stats .btn { background: #ffffff; }
+
   /* ========== CARTES COMPTES v2 (inspiré Analyse Avancée) ========== */
   .acc-role-badge {
     font-size: 9px; font-weight: 700; letter-spacing: 0.08em;
@@ -5584,7 +5620,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono" id="app-version-full">2026-07-06 · r75</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono" id="app-version-full">2026-07-06 · r76</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -15480,6 +15516,29 @@
   }
   function openBtSessionOverlay() { BT_REVIEW_ID = null; const o = document.getElementById('bt-session-overlay'); if (o) o.style.display = 'block'; document.body.style.overflow = 'hidden'; renderBtSessionCockpit(); }
   function closeBtSessionOverlay() { BT_REVIEW_ID = null; const o = document.getElementById('bt-session-overlay'); if (o) o.style.display = 'none'; document.body.style.overflow = ''; }
+  // r73 — mots-clés cliquables du formulaire
+  function btTagChip(tg) {
+    const on = BTQ_TAGS.includes(tg);
+    const esc = tg.replace(/'/g, "\\'");
+    return `<button onclick="btToggleTag('${esc}')" style="padding:8px 13px; border-radius:99px; border:1.5px solid ${on ? 'var(--accent)' : 'var(--border)'}; background:${on ? 'var(--accent-soft)' : 'var(--bg-2)'}; color:${on ? 'var(--accent)' : 'var(--text-2)'}; font-size:12px; font-weight:700; cursor:pointer; transition:all .12s;">${on ? '✓ ' : ''}${tg}</button>`;
+  }
+  function btToggleTag(tg) {
+    btCaptureInputs();
+    const i = BTQ_TAGS.indexOf(tg);
+    if (i >= 0) BTQ_TAGS.splice(i, 1); else BTQ_TAGS.push(tg);
+    renderBtSessionCockpit();
+  }
+  function btAddTagPreset() {
+    btCaptureInputs();
+    const v = (prompt('Nouveau mot-clé :', '') || '').trim();
+    if (!v) return;
+    if (!BT_TAG_PRESETS.includes(v)) {
+      BT_TAG_PRESETS.push(v);
+      try { localStorage.setItem('bt_tag_presets', JSON.stringify(BT_TAG_PRESETS)); } catch (e) {}
+    }
+    if (!BTQ_TAGS.includes(v)) BTQ_TAGS.push(v);
+    renderBtSessionCockpit();
+  }
   function btqDateChanged() { btCaptureInputs(); renderBtSessionCockpit(); } // nouvelle date = compteur SL du jour remis à zéro
   function btqSetSide(s) { btCaptureInputs(); BTQ_SIDE = s; renderBtSessionCockpit(); }
   function btqSetRes(r) { btCaptureInputs(); BTQ_RESULT = r; renderBtSessionCockpit(); }
@@ -15535,7 +15594,7 @@
       if (!ok) return;
       BACKTEST_TRADES = BACKTEST_TRADES.filter(x => x.id !== id);
       saveBacktestData();
-      renderBtSessionCockpit();
+      btRefreshOverlay();
       renderBtSessionsList();
       if (typeof renderBtSessionPanel === 'function') renderBtSessionPanel();
       if (typeof showToast === 'function') showToast('🗑 Trade supprimé', 'success');
@@ -15553,11 +15612,6 @@
     const sc = SCENARIOS.find(s => s.id === BT_SESSION.scenarioId) || { name: '?', rrTarget: 2 };
     const t = btSessionTally(BT_SESSION.id);
     const ts = BACKTEST_TRADES.filter(x => x.sessionId === BT_SESSION.id).slice().reverse();
-    // Checklist (comme en live) + garde-fous
-    const ck = PLAN.checklist || [];
-    const checks = BT_SESSION.checks || [];
-    const ckDone = checks.filter(Boolean).length;
-    const ready = ck.length === 0 || ckDone === ck.length;
     const startedStr = BT_SESSION.startedAt ? new Date(BT_SESSION.startedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '—';
     // SL comptés PAR JOURNÉE (la date du formulaire) — nouvelle date = compteur remis à zéro, comme en live
     const selDate = BTQ_LASTDATE || new Date().toISOString().slice(0, 10);
@@ -15577,10 +15631,10 @@
           <div style="display:flex; align-items:center; gap:12px; min-width:0;">
             <div style="width:44px; height:44px; flex:0 0 auto; display:flex; align-items:center; justify-content:center; font-size:22px; border-radius:13px; background:color-mix(in srgb, var(--accent) 14%, transparent); border:1px solid color-mix(in srgb, var(--accent) 30%, transparent);">🎬</div>
             <div style="min-width:0;">
-              <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-3);">Session backtest · démarrée ${startedStr}</div>
-              <div style="font-size:16px; font-weight:800; line-height:1.15; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${sc.name}</div>
+              <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-3);">Session backtest · démarrée ${startedStr} · ${sc.name}</div>
+              <div style="font-size:16px; font-weight:800; line-height:1.15; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${btSessName(BT_SESSION.id, '') || 'Session du ' + startedStr}</div>
             </div>
-            <div class="sess-go ${ready ? 'go' : 'nogo'}" style="flex:0 0 auto;">${ready ? '✅ GO' : '⛔ PAS PRÊT — ' + (ck.length - ckDone) + ' à cocher'}</div>
+            <button onclick="btRenameSession('${BT_SESSION.id}')" title="Renommer la session" style="flex:0 0 auto; background:none; border:none; font-size:14px; cursor:pointer; padding:4px 7px; border-radius:7px; color:var(--text-3);">✏️</button>
           </div>
           <div style="display:flex; gap:8px; flex:0 0 auto;">
             <button class="btn" onclick="closeBtSessionOverlay()">↙ Réduire</button>
@@ -15595,45 +15649,7 @@
 
       ${slCount >= 2 ? `<div style="display:flex; align-items:center; gap:12px; padding:13px 16px; margin-bottom:18px; border-radius:12px; border:1px solid var(--red); background:rgba(255,77,107,0.10); font-size:13px; line-height:1.45;"><span style="font-size:20px; flex:0 0 auto;">🛑</span><div><strong>${slCount} SL sur la journée du ${selDate.split('-').reverse().join('/')}</strong> — en live, cette journée serait TERMINÉE (stop net après 2 SL). Passe à la date suivante pour continuer ton backtest : le compteur repart à zéro.</div></div>` : ''}
 
-      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(360px, 1fr)); gap:16px; align-items:start; margin-bottom:18px;">
-      <div class="card" style="border-color:color-mix(in srgb, var(--accent) 45%, var(--border));">
-        <div class="card-header" style="background:linear-gradient(90deg, color-mix(in srgb, var(--accent) 12%, transparent), transparent);">
-          <span class="card-title">📐 Règles du replay — lecture corrigée</span>
-          <span class="mono" style="font-size:10px; font-weight:700; color:var(--accent-bright, #d946ef);">CALIBRAGE</span>
-        </div>
-        <div class="card-body" style="padding:10px 16px 14px;">
-          ${[
-            ['1', "<strong>High/low de référence D'ABORD</strong> — c'est lui qui définit la divergence (la vidéo fait foi)."],
-            ['2', "<strong>ABS</strong> = le CVD fait le nouvel extrême, le prix refuse · <strong>EXH</strong> = le prix fait le nouvel extrême, le CVD refuse — <strong style='color:var(--accent-bright, #d946ef);'>EXH prioritaire</strong>."],
-            ['3', "Bougies <strong>4–11</strong> · <strong>arc joli</strong> · SL 1 tick derrière le début de la divergence · <strong>TP 2RR</strong> · BE : EXH 1R / ABS 1,5R."],
-            ['4', "<strong>Fenêtre 13h–15h uniquement</strong> — rien en dehors."],
-            ['5', "Décision notée <strong>AVANT</strong> de regarder le bilan STCK — sinon le test est mort."],
-            ['6', "<strong>Stop après 2 SL / jour</strong>, comme en live — puis date suivante."],
-            ['7', "Chaque jour : <strong>Q1</strong> « mon trade d'origine, je le reprends ? » puis <strong>Q2</strong> « qu'est-ce que je prends à la place ? »."],
-            ['8', "<strong>45–60 min max</strong> par séance — yeux frais ou rien."]
-          ].map(([n, txt]) => `<div style="display:flex; gap:10px; align-items:flex-start; padding:7px 0; border-bottom:1px solid color-mix(in srgb, var(--border) 55%, transparent); font-size:12.5px; line-height:1.45;">
-            <span class="mono" style="flex:0 0 auto; width:20px; height:20px; display:flex; align-items:center; justify-content:center; border-radius:6px; font-size:10.5px; font-weight:800; background:color-mix(in srgb, var(--accent) 16%, transparent); color:var(--accent-bright, #d946ef);">${n}</span>
-            <span style="color:var(--text-1);">${txt}</span>
-          </div>`).join('')}
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">✅ Checklist avant d'entrer</span>
-          <span class="mono" style="font-weight:700;">${ckDone}/${ck.length}</span>
-        </div>
-        <div class="card-body">
-          <div class="acc-bar-track" style="margin-bottom:14px;"><div class="acc-bar-fill green" style="width:${ck.length ? Math.round(ckDone / ck.length * 100) : 0}%;"></div></div>
-          ${ck.length ? ck.map((item, i) => `
-          <div class="sess-check-item ${checks[i] ? 'checked' : ''}" onclick="btToggleCheck(${i})">
-            <div class="sess-check-box">${checks[i] ? '✓' : ''}</div>
-            <div>${escPlanText(item)}</div>
-          </div>`).join('') : '<div class="empty-state" style="padding:16px;">Ta checklist est vide — remplis-la dans le Plan de trading, elle apparaîtra ici comme en live.</div>'}
-        </div>
-      </div>
-
-      <div class="card">
+      <div class="card" style="margin-bottom:18px;">
         <div class="card-header"><span class="card-title">⚡ Nouveau trade</span><span class="muted" style="font-size:11px;" id="btq-disc-count">Discipline : ${discNow}/3</span></div>
         <div class="card-body">
           <div class="bt-q-lbl">Sens</div>
@@ -15652,11 +15668,14 @@
             <div style="flex:1; min-width:150px;"><div class="bt-q-lbl">Arc joli</div><div style="display:flex; gap:8px;">${btBigBtn(BTQ_ARC === 'oui', '✓ Oui', "btqSetArc('oui')", 'var(--green)')}${btBigBtn(BTQ_ARC === 'non', '✗ Non', "btqSetArc('non')", 'var(--red)')}</div></div>
           </div>
           <div class="bt-q-lbl">Zone</div>
-          <div style="display:flex; gap:8px; margin-bottom:18px; flex-wrap:wrap;">${btBigBtn(BTQ_ZONE === 'jaune', '🟨 Jaune', "btqSetZone('jaune')", 'var(--amber)')}${btBigBtn(BTQ_ZONE === 'orange', '🟧 Orange', "btqSetZone('orange')", '#f97316')}${btBigBtn(BTQ_ZONE === 'interdite', '🟥 Interdite', "btqSetZone('interdite')", 'var(--red)')}${btBigBtn(!BTQ_ZONE, '— Aucune', "btqSetZone('')")}</div>
-          <button class="btn btn-primary" style="width:100%; padding:15px; font-size:15px;${ready ? '' : ' opacity:0.45; filter:grayscale(0.4);'}" onclick="btQuickAdd()">${ready ? '➕ Ajouter le trade' : "⛔ Coche ta checklist avant d'entrer"}</button>
+          <div style="display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap;">${btBigBtn(BTQ_ZONE === 'jaune', '🟨 Jaune', "btqSetZone('jaune')", 'var(--amber)')}${btBigBtn(BTQ_ZONE === 'orange', '🟧 Orange', "btqSetZone('orange')", '#f97316')}${btBigBtn(BTQ_ZONE === 'interdite', '🟥 Interdite', "btqSetZone('interdite')", 'var(--red)')}${btBigBtn(!BTQ_ZONE, '— Aucune', "btqSetZone('')")}</div>
+          <div class="bt-q-lbl">Mots-clés — un petit truc en plus sur le trade (optionnel)</div>
+          <div style="display:flex; gap:7px; flex-wrap:wrap; margin-bottom:18px;">
+            ${BT_TAG_PRESETS.map(tg => btTagChip(tg)).join('')}
+            <button onclick="btAddTagPreset()" title="Ajouter un mot-clé personnalisé" style="padding:8px 13px; border-radius:99px; border:1.5px dashed var(--border-strong); background:transparent; color:var(--text-3); font-size:12px; font-weight:700; cursor:pointer;">＋ mot-clé</button>
+          </div>
+          <button class="btn btn-primary" style="width:100%; padding:15px; font-size:15px;" onclick="btQuickAdd()">➕ Ajouter le trade</button>
         </div>
-      </div>
-
       </div>
 
       <div class="card">
@@ -15676,10 +15695,12 @@
               const arc = cf.arcJoli === 'oui' ? '✓arc' : cf.arcJoli === 'non' ? '✗arc' : '';
               const zone = cf.zone === 'interdite' ? '🟥' : cf.zone === 'orange' ? '🟧' : cf.zone === 'jaune' ? '🟨' : '';
               const tags = [setup, bg, arc].filter(Boolean).map(s => ' · ' + s).join('') + (zone ? ' ' + zone : '');
+              const kw = (cf.tags || []).map(tg => `<span style="font-size:10px; padding:1px 7px; border-radius:99px; background:var(--accent-soft); color:var(--accent); font-weight:700; margin-left:5px; white-space:nowrap;">${tg}</span>`).join('');
               return `<div style="display:flex; align-items:center; gap:12px; padding:10px 16px; border-bottom:1px solid var(--border);">
                 <span style="width:9px; height:9px; border-radius:99px; background:${dot}; flex:0 0 auto;"></span>
-                <span style="flex:1; font-size:12.5px;"><span class="mono" style="color:var(--text-2);">${x.time || ''}</span> · <span style="color:${x.side === 'LONG' ? 'var(--green)' : 'var(--red)'};">${x.side === 'LONG' ? '▲ Achat' : '▼ Vente'}</span> · ${x.result}${tags}</span>
+                <span style="flex:1; font-size:12.5px;"><span class="mono" style="color:var(--text-2);">${x.time || ''}</span> · <span style="color:${x.side === 'LONG' ? 'var(--green)' : 'var(--red)'};">${x.side === 'LONG' ? '▲ Achat' : '▼ Vente'}</span> · ${x.result}${tags}${kw}</span>
                 <span class="mono" style="font-weight:800; color:${rc >= 0 ? 'var(--green)' : 'var(--red)'};">${rc >= 0 ? '+' : ''}${rc.toFixed(1)}R</span>
+                <button onclick="openBacktestTradeModal('${x.id}')" title="Modifier ce trade (heure, date, résultat…)" style="flex:0 0 auto; background:none; border:none; color:var(--text-3); font-size:13px; cursor:pointer; padding:4px 7px; border-radius:7px; transition:all .15s;" onmouseover="this.style.color='var(--accent)'; this.style.background='var(--accent-soft)';" onmouseout="this.style.color='var(--text-3)'; this.style.background='none';">✏️</button>
                 <button onclick="btqDeleteTrade('${x.id}')" title="Supprimer ce trade" style="flex:0 0 auto; background:none; border:none; color:var(--text-3); font-size:14px; cursor:pointer; padding:4px 7px; border-radius:7px; transition:all .15s;" onmouseover="this.style.color='var(--red)'; this.style.background='rgba(255,77,107,0.12)';" onmouseout="this.style.color='var(--text-3)'; this.style.background='none';">🗑</button>
               </div>`;
             };
@@ -15705,6 +15726,92 @@
     const wins = ts.filter(t => t.result === 'TP').length;
     const dec = ts.filter(t => t.result === 'TP' || t.result === 'SL').length;
     return { n: ts.length, r, wins, wr: dec ? wins / dec * 100 : 0 };
+  }
+  // r73 — REVUE D'UNE SESSION PASSÉE : clique sur une session → toutes ses données
+  function openBtSessionReview(sid) {
+    BT_REVIEW_ID = sid;
+    const o = document.getElementById('bt-session-overlay');
+    const body = document.getElementById('bt-session-overlay-body');
+    if (!o || !body) return;
+    o.style.display = 'block';
+    document.body.style.overflow = 'hidden';
+    const ts = BACKTEST_TRADES.filter(x => x.sessionId === sid);
+    if (!ts.length) { closeBtSessionOverlay(); renderBacktest(); return; }
+    const sc = SCENARIOS.find(s => s.id === ts[0].scenarioId) || { name: '?' };
+    const t = btSessionTally(sid);
+    const be = ts.filter(x => x.result === 'BE').length;
+    const sl = ts.filter(x => x.result === 'SL').length;
+    const d0 = new Date(ts[0].createdAt || Date.now());
+    const dateLbl = d0.toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' });
+    const nm = btSessName(sid, '') || 'Session du ' + dateLbl;
+    const exp = t.n ? (t.r / t.n) : 0;
+    const tiles = [
+      ['Trades', String(t.n), 'var(--text-0)', 'var(--accent)'],
+      ['Gagnants (TP)', String(t.wins), 'var(--green)', 'var(--green)'],
+      ['Perdants (SL)', String(sl), 'var(--red)', 'var(--red)'],
+      ['BE', String(be), 'var(--amber)', 'var(--amber)'],
+      ['Win rate', t.n ? t.wr.toFixed(0) + '%' : '—', 'var(--text-0)', 'var(--accent-bright, #d946ef)'],
+      ['R total', (t.r >= 0 ? '+' : '') + t.r.toFixed(1) + 'R', t.r >= 0 ? 'var(--green)' : 'var(--red)', t.r >= 0 ? 'var(--green)' : 'var(--red)']
+    ];
+    const rowHtml = x => {
+      const rc = (+x.rRealised || 0);
+      const dot = x.result === 'TP' ? 'var(--green)' : x.result === 'SL' ? 'var(--red)' : 'var(--amber)';
+      const cf = x.confirms || {};
+      const setup = cf.setup ? (cf.setup === 'absorption' ? 'ABS' : cf.setup === 'exhaustion' ? 'EXH' : '') : '';
+      const bg = (cf.bougiesCount != null) ? cf.bougiesCount + 'b' : '';
+      const arc = cf.arcJoli === 'oui' ? '✓arc' : cf.arcJoli === 'non' ? '✗arc' : '';
+      const zone = cf.zone === 'interdite' ? '🟥' : cf.zone === 'orange' ? '🟧' : cf.zone === 'jaune' ? '🟨' : '';
+      const tags = [setup, bg, arc].filter(Boolean).map(s => ' · ' + s).join('') + (zone ? ' ' + zone : '');
+      const kw = (cf.tags || []).map(tg => `<span style="font-size:10px; padding:1px 7px; border-radius:99px; background:var(--accent-soft); color:var(--accent); font-weight:700; margin-left:5px; white-space:nowrap;">${tg}</span>`).join('');
+      return `<div style="display:flex; align-items:center; gap:12px; padding:10px 16px; border-bottom:1px solid var(--border);">
+        <span style="width:9px; height:9px; border-radius:99px; background:${dot}; flex:0 0 auto;"></span>
+        <span style="flex:1; font-size:12.5px;"><span class="mono" style="color:var(--text-2);">${x.time || ''}</span> · <span style="color:${x.side === 'LONG' ? 'var(--green)' : 'var(--red)'};">${x.side === 'LONG' ? '▲ Achat' : '▼ Vente'}</span> · ${x.result}${tags}${kw}</span>
+        <span class="mono" style="font-weight:800; color:${rc >= 0 ? 'var(--green)' : 'var(--red)'};">${rc >= 0 ? '+' : ''}${rc.toFixed(1)}R</span>
+        <button onclick="openBacktestTradeModal('${x.id}')" title="Modifier ce trade" style="flex:0 0 auto; background:none; border:none; color:var(--text-3); font-size:13px; cursor:pointer; padding:4px 7px; border-radius:7px;" onmouseover="this.style.color='var(--accent)';" onmouseout="this.style.color='var(--text-3)';">✏️</button>
+        <button onclick="btqDeleteTrade('${x.id}')" title="Supprimer ce trade" style="flex:0 0 auto; background:none; border:none; color:var(--text-3); font-size:14px; cursor:pointer; padding:4px 7px; border-radius:7px;" onmouseover="this.style.color='var(--red)';" onmouseout="this.style.color='var(--text-3)';">🗑</button>
+      </div>`;
+    };
+    const byDay = {};
+    ts.slice().reverse().forEach(x => { const d = x.date || '—'; (byDay[d] = byDay[d] || []).push(x); });
+    const days = Object.keys(byDay).sort().reverse();
+    body.innerHTML = `
+      <div style="position:sticky; top:0; z-index:5; margin:-22px -16px 18px; background:var(--bg-1); border-bottom:1px solid var(--border);">
+        <div style="height:3px; background:linear-gradient(90deg, var(--accent), var(--accent-bright, #d946ef));"></div>
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:13px 18px;">
+          <div style="display:flex; align-items:center; gap:12px; min-width:0;">
+            <div style="width:44px; height:44px; flex:0 0 auto; display:flex; align-items:center; justify-content:center; font-size:22px; border-radius:13px; background:color-mix(in srgb, var(--accent) 14%, transparent); border:1px solid color-mix(in srgb, var(--accent) 30%, transparent);">📂</div>
+            <div style="min-width:0;">
+              <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-3);">Revue de session · ${dateLbl} · ${sc.name}</div>
+              <div style="font-size:16px; font-weight:800; line-height:1.15; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${nm}</div>
+            </div>
+            <button onclick="btRenameSession('${sid}')" title="Renommer la session" style="flex:0 0 auto; background:none; border:none; font-size:14px; cursor:pointer; padding:4px 7px; border-radius:7px; color:var(--text-3);">✏️</button>
+          </div>
+          <div style="display:flex; gap:8px; flex:0 0 auto;">
+            <button class="btn" onclick="closeBtSessionOverlay(); renderBacktest();">✕ Fermer</button>
+          </div>
+        </div>
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px; margin-bottom:12px;">
+        ${tiles.map(([lb, val, col, acc]) => `<div class="card" style="position:relative; overflow:hidden; text-align:center; padding:15px 6px;"><div style="position:absolute; top:0; left:0; right:0; height:2px; background:linear-gradient(90deg, ${acc}, transparent);"></div><div class="mono" style="font-size:23px; font-weight:800; color:${col};">${val}</div><div class="bt-q-lbl" style="margin:5px 0 0;">${lb}</div></div>`).join('')}
+      </div>
+      <div style="text-align:center; font-size:11.5px; color:var(--text-3); margin-bottom:16px;">Expectancy : <span class="mono" style="font-weight:800; color:${exp >= 0 ? 'var(--green)' : 'var(--red)'};">${exp >= 0 ? '+' : ''}${exp.toFixed(2)}R / trade</span></div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">Trades de la session</span><span class="muted" style="font-size:11px;">${t.n}</span></div>
+        <div class="card-body" style="padding:0;">
+          ${days.map(d => {
+            const list = byDay[d].slice().sort((a, b) => (b.time || '').localeCompare(a.time || ''));
+            const rDay = list.reduce((s, x) => s + (+x.rRealised || 0), 0);
+            const slDay = list.filter(x => x.result === 'SL').length;
+            const dFr = /^\d{4}-\d{2}-\d{2}$/.test(d) ? d.split('-').reverse().join('/') : d;
+            return `<div style="display:flex; align-items:center; gap:10px; padding:9px 16px; background:var(--bg-2); border-bottom:1px solid var(--border);">
+              <span style="font-size:11px; font-weight:800; letter-spacing:0.05em; text-transform:uppercase; color:var(--text-1);">📅 ${dFr}</span>
+              <span class="mono" style="font-size:11px; font-weight:800; color:${rDay >= 0 ? 'var(--green)' : 'var(--red)'};">${rDay >= 0 ? '+' : ''}${rDay.toFixed(1)}R</span>
+              <span style="font-size:10.5px; color:var(--text-3);">· ${list.length} trade${list.length > 1 ? 's' : ''}</span>
+              <span class="mono" style="margin-left:auto; font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:99px; ${slDay >= 2 ? 'background:rgba(255,77,107,0.14); color:var(--red);' : 'color:var(--text-3);'}">SL ${slDay}/2</span>
+            </div>` + list.map(rowHtml).join('');
+          }).join('')}
+        </div>
+      </div>`;
   }
   function renderBtSessionPanel() {
     const panel = document.getElementById('bt-session-panel');
@@ -15751,14 +15858,15 @@
       const d = new Date(ts[0].createdAt || Date.now());
       const dateLbl = d.toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: 'short' }) + ' ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
       const live = (BT_SESSION && BT_SESSION.id === id);
-      return `<div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 16px; border-bottom:1px solid var(--border); ${live ? 'background:color-mix(in srgb, var(--accent) 8%, transparent);' : ''}">
+      const nm = btSessName(id, '');
+      return `<div onclick="${live ? 'openBtSessionOverlay()' : `openBtSessionReview('${id}')`}" style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 16px; border-bottom:1px solid var(--border); cursor:pointer; transition:background .15s; ${live ? 'background:color-mix(in srgb, var(--accent) 8%, transparent);' : ''}" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='${live ? 'color-mix(in srgb, var(--accent) 8%, transparent)' : 'transparent'}'">
         <div>
-          <div style="font-size:13px; font-weight:700;">${dateLbl}${live ? ' <span style="color:var(--green); font-size:11px;">● en cours</span>' : ''}</div>
-          <div style="font-size:11px; color:var(--text-2); margin-top:2px;">${sc.name} · ${tally.n} trade${tally.n > 1 ? 's' : ''} · WR ${tally.n ? tally.wr.toFixed(0) + '%' : '—'}</div>
+          <div style="font-size:13px; font-weight:700;">${nm || dateLbl}${live ? ' <span style="color:var(--green); font-size:11px;">● en cours</span>' : ''}</div>
+          <div style="font-size:11px; color:var(--text-2); margin-top:2px;">${nm ? dateLbl + ' · ' : ''}${sc.name} · ${tally.n} trade${tally.n > 1 ? 's' : ''} · WR ${tally.n ? tally.wr.toFixed(0) + '%' : '—'} · <span style="color:var(--accent); font-weight:700;">ouvrir ↗</span></div>
         </div>
         <div style="display:flex; align-items:center; gap:10px;">
           <div class="mono" style="font-size:17px; font-weight:800; color:${tally.r >= 0 ? 'var(--green)' : 'var(--red)'};">${tally.r >= 0 ? '+' : ''}${tally.r.toFixed(1)}R</div>
-          ${live ? '' : `<button onclick="btDeleteSession('${id}')" title="Supprimer cette session et ses trades" style="background:none; border:none; color:var(--text-3); font-size:14px; cursor:pointer; padding:4px 7px; border-radius:7px; transition:all .15s;" onmouseover="this.style.color='var(--red)'; this.style.background='rgba(255,77,107,0.12)';" onmouseout="this.style.color='var(--text-3)'; this.style.background='none';">🗑</button>`}
+          ${live ? '' : `<button onclick="event.stopPropagation(); btDeleteSession('${id}')" title="Supprimer cette session et ses trades" style="background:none; border:none; color:var(--text-3); font-size:14px; cursor:pointer; padding:4px 7px; border-radius:7px; transition:all .15s;" onmouseover="this.style.color='var(--red)'; this.style.background='rgba(255,77,107,0.12)';" onmouseout="this.style.color='var(--text-3)'; this.style.background='none';">🗑</button>`}
         </div>
       </div>`;
     }).join('');
@@ -16051,6 +16159,7 @@
     saveBacktestData();
     closeBtmModal();
     renderBacktest();
+    if (typeof btRefreshOverlay === 'function') btRefreshOverlay();
   }
   function loadBacktestDemoTrades() {
     if (!SCENARIOS.length) return;
@@ -16105,6 +16214,7 @@
     saveBacktestData();
     closeBtmModal();
     renderBacktest();
+    if (typeof btRefreshOverlay === 'function') btRefreshOverlay();
   }
 
   // ----- Photo zoom -----
