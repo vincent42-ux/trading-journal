@@ -96,6 +96,10 @@
   }
 </script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" crossorigin="anonymous"></script>
+<!-- r81 — Firebase (base de données cloud temps réel) : si le CDN échoue, l'app fonctionne quand même en local -->
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js" crossorigin="anonymous"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js" crossorigin="anonymous"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js" crossorigin="anonymous"></script>
 <script>
   if (typeof Chart === 'undefined') {
     document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js" crossorigin="anonymous"><\/script>');
@@ -5543,9 +5547,33 @@
           <p style="font-size:11px; color:var(--text-2); margin-top:10px; line-height:1.5;">Le parser CSV auto-détecte les formats TradeSyncer, NinjaTrader et Tradovate.</p>
         </div>
 
-        <!-- Synchro cloud -->
+        <!-- r81 — Base de données cloud (Firebase Firestore) -->
         <div class="modal-section">
-          <div class="section-label">☁️ Synchro Mac ↔ iPhone (GitHub)</div>
+          <div class="section-label">🔥 Base de données cloud (Firebase) — synchro temps réel</div>
+          <div id="fs-setup">
+            <div class="muted" style="font-size:12px; line-height:1.55; margin-bottom:12px;">
+              Ta vraie base de données : chaque trade, backtest et réglage y vit dans son propre document.
+              Connecte-toi une seule fois par appareil (email + mot de passe Firebase) → synchro <strong>instantanée</strong> Mac ↔ iPhone, rien n'expire.
+            </div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <input type="email" id="fs-email" value="vincentmarionpro42@gmail.com" placeholder="Email" autocomplete="username" style="flex:1; min-width:180px; background:var(--bg-2); border:1px solid var(--border); border-radius:10px; padding:11px 14px; color:var(--text-0); font-size:12px;">
+              <input type="password" id="fs-password" placeholder="Mot de passe Firebase" autocomplete="current-password" style="flex:1; min-width:150px; background:var(--bg-2); border:1px solid var(--border); border-radius:10px; padding:11px 14px; color:var(--text-0); font-size:12px;">
+              <button class="btn btn-primary" onclick="fsLogin()">Se connecter</button>
+            </div>
+            <div id="fs-status-setup" class="sync-status" style="margin-top:8px;"></div>
+          </div>
+          <div id="fs-active" style="display:none;">
+            <div id="fs-status" class="sync-status ok">🔥 Base connectée</div>
+            <div style="display:flex; gap:8px; margin-top:10px;">
+              <button class="btn" onclick="fsPushAll('manuel')" style="flex:1;">⬆ Forcer l'envoi</button>
+              <button class="btn" onclick="fsLogout()" style="border-color:var(--red); color:var(--red);">Se déconnecter</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Synchro cloud (miroir GitHub, conservé en secours + lecture du coach) -->
+        <div class="modal-section">
+          <div class="section-label">☁️ Miroir GitHub (secours + coach)</div>
           <div id="sync-setup">
             <div class="muted" style="font-size:12px; line-height:1.55; margin-bottom:12px;">
               Tes données (trades, plan, objectifs…) sont stockées dans un <strong>coffre privé</strong> de ton compte GitHub.
@@ -5620,7 +5648,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono" id="app-version-full">2026-07-07 · r80</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono" id="app-version-full">2026-07-07 · r81</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -14839,7 +14867,9 @@
   function markLocalChange() {
     if (window.__syncApplying) return; // pas de re-push pendant qu'on applique une synchro reçue
     try { localStorage.setItem('last_local_change', String(Date.now())); } catch (e) {}
-    syncPushDebounced();
+    // r81 : si la base Firebase est connectée, c'est ELLE la source de vérité (le Gist n'est plus qu'un miroir différé)
+    if (typeof FS !== 'undefined' && FS.user) { fsPushDebounced(); }
+    else { syncPushDebounced(); }
   }
   let _syncPushTimer = null;
   function syncPushDebounced() {
@@ -14996,9 +15026,10 @@
   }
   // ===== r78 — BATTEMENT DE CŒUR : la synchro tourne CONSTAMMENT tant que l'app est ouverte =====
   // 1. Pull/push automatique toutes les 5 minutes (le plus récent gagne, fusion par id — rien ne se perd)
-  setInterval(() => { if (syncEnabled()) syncPull(true); }, 5 * 60 * 1000);
+  // r81 : le pull Gist est coupé quand Firebase est connecté (sinon un vieux coffre écraserait la base temps réel)
+  setInterval(() => { if (syncEnabled() && !(typeof FS !== 'undefined' && FS.user)) syncPull(true); }, 5 * 60 * 1000);
   // 2. Re-synchro immédiate quand on revient sur l'onglet (Safari/iPhone endorment les onglets)
-  document.addEventListener('visibilitychange', () => { if (!document.hidden && syncEnabled()) syncPull(true); });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && syncEnabled() && !(typeof FS !== 'undefined' && FS.user)) syncPull(true); });
   // 3. SENTINELLE : si la synchro est activée mais n'a pas RÉUSSI depuis > 30 min → bannière rouge impossible à rater
   const SYNC_BOOT = Date.now(); // r79 : point de départ de session pour la sentinelle
   function checkSyncHealth() {
@@ -15039,7 +15070,261 @@
     if (on && SYNC.lastSync) {
       setSyncStatus('☁️ Dernière synchro : ' + new Date(SYNC.lastSync).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }), 'ok');
     }
+    if (typeof renderFsUI === 'function') renderFsUI();
   }
+
+  // ========== r81 — BASE DE DONNÉES CLOUD (Firebase Firestore, temps réel) ==========
+  // Modèle : 1 document par trade (trades/{id}), par trade backtest (backtestTrades/{id}),
+  // par scénario (scenarios/{id}), par photo (photos/{tradeId}), et 1 doc par section méta (meta/{clé}).
+  // Écoute temps réel (onSnapshot) → chaque appareil voit les changements en ~1 s.
+  // Suppressions propres : supprimer un trade supprime son document → plus de résurrections.
+  // Le miroir GitHub (Gist) reste alimenté en arrière-plan (max 1×/10 min) pour le coach quotidien.
+  const FS_CONFIG = {
+    apiKey: 'AIzaSyDPUyFkD8KtTnxgZzyj96fi21FiaO0u11I',
+    authDomain: 'trading-journal-3521b.firebaseapp.com',
+    projectId: 'trading-journal-3521b',
+    storageBucket: 'trading-journal-3521b.firebasestorage.app',
+    messagingSenderId: '1045119251137',
+    appId: '1:1045119251137:web:b98a617b06b5a9fc929a40'
+  };
+  let FS = { app: null, db: null, user: null };
+  let FS_PHOTO_INDEX = {};           // { tradeId: 1 } — quelles photos existent dans le cloud
+  const FS_HASH = {};                // 'coll/id' -> JSON connu (anti-écho : on ne re-pousse pas ce qu'on vient de recevoir)
+  let FS_UNSUBS = [];
+  let _fsPushTimer = null, _fsGistMirrorTs = 0;
+
+  function fsAvailable() { return typeof firebase !== 'undefined' && firebase.firestore && firebase.auth; }
+  function setFsStatus(msg, cls) {
+    ['fs-status', 'fs-status-setup'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.innerHTML = msg; el.className = 'sync-status ' + (cls || ''); }
+    });
+  }
+  function renderFsUI() {
+    const setup = document.getElementById('fs-setup');
+    const active = document.getElementById('fs-active');
+    const on = !!FS.user;
+    if (setup) setup.style.display = on ? 'none' : 'block';
+    if (active) active.style.display = on ? 'block' : 'none';
+    if (on) setFsStatus('🔥 Base connectée · ' + (FS.user.email || ''), 'ok');
+  }
+  function fsInit() {
+    if (!fsAvailable()) { setFsStatus('⚠️ Librairie Firebase non chargée (hors ligne ?) — l’app fonctionne en local.', 'err'); return false; }
+    if (FS.app) return true;
+    try {
+      FS.app = firebase.initializeApp(FS_CONFIG);
+      FS.db = firebase.firestore();
+      firebase.auth().onAuthStateChanged(u => {
+        FS.user = u || null;
+        renderFsUI();
+        if (u) fsStart(); else fsStop();
+      });
+      return true;
+    } catch (e) { console.error('[fs init]', e); setFsStatus('⚠️ ' + e.message, 'err'); return false; }
+  }
+  async function fsLogin() {
+    if (!fsInit()) return;
+    const em = (document.getElementById('fs-email') || {}).value || '';
+    const pw = (document.getElementById('fs-password') || {}).value || '';
+    if (!em.trim() || !pw) { setFsStatus('⚠️ Email et mot de passe requis.', 'err'); return; }
+    try {
+      setFsStatus('🔥 Connexion…', 'busy');
+      await firebase.auth().signInWithEmailAndPassword(em.trim(), pw);
+      const pwEl = document.getElementById('fs-password'); if (pwEl) pwEl.value = '';
+      if (typeof showToast === 'function') showToast('🔥 Base de données connectée — synchro temps réel active', 'success');
+    } catch (e) {
+      console.error('[fs login]', e);
+      const msg = /invalid-credential|wrong-password|user-not-found/.test(e.code || '') ? 'Email ou mot de passe incorrect.' : /api-key/.test((e.message || '')) ? 'Clé API invalide — vérifier FS_CONFIG.' : e.message;
+      setFsStatus('⚠️ ' + msg, 'err');
+    }
+  }
+  function fsLogout() {
+    if (!confirm('Se déconnecter de la base sur CET appareil ?\n(Les données cloud et les autres appareils ne sont pas touchés)')) return;
+    try { firebase.auth().signOut(); } catch (e) {}
+  }
+  // ----- Écoute temps réel -----
+  function fsListenColl(coll, getArr, persist) {
+    const unsub = FS.db.collection(coll).onSnapshot(snap => {
+      let changed = 0;
+      window.__syncApplying = true;
+      try {
+        snap.docChanges().forEach(ch => {
+          const id = ch.doc.id, key = coll + '/' + id;
+          const arr = getArr(); if (!Array.isArray(arr)) return;
+          if (ch.type === 'removed') {
+            delete FS_HASH[key];
+            const i = arr.findIndex(x => x && String(x.id) === id);
+            if (i >= 0) { arr.splice(i, 1); changed++; }
+          } else {
+            const item = (ch.doc.data() || {}).v; if (!item) return;
+            const j = JSON.stringify(item);
+            if (FS_HASH[key] === j) return; // écho de notre propre push
+            FS_HASH[key] = j;
+            const i = arr.findIndex(x => x && String(x.id) === id);
+            if (i >= 0) arr[i] = item; else arr.push(item);
+            changed++;
+          }
+        });
+        if (changed) { persist(); if (typeof render === 'function') render(); if (typeof rehydratePhotos === 'function') rehydratePhotos(); }
+      } finally { window.__syncApplying = false; }
+      if (changed) { SYNC.lastSync = Date.now(); fsFetchMissingPhotos(); }
+    }, err => { console.error('[fs listen ' + coll + ']', err); setFsStatus('⚠️ Écoute ' + coll + ' : ' + err.message, 'err'); });
+    FS_UNSUBS.push(unsub);
+  }
+  function fsApplyMeta(key, val) {
+    if (key === 'photoIndex') { FS_PHOTO_INDEX = val || {}; fsFetchMissingPhotos(); return; }
+    if (key === 'session') {
+      window.__syncApplying = true;
+      try { if (val && typeof val === 'object') { SESSION = val; try { localStorage.setItem('session_state', JSON.stringify(SESSION)); } catch (e) {} if (typeof render === 'function') render(); } }
+      finally { window.__syncApplying = false; }
+      return;
+    }
+    const listWrapped = { accounts: 1, rotationWeeks: 1, goalsLadder: 1, marketNotes: 1, notifications: 1 };
+    const partial = {};
+    partial[key] = listWrapped[key] ? ((val && val.list) || []) : val;
+    if (partial[key] == null) return;
+    applyBackupData(partial, true);
+  }
+  function fsListenMeta() {
+    const unsub = FS.db.collection('meta').onSnapshot(snap => {
+      snap.docChanges().forEach(ch => {
+        if (ch.type === 'removed') return;
+        const key = 'meta/' + ch.doc.id, val = (ch.doc.data() || {}).v;
+        const j = JSON.stringify(val == null ? null : val);
+        if (FS_HASH[key] === j) return;
+        FS_HASH[key] = j;
+        try { fsApplyMeta(ch.doc.id, val); } catch (e) { console.error('[fs meta ' + ch.doc.id + ']', e); }
+      });
+      SYNC.lastSync = Date.now();
+    }, err => { console.error('[fs listen meta]', err); setFsStatus('⚠️ Écoute meta : ' + err.message, 'err'); });
+    FS_UNSUBS.push(unsub);
+  }
+  function fsStart() {
+    fsStop();
+    setFsStatus('🔥 Connexion à la base…', 'busy');
+    fsListenColl('trades', () => TRADES, () => { if (typeof saveTrades === 'function') saveTrades(true); });
+    fsListenColl('backtestTrades', () => (typeof BACKTEST_TRADES !== 'undefined' ? BACKTEST_TRADES : null), () => { try { localStorage.setItem('backtest_trades', JSON.stringify(BACKTEST_TRADES)); } catch (e) {} });
+    fsListenColl('scenarios', () => (typeof SCENARIOS !== 'undefined' ? SCENARIOS : null), () => { try { localStorage.setItem('backtest_scenarios', JSON.stringify(SCENARIOS)); } catch (e) {} });
+    fsListenMeta();
+    // Après l'arrivée des snapshots initiaux : pousse tout ce que le cloud n'a pas encore (fusion, jamais de perte)
+    setTimeout(() => fsPushAll('initial'), 6000);
+  }
+  function fsStop() { FS_UNSUBS.forEach(u => { try { u(); } catch (e) {} }); FS_UNSUBS = []; }
+  // ----- Envoi (granulaire : uniquement ce qui a changé) -----
+  function fsPushDebounced() { if (!FS.user) return; clearTimeout(_fsPushTimer); _fsPushTimer = setTimeout(() => fsPushAll('auto'), 2500); }
+  function fsMetaSections() {
+    return {
+      plan: () => (typeof PLAN !== 'undefined') ? PLAN : null,
+      prefs: () => (typeof PREFS !== 'undefined') ? PREFS : null,
+      accounts: () => ({ list: (typeof ACCOUNTS !== 'undefined' ? ACCOUNTS : []) }),
+      rotationWeeks: () => ({ list: (typeof ROTATION_WEEKS !== 'undefined' ? ROTATION_WEEKS : []) }),
+      goalsLadder: () => ({ list: (typeof GOALS_LADDER !== 'undefined' ? GOALS_LADDER : []) }),
+      marketNotes: () => ({ list: (typeof MARKET_NOTES !== 'undefined' ? MARKET_NOTES : []) }),
+      notifications: () => ({ list: (typeof NOTIFS !== 'undefined' ? NOTIFS : []) }),
+      session: () => (typeof SESSION !== 'undefined') ? SESSION : null,
+      capital: () => (typeof CAPITAL !== 'undefined') ? CAPITAL : null,
+      routine: () => (typeof ROUTINE !== 'undefined') ? ROUTINE : null,
+      routineLog: () => (typeof ROUTINE_LOG !== 'undefined') ? ROUTINE_LOG : null,
+      health: () => (typeof HEALTH !== 'undefined') ? HEALTH : null,
+      btSessMeta: () => (typeof BT_SESS_META !== 'undefined') ? BT_SESS_META : null,
+      photoIndex: () => FS_PHOTO_INDEX
+    };
+  }
+  async function fsPushAll(reason) {
+    if (!FS.user || !FS.db) return;
+    try {
+      const ops = []; // { type:'set'|'delete', coll, id, data }
+      const collectArr = (coll, arr, transform) => {
+        const localIds = new Set();
+        (arr || []).forEach(it => {
+          if (!it || it.id == null) return;
+          const id = String(it.id); localIds.add(id);
+          const clean = JSON.parse(JSON.stringify(transform ? transform(it) : it));
+          const key = coll + '/' + id, j = JSON.stringify(clean);
+          if (FS_HASH[key] === j) return;
+          FS_HASH[key] = j;
+          ops.push({ type: 'set', coll, id, data: { v: clean, t: Date.now() } });
+        });
+        // Suppressions : tout doc connu du cloud (FS_HASH) qui n'existe plus en local → supprimé proprement
+        Object.keys(FS_HASH).forEach(k => {
+          if (!k.startsWith(coll + '/')) return;
+          const id = k.slice(coll.length + 1);
+          if (!localIds.has(id)) { delete FS_HASH[k]; ops.push({ type: 'delete', coll, id }); }
+        });
+      };
+      collectArr('trades', (typeof TRADES !== 'undefined' ? TRADES : []), t => (t && t.photo) ? { ...t, photo: null, hasPhoto: true } : t);
+      collectArr('backtestTrades', (typeof BACKTEST_TRADES !== 'undefined' ? BACKTEST_TRADES : []));
+      collectArr('scenarios', (typeof SCENARIOS !== 'undefined' ? SCENARIOS : []));
+      // Photos : upload de celles que le cloud n'a pas (≤ 900 Ko, base64 dans Firestore)
+      let photoIndexChanged = false;
+      for (const t of (typeof TRADES !== 'undefined' ? TRADES : [])) {
+        if (!t || !t.id || !(t.photo || t.hasPhoto) || FS_PHOTO_INDEX[t.id]) continue;
+        let p = t.photo;
+        if (!p && typeof idbGet === 'function') { try { p = await idbGet('photo_' + t.id); } catch (e) {} }
+        if (typeof p === 'string' && p.length > 0 && p.length <= 900000) {
+          ops.push({ type: 'set', coll: 'photos', id: String(t.id), data: { v: p, t: Date.now() } });
+          FS_PHOTO_INDEX[t.id] = 1; photoIndexChanged = true;
+        }
+      }
+      // Sections méta
+      const sections = fsMetaSections();
+      for (const key in sections) {
+        if (key === 'photoIndex' && photoIndexChanged) { FS_HASH['meta/photoIndex'] = null; } // force le renvoi de l'index
+        let val = null;
+        try { val = sections[key](); } catch (e) {}
+        const clean = val == null ? null : JSON.parse(JSON.stringify(val));
+        const hKey = 'meta/' + key, j = JSON.stringify(clean);
+        if (clean == null || FS_HASH[hKey] === j) continue;
+        FS_HASH[hKey] = j;
+        ops.push({ type: 'set', coll: 'meta', id: key, data: { v: clean, t: Date.now() } });
+      }
+      if (!ops.length) { if (reason === 'manuel') setFsStatus('🔥 Base à jour — rien à envoyer', 'ok'); return; }
+      setFsStatus('🔥 Envoi de ' + ops.length + ' document(s)…', 'busy');
+      for (let i = 0; i < ops.length; i += 400) {
+        const batch = FS.db.batch();
+        ops.slice(i, i + 400).forEach(op => {
+          const ref = FS.db.collection(op.coll).doc(op.id);
+          if (op.type === 'delete') batch.delete(ref); else batch.set(ref, op.data);
+        });
+        await batch.commit();
+      }
+      SYNC.lastSync = Date.now(); saveSyncConfig();
+      setFsStatus('🔥 Synchronisé · ' + new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) + ' (' + ops.length + ' doc)', 'ok');
+      fsGistMirror();
+    } catch (e) {
+      console.error('[fs push]', e);
+      setFsStatus('⚠️ Envoi impossible — ' + e.message, 'err');
+    }
+  }
+  // ----- Photos manquantes en local : téléchargement à la demande -----
+  let _fsFetchingPhotos = false;
+  async function fsFetchMissingPhotos() {
+    if (!FS.user || !FS.db || _fsFetchingPhotos || typeof TRADES === 'undefined') return;
+    _fsFetchingPhotos = true;
+    try {
+      let got = 0;
+      for (const t of TRADES) {
+        if (!t || !t.id || !t.hasPhoto || t.photo || !FS_PHOTO_INDEX[t.id]) continue;
+        let local = null;
+        try { local = await idbGet('photo_' + t.id); } catch (e) {}
+        if (local) continue;
+        try {
+          const doc = await FS.db.collection('photos').doc(String(t.id)).get();
+          const p = doc.exists ? (doc.data() || {}).v : null;
+          if (typeof p === 'string' && p) { await idbSet('photo_' + t.id, p); got++; }
+        } catch (e) { console.error('[fs photo ' + t.id + ']', e); }
+      }
+      if (got && typeof rehydratePhotos === 'function') { rehydratePhotos(); console.log('[fs] ' + got + ' photo(s) récupérée(s) du cloud'); }
+    } finally { _fsFetchingPhotos = false; }
+  }
+  // ----- Miroir Gist (pour le coach quotidien) : max 1×/10 min, en arrière-plan -----
+  function fsGistMirror() {
+    if (!syncEnabled()) return;
+    if (Date.now() - _fsGistMirrorTs < 10 * 60 * 1000) return;
+    _fsGistMirrorTs = Date.now();
+    try { syncPush(); } catch (e) {}
+  }
+  fsInit();
   function exportFiltered() {
     const account = prompt('Compte à exporter (laisser vide pour tous) :', '');
     const fromStr = prompt('Date de début (JJ/MM, vide = depuis le début) :', '');
