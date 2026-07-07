@@ -5587,31 +5587,7 @@
           </div>
         </div>
 
-        <!-- Synchro cloud (miroir GitHub, conservé en secours + lecture du coach) -->
-        <div class="modal-section">
-          <div class="section-label">☁️ Miroir GitHub (secours + coach)</div>
-          <div id="sync-setup">
-            <div class="muted" style="font-size:12px; line-height:1.55; margin-bottom:12px;">
-              Tes données (trades, plan, objectifs…) sont stockées dans un <strong>coffre privé</strong> de ton compte GitHub.
-              Colle le même token ici sur chaque appareil → tout se synchronise automatiquement, tu n'as plus rien à faire.
-            </div>
-            <div style="display:flex; gap:8px;">
-              <input type="password" id="sync-token-input" placeholder="Token GitHub (scope « gist » uniquement)" style="flex:1; background:var(--bg-2); border:1px solid var(--border); border-radius:10px; padding:11px 14px; color:var(--text-0); font-family:'JetBrains Mono', monospace; font-size:12px;">
-              <button class="btn btn-primary" onclick="activateSync()">Activer</button>
-            </div>
-            <div class="muted" style="font-size:11px; margin-top:8px;">
-              Créer le token : github.com → Settings → Developer settings → Personal access tokens → <strong>Tokens (classic)</strong> → Generate new token (classic) → coche <strong>uniquement « gist »</strong> → Generate → copie-colle ici.
-            </div>
-          </div>
-          <div id="sync-active" style="display:none;">
-            <div id="sync-status" class="sync-status ok">☁️ Synchro active</div>
-            <div style="display:flex; gap:8px; margin-top:10px;">
-              <button class="btn" onclick="syncPull(false)" style="flex:1;">⬇ Récupérer maintenant</button>
-              <button class="btn" onclick="syncPush()" style="flex:1;">⬆ Envoyer maintenant</button>
-              <button class="btn" onclick="deactivateSync()" style="border-color:var(--red); color:var(--red);">Désactiver</button>
-            </div>
-          </div>
-        </div>
+        <!-- r83 : le miroir GitHub a été retiré — Firebase est l'unique synchro (demande de Vincent). -->
 
         <!-- Sauvegarde automatique -->
         <div class="modal-section">
@@ -5664,7 +5640,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono" id="app-version-full">2026-07-07 · r82</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono" id="app-version-full">2026-07-07 · r83</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -14934,9 +14910,8 @@
   function markLocalChange() {
     if (window.__syncApplying) return; // pas de re-push pendant qu'on applique une synchro reçue
     try { localStorage.setItem('last_local_change', String(Date.now())); } catch (e) {}
-    // r81 : si la base Firebase est connectée, c'est ELLE la source de vérité (le Gist n'est plus qu'un miroir différé)
+    // r83 : Firebase est l'UNIQUE synchro (le Gist GitHub est débranché, demande de Vincent)
     if (typeof FS !== 'undefined' && FS.user) { fsPushDebounced(); }
-    else { syncPushDebounced(); }
   }
   let _syncPushTimer = null;
   function syncPushDebounced() {
@@ -15093,32 +15068,29 @@
   }
   // ===== r78 — BATTEMENT DE CŒUR : la synchro tourne CONSTAMMENT tant que l'app est ouverte =====
   // 1. Pull/push automatique toutes les 5 minutes (le plus récent gagne, fusion par id — rien ne se perd)
-  // r81 : le pull Gist est coupé quand Firebase est connecté (sinon un vieux coffre écraserait la base temps réel)
-  setInterval(() => { if (syncEnabled() && !(typeof FS !== 'undefined' && FS.user)) syncPull(true); }, 5 * 60 * 1000);
-  // 2. Re-synchro immédiate quand on revient sur l'onglet (Safari/iPhone endorment les onglets)
-  document.addEventListener('visibilitychange', () => { if (!document.hidden && syncEnabled() && !(typeof FS !== 'undefined' && FS.user)) syncPull(true); });
-  // 3. SENTINELLE : si la synchro est activée mais n'a pas RÉUSSI depuis > 30 min → bannière rouge impossible à rater
-  const SYNC_BOOT = Date.now(); // r79 : point de départ de session pour la sentinelle
+  // r83 : plus aucun échange automatique avec le Gist GitHub — Firebase est l'unique synchro.
+  // Retour sur l'onglet → petit signe de vie Firebase (met à jour le doc coach + la sentinelle)
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && typeof FS !== 'undefined' && FS.user && typeof fsCoachMirror === 'function') fsCoachMirror(); });
+  // 3. SENTINELLE r83 (100 % Firebase) : le heartbeat écrit le doc coach toutes les 10 min →
+  // si AUCUN échange Firebase réussi depuis > 30 min (et app ouverte depuis > 30 min), c'est une vraie panne.
+  const SYNC_BOOT = Date.now();
   function checkSyncHealth() {
-    if (!syncEnabled()) return;
-    // r79 : jamais d'alarme calculée depuis 1970 — l'alarme ne part que si AUCUN succès depuis 30 min
-    // À LA FOIS depuis le dernier succès enregistré ET depuis l'ouverture de l'app (laisse le temps au premier pull).
+    let banner = document.getElementById('sync-dead-banner');
+    if (!(typeof FS !== 'undefined' && FS.user)) { if (banner) banner.remove(); return; }
     const sinceSuccess = Date.now() - (SYNC.lastSync || 0);
     const sinceBoot = Date.now() - SYNC_BOOT;
     const silent = Math.min(sinceSuccess, sinceBoot);
-    let banner = document.getElementById('sync-dead-banner');
     if (silent > 30 * 60 * 1000) {
       const mins = Math.round(sinceSuccess / 60000);
-      // Sans succès enregistré sur cet appareil, on ne prétend pas connaître la date de la dernière réussite
-      const ago = !SYNC.lastSync ? 'un moment (jamais réussi sur cet appareil)' : mins > 5940 ? Math.round(mins / 1440) + ' j' : mins > 120 ? Math.round(mins / 60) + ' h' : mins + ' min';
-      const msg = '⚠️ SYNCHRO CLOUD EN PANNE — dernière réussite il y a ' + ago + '. Tes trades ne sont plus sauvegardés dans le cloud. Clique ici : Paramètres → Données → recolle un token GitHub (scope gist).';
+      const ago = !SYNC.lastSync ? 'un moment' : mins > 5940 ? Math.round(mins / 1440) + ' j' : mins > 120 ? Math.round(mins / 60) + ' h' : mins + ' min';
+      const msg = '⚠️ BASE FIREBASE INJOIGNABLE — dernier échange réussi il y a ' + ago + '. Tes trades ne partent plus dans le cloud. Vérifie ta connexion internet, puis Paramètres → Données → 🔥 Base de données.';
       if (!banner) {
         banner = document.createElement('div');
         banner.id = 'sync-dead-banner';
         banner.style.cssText = 'position:fixed; top:0; left:0; right:0; z-index:99998; background:linear-gradient(90deg,#e11d48,#f43f5e); color:#fff; padding:10px 18px; font:700 12.5px Inter,sans-serif; text-align:center; cursor:pointer; box-shadow:0 4px 18px rgba(0,0,0,0.35);';
         banner.onclick = () => { try { openSettingsModal(); } catch (e) {} };
         document.body.appendChild(banner);
-        if (typeof pushNotif === 'function') pushNotif('danger', '☁️', '<strong>Synchro cloud en panne</strong> — token à recoller dans Paramètres → Données.', 'sync-dead-' + new Date().toISOString().slice(0, 10));
+        if (typeof pushNotif === 'function') pushNotif('danger', '🔥', '<strong>Base Firebase injoignable</strong> — vérifie la connexion dans Paramètres → Données.', 'sync-dead-' + new Date().toISOString().slice(0, 10));
       }
       banner.textContent = msg;
     } else if (banner) {
@@ -15126,7 +15098,7 @@
     }
   }
   setInterval(checkSyncHealth, 60 * 1000);
-  setTimeout(checkSyncHealth, 15 * 1000); // premier contrôle 15 s après l'ouverture (laisse le pull initial passer)
+  setTimeout(checkSyncHealth, 15 * 1000);
 
   function renderSyncUI() {
     const on = syncEnabled();
@@ -15357,7 +15329,7 @@
       }
       SYNC.lastSync = Date.now(); saveSyncConfig();
       setFsStatus('🔥 Synchronisé · ' + new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) + ' (' + ops.length + ' doc)', 'ok');
-      fsGistMirror();
+      fsCoachMirrorThrottled();
     } catch (e) {
       console.error('[fs push]', e);
       setFsStatus('⚠️ Envoi impossible — ' + e.message, 'err');
@@ -15384,13 +15356,23 @@
       if (got && typeof rehydratePhotos === 'function') { rehydratePhotos(); console.log('[fs] ' + got + ' photo(s) récupérée(s) du cloud'); }
     } finally { _fsFetchingPhotos = false; }
   }
-  // ----- Miroir Gist (pour le coach quotidien) : max 1×/10 min, en arrière-plan -----
-  function fsGistMirror() {
-    if (!syncEnabled()) return;
-    if (Date.now() - _fsGistMirrorTs < 10 * 60 * 1000) return;
-    _fsGistMirrorTs = Date.now();
-    try { syncPush(); } catch (e) {}
+  // ----- r83 : DOC COACH (public/coach) — remplace le miroir Gist GitHub -----
+  // Le coach quotidien lit ce document via l'API REST Firestore (lecture publique, écriture réservée à Vincent).
+  // Il sert AUSSI de battement de cœur : écrit toutes les 10 min → la sentinelle sait que la base répond.
+  async function fsCoachMirror() {
+    if (!FS.user || !FS.db) return;
+    try {
+      await FS.db.collection('public').doc('coach').set({ v: JSON.stringify(buildFullBackup()), t: Date.now() });
+      _fsGistMirrorTs = Date.now();
+      SYNC.lastSync = Date.now(); saveSyncConfig();
+    } catch (e) { console.error('[fs coach]', e); }
   }
+  function fsCoachMirrorThrottled() {
+    if (Date.now() - _fsGistMirrorTs < 5 * 60 * 1000) return;
+    fsCoachMirror();
+  }
+  setInterval(() => { if (FS.user) fsCoachMirror(); }, 10 * 60 * 1000);
+  setTimeout(() => { if (FS.user) fsCoachMirror(); }, 20 * 1000); // premier battement peu après l'ouverture
   fsInit();
   function exportFiltered() {
     const account = prompt('Compte à exporter (laisser vide pour tous) :', '');
