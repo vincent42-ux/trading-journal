@@ -4767,7 +4767,10 @@
         <div class="card" style="margin-bottom:16px;">
           <div class="card-header">
             <span class="card-title">📋 Mes sessions de backtest</span>
-            <span class="muted" id="bt-sessions-count" style="font-size:11px;">—</span>
+            <div style="display:flex; align-items:center; gap:10px;">
+              <button class="btn" onclick="openBtSessionsCompare()" style="padding:5px 12px; font-size:11.5px;" title="Comparer les sessions côte à côte">⇆ Comparer</button>
+              <span class="muted" id="bt-sessions-count" style="font-size:11px;">—</span>
+            </div>
           </div>
           <div class="card-body" id="bt-sessions-list" style="padding:0;"></div>
         </div>
@@ -5148,6 +5151,19 @@
                     <button class="seg-btn" id="sq-mental-surconfiance" onclick="setQtMental('surconfiance')" title="Sur-confiance" style="border:1px solid var(--border); padding:8px 6px;">🔴</button>
                   </div>
                 </div>
+              </div>
+              <!-- r82 : zones + mots-clés en live (demande de Vincent — comme en backtest) -->
+              <div class="form-field" style="margin-bottom:12px;">
+                <label>Zone</label>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                  <button class="seg-btn" id="sq-zone-jaune" onclick="setQtZone('jaune')" style="border:1px solid var(--border); padding:8px 14px;">🟨 Jaune</button>
+                  <button class="seg-btn" id="sq-zone-orange" onclick="setQtZone('orange')" style="border:1px solid var(--border); padding:8px 14px;">🟧 Orange</button>
+                  <button class="seg-btn" id="sq-zone-interdite" onclick="setQtZone('interdite')" style="border:1px solid var(--border); padding:8px 14px;">🟥 Interdite</button>
+                </div>
+              </div>
+              <div class="form-field" style="margin-bottom:12px;">
+                <label>Mots-clés — un petit truc en plus sur le trade (optionnel)</label>
+                <div id="sq-tags" style="display:flex; gap:7px; flex-wrap:wrap;"></div>
               </div>
               <div class="form-field" style="margin-bottom:12px;">
                 <label>Screenshot</label>
@@ -5648,7 +5664,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono" id="app-version-full">2026-07-07 · r81</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono" id="app-version-full">2026-07-07 · r82</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -6077,13 +6093,14 @@
           </div>
         </div>
         <div class="form-row">
-          <div class="form-field">
+          <!-- r82 : champ Taille masqué (le préréglage ⚡ ci-dessus la remplit automatiquement) — l'input reste pour le JS -->
+          <div class="form-field" style="display:none;">
             <label>Taille ($)</label>
             <input type="number" id="am-size" placeholder="25000" />
           </div>
           <div class="form-field" id="amf-risk">
-            <label>Risque/trade ($)</label>
-            <input type="number" id="am-risk" step="0.01" placeholder="62.80" />
+            <label>💰 1RR = $ <span style="opacity:.6; font-weight:400; text-transform:none;">— ton risque par trade sur CE compte (sert de référence R partout)</span></label>
+            <input type="number" id="am-risk" step="0.01" placeholder="125" />
           </div>
         </div>
         <div class="form-row" id="amf-mult">
@@ -10727,11 +10744,46 @@
         : '<div class="empty-state" style="padding:20px;">Aucun trade cette session. Le premier arrive 💪</div>';
     }
     setQtSide(QT_SIDE);
+    if (typeof renderQtTags === 'function') renderQtTags(); // r82 : chips mots-clés
+    if (typeof setQtZone === 'function') { const z = QT_ZONE; QT_ZONE = ''; if (z) setQtZone(z); } // resync boutons zone
     updateQtDiscCount();
   }
 
   // ----- Formulaire trade rapide -----
   let QT_SIDE = 'LONG', QT_RESULT = '', QT_SETUP = '', QT_ARC = '', QT_MENTAL = '', QT_PHOTO = null;
+  let QT_ZONE = '', QT_TAGS = []; // r82 : zone + mots-clés en live
+  function setQtZone(v) {
+    QT_ZONE = QT_ZONE === v ? '' : v;
+    ['jaune', 'orange', 'interdite'].forEach(z => {
+      const el = document.getElementById('sq-zone-' + z);
+      if (el) el.classList.toggle('active', QT_ZONE === z);
+    });
+  }
+  function renderQtTags() {
+    const box = document.getElementById('sq-tags');
+    if (!box) return;
+    const presets = (typeof BT_TAG_PRESETS !== 'undefined' && BT_TAG_PRESETS.length) ? BT_TAG_PRESETS : [];
+    box.innerHTML = presets.map(tg => {
+      const on = QT_TAGS.includes(tg);
+      const esc = tg.replace(/'/g, "\\'");
+      return `<button onclick="qtToggleTag('${esc}')" style="padding:8px 13px; border-radius:99px; border:1.5px solid ${on ? 'var(--accent)' : 'var(--border)'}; background:${on ? 'var(--accent-soft)' : 'var(--bg-2)'}; color:${on ? 'var(--accent)' : 'var(--text-2)'}; font-size:12px; font-weight:700; cursor:pointer; transition:all .12s;">${on ? '✓ ' : ''}${tg}</button>`;
+    }).join('') + `<button onclick="qtAddTagPreset()" title="Ajouter un mot-clé personnalisé" style="padding:8px 13px; border-radius:99px; border:1.5px dashed var(--border-strong); background:transparent; color:var(--text-3); font-size:12px; font-weight:700; cursor:pointer;">＋ mot-clé</button>`;
+  }
+  function qtToggleTag(tg) {
+    const i = QT_TAGS.indexOf(tg);
+    if (i >= 0) QT_TAGS.splice(i, 1); else QT_TAGS.push(tg);
+    renderQtTags();
+  }
+  function qtAddTagPreset() {
+    const v = (prompt('Nouveau mot-clé :', '') || '').trim();
+    if (!v) return;
+    if (typeof BT_TAG_PRESETS !== 'undefined' && !BT_TAG_PRESETS.includes(v)) {
+      BT_TAG_PRESETS.push(v);
+      try { localStorage.setItem('bt_tag_presets', JSON.stringify(BT_TAG_PRESETS)); } catch (e) {}
+    }
+    if (!QT_TAGS.includes(v)) QT_TAGS.push(v);
+    renderQtTags();
+  }
   function setQtSide(s) {
     QT_SIDE = s;
     const l = document.getElementById('sq-side-long'), sh = document.getElementById('sq-side-short');
@@ -10747,7 +10799,7 @@
     // Pré-remplissage R + montant selon le plan
     const rrEl = document.getElementById('sq-rr');
     const amountEl = document.getElementById('sq-amount');
-    const risk = PLAN.riskPerTrade > 0 ? PLAN.riskPerTrade : 62.80;
+    const risk = accountRisk(null); // r82 : 1RR = $ du compte master
     const autoR = r === 'TP' ? (PLAN.rrTarget || 2) : r === 'SL' ? -1 : 0;
     if (rrEl) rrEl.value = autoR;
     if (amountEl) amountEl.value = (autoR * risk).toFixed(2);
@@ -10756,7 +10808,7 @@
   function onQtRrChange() {
     const rrEl = document.getElementById('sq-rr');
     const amountEl = document.getElementById('sq-amount');
-    const risk = PLAN.riskPerTrade > 0 ? PLAN.riskPerTrade : 62.80;
+    const risk = accountRisk(null); // r82 : 1RR = $ du compte master
     if (rrEl && amountEl) {
       const r = parseFloat(rrEl.value);
       if (!isNaN(r)) amountEl.value = (r * risk).toFixed(2);
@@ -10830,7 +10882,10 @@
       arcJoli: QT_ARC,
       // La discipline juge tes RÈGLES, pas le résultat : un SL à −1R avec plan suivi reste 5/5
       tp2rr: QT_TP2RR,
-      mental: QT_MENTAL
+      mental: QT_MENTAL,
+      // r82 : zone + mots-clés (n'entrent pas dans la note de discipline, mais dans les stats)
+      zone: QT_ZONE || undefined,
+      tags: QT_TAGS.length ? QT_TAGS.slice() : undefined
     };
   }
   function updateQtDiscCount() {
@@ -10882,6 +10937,9 @@
     saveTrades();
     // Reset partiel du formulaire (on garde sens + setup pour enchaîner)
     QT_RESULT = ''; QT_ARC = ''; QT_MENTAL = '';
+    QT_ZONE = ''; QT_TAGS = []; // r82
+    ['jaune', 'orange', 'interdite'].forEach(z => { const el = document.getElementById('sq-zone-' + z); if (el) el.classList.remove('active'); });
+    renderQtTags();
     ['sq-res-tp', 'sq-res-sl', 'sq-res-be', 'sq-arc-oui', 'sq-arc-non'].forEach(id => {
       const el = document.getElementById(id); if (el) el.classList.remove('active');
     });
@@ -12925,6 +12983,14 @@
   // ========== R PAR TRADE — SOURCE UNIQUE DE VÉRITÉ ==========
   // Règle de Vincent : BE = TOUJOURS 0R (même avec quelques $ de BE+) ·
   // sinon R saisi · sinon défaut par résultat (TP = +cible du plan, SL = −1) · sinon pnl/risque
+  // r82 : 1RR en $ PAR COMPTE — le risque du compte prime, le plan sert de secours
+  function accountRisk(acctName) {
+    const accs = (typeof ACCOUNTS !== 'undefined' && Array.isArray(ACCOUNTS)) ? ACCOUNTS : [];
+    let a = acctName ? accs.find(x => x && x.name === acctName) : null;
+    if (!a) a = accs.find(x => x && x.role === 'master') || accs[0];
+    if (a && a.risk > 0) return a.risk;
+    return (typeof PLAN !== 'undefined' && PLAN && PLAN.riskPerTrade > 0) ? PLAN.riskPerTrade : 62.80;
+  }
   function tradeRValue(t, risk) {
     if (!t) return 0;
     // R purement basé sur le RÉSULTAT (jamais sur le risque réel, imprécis à cause des contrats).
@@ -13709,8 +13775,9 @@
     // Pré-remplit aussi le P&L correspondant si vide (basé sur le risque du plan)
     const pnlEl = document.getElementById('tm-pnl');
     if (pnlEl && (pnlEl.value === '' || pnlEl.value == null)) {
-      const risk = (typeof PLAN !== 'undefined' && PLAN.riskPerTrade > 0) ? PLAN.riskPerTrade
-                 : (ACCOUNTS.find(a => a.role === 'master') || ACCOUNTS[0] || { risk: 62.80 }).risk;
+      // r82 : 1RR = $ du COMPTE sélectionné dans le formulaire (chaque compte a son risque)
+      const acctSel = document.getElementById('tm-account');
+      const risk = accountRisk(acctSel ? acctSel.value : null);
       pnlEl.value = (autoR * risk).toFixed(2);
     }
   }
@@ -15386,13 +15453,14 @@
   function importJSONFromSettings(e) {
     const file = e.target.files[0];
     if (!file) return;
-    if (!confirm(`⚠ Restaurer depuis "${file.name}" ?\n\nCela ÉCRASE tous tes trades, comptes, rotation et préférences actuels.`)) return;
+    if (!confirm(`Restaurer depuis "${file.name}" ?\n\nFUSION : les trades/backtests du fichier sont réinjectés par id — rien de plus récent n'est perdu. Les réglages (plan, préférences…) du fichier remplacent les actuels.`)) return;
     const reader = new FileReader();
     reader.onload = ev => {
       try {
         const data = JSON.parse(ev.target.result);
         // Tolérant : accepte la sauvegarde complète v2, l'ancienne v1, ou un simple tableau de trades
-        applyBackupData(data, false);
+        // r82 : merge=true — l'import ne peut plus effacer (ni localement, ni dans Firebase via le balayage)
+        applyBackupData(data, true);
         closeSettingsModal();
         renderRotation();
         if (typeof syncPushDebounced === 'function') syncPushDebounced();
@@ -15497,20 +15565,28 @@
   function restoreBackup(idx) {
     const b = loadBackups()[idx];
     if (!b) return;
-    if (!confirm(`Restaurer la sauvegarde du ${new Date(b.timestamp).toLocaleString('fr-FR')} ?\nCela écrase les données actuelles.`)) return;
-    if (b.data.trades) TRADES = b.data.trades;
-    if (b.data.accounts) ACCOUNTS = b.data.accounts;
-    if (b.data.rotationWeeks) ROTATION_WEEKS = b.data.rotationWeeks;
-    // r77 : les sauvegardes incluent désormais le BACKTEST — on le restaure aussi
-    if (Array.isArray(b.data.backtestTrades) && b.data.backtestTrades.length) BACKTEST_TRADES = b.data.backtestTrades;
-    if (Array.isArray(b.data.backtestScenarios) && b.data.backtestScenarios.length) SCENARIOS = b.data.backtestScenarios;
-    if (b.data.btSessMeta && typeof BT_SESS_META !== 'undefined') { BT_SESS_META = b.data.btSessMeta; saveBtSessMeta(); }
+    // r82 : la restauration FUSIONNE (union par id) au lieu de remplacer.
+    // Avant, restaurer une vieille sauvegarde effaçait tout ce qui était plus récent — et avec Firebase,
+    // le balayage des suppressions aurait aussi retiré ces éléments de la base cloud. Plus maintenant.
+    if (!confirm(`Restaurer la sauvegarde du ${new Date(b.timestamp).toLocaleString('fr-FR')} ?\nFUSION : les éléments de la sauvegarde sont réinjectés, rien de plus récent n'est perdu.`)) return;
+    const mergeById = (cur, inc) => {
+      if (!Array.isArray(inc) || !inc.length) return cur || [];
+      if (!Array.isArray(cur) || !cur.length) return inc;
+      const have = new Set(cur.filter(x => x && x.id).map(x => x.id));
+      return cur.concat(inc.filter(x => x && x.id && !have.has(x.id)));
+    };
+    TRADES = mergeById(TRADES, b.data.trades);
+    if (Array.isArray(b.data.accounts) && b.data.accounts.length) ACCOUNTS = mergeById(ACCOUNTS, b.data.accounts);
+    ROTATION_WEEKS = mergeById(ROTATION_WEEKS, b.data.rotationWeeks);
+    BACKTEST_TRADES = mergeById(BACKTEST_TRADES, b.data.backtestTrades);
+    SCENARIOS = mergeById(SCENARIOS, b.data.backtestScenarios);
+    if (b.data.btSessMeta && typeof BT_SESS_META !== 'undefined') { BT_SESS_META = { ...b.data.btSessMeta, ...BT_SESS_META }; saveBtSessMeta(); }
     if (typeof saveBacktestData === 'function') saveBacktestData();
     saveTrades(); saveAccountsAndRotation();
     if (typeof rehydratePhotos === 'function') rehydratePhotos(); // récupère les screenshots depuis IndexedDB
     closeSettingsModal();
     render(); renderRotation();
-    uiAlert('Sauvegarde restaurée.');
+    uiAlert('Sauvegarde fusionnée — les éléments manquants ont été réinjectés, rien n\'a été écrasé.');
   }
 
   // ========== MODE MONO-COMPTE ==========
@@ -15891,15 +15967,41 @@
     if (i >= 0) BTQ_TAGS.splice(i, 1); else BTQ_TAGS.push(tg);
     renderBtSessionCockpit();
   }
+  // r82 : mots-clés PAR SESSION — chaque session peut avoir sa propre liste (sinon la liste globale)
+  function btTagPresetsFor(sid) {
+    const m = sid && BT_SESS_META[sid];
+    return (m && Array.isArray(m.tagPresets) && m.tagPresets.length) ? m.tagPresets : BT_TAG_PRESETS;
+  }
   function btAddTagPreset() {
     btCaptureInputs();
     const v = (prompt('Nouveau mot-clé :', '') || '').trim();
     if (!v) return;
-    if (!BT_TAG_PRESETS.includes(v)) {
+    const sid = BT_SESSION ? BT_SESSION.id : null;
+    const m = sid ? BT_SESS_META[sid] : null;
+    if (m && Array.isArray(m.tagPresets) && m.tagPresets.length) {
+      if (!m.tagPresets.includes(v)) { m.tagPresets.push(v); saveBtSessMeta(); }
+    } else if (!BT_TAG_PRESETS.includes(v)) {
       BT_TAG_PRESETS.push(v);
       try { localStorage.setItem('bt_tag_presets', JSON.stringify(BT_TAG_PRESETS)); } catch (e) {}
     }
     if (!BTQ_TAGS.includes(v)) BTQ_TAGS.push(v);
+    renderBtSessionCockpit();
+  }
+  function btEditTagPresets() {
+    btCaptureInputs();
+    const sid = BT_SESSION ? BT_SESSION.id : null;
+    const cur = btTagPresetsFor(sid).join(', ');
+    const v = prompt(sid ? 'Mots-clés de CETTE session (séparés par des virgules) — modifie, ajoute, supprime :' : 'Mots-clés (liste globale, séparés par des virgules) :', cur);
+    if (v == null) return;
+    const list = v.split(',').map(s => s.trim()).filter(Boolean);
+    if (sid) {
+      BT_SESS_META[sid] = { ...(BT_SESS_META[sid] || {}), tagPresets: list };
+      saveBtSessMeta();
+    } else {
+      BT_TAG_PRESETS = list;
+      try { localStorage.setItem('bt_tag_presets', JSON.stringify(BT_TAG_PRESETS)); } catch (e) {}
+    }
+    BTQ_TAGS = BTQ_TAGS.filter(t => list.includes(t));
     renderBtSessionCockpit();
   }
   function btqDateChanged() { btCaptureInputs(); renderBtSessionCockpit(); } // nouvelle date = compteur SL du jour remis à zéro
@@ -16034,8 +16136,9 @@
           <div style="display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap;">${btBigBtn(BTQ_ZONE === 'jaune', '🟨 Jaune', "btqSetZone('jaune')", 'var(--amber)')}${btBigBtn(BTQ_ZONE === 'orange', '🟧 Orange', "btqSetZone('orange')", '#f97316')}${btBigBtn(BTQ_ZONE === 'interdite', '🟥 Interdite', "btqSetZone('interdite')", 'var(--red)')}${btBigBtn(!BTQ_ZONE, '— Aucune', "btqSetZone('')")}</div>
           <div class="bt-q-lbl">Mots-clés — un petit truc en plus sur le trade (optionnel)</div>
           <div style="display:flex; gap:7px; flex-wrap:wrap; margin-bottom:18px;">
-            ${BT_TAG_PRESETS.map(tg => btTagChip(tg)).join('')}
+            ${btTagPresetsFor(BT_SESSION ? BT_SESSION.id : null).map(tg => btTagChip(tg)).join('')}
             <button onclick="btAddTagPreset()" title="Ajouter un mot-clé personnalisé" style="padding:8px 13px; border-radius:99px; border:1.5px dashed var(--border-strong); background:transparent; color:var(--text-3); font-size:12px; font-weight:700; cursor:pointer;">＋ mot-clé</button>
+            <button onclick="btEditTagPresets()" title="Modifier la liste des mots-clés de cette session" style="padding:8px 13px; border-radius:99px; border:1.5px dashed var(--border-strong); background:transparent; color:var(--text-3); font-size:12px; font-weight:700; cursor:pointer;">✎ gérer</button>
           </div>
           <button class="btn btn-primary" style="width:100%; padding:15px; font-size:15px;" onclick="btQuickAdd()">➕ Ajouter le trade</button>
         </div>
@@ -16289,6 +16392,100 @@
         <button class="btn" onclick="endBtSession()">■ Terminer</button>
       </div>
     </div>`;
+  }
+  // ===== r82 — COMPARAISON DE SESSIONS (page plein écran façon présentation) =====
+  let BT_COMPARE_SEL = [];
+  function btAllSessionIds() {
+    const seen = {};
+    for (const t of BACKTEST_TRADES) { if (t.sessionId && !seen[t.sessionId]) seen[t.sessionId] = t.createdAt || ''; }
+    return Object.keys(seen).sort((a, b) => (seen[b] || '').localeCompare(seen[a] || ''));
+  }
+  function openBtSessionsCompare() {
+    const ids = btAllSessionIds();
+    if (ids.length < 2) { if (typeof showToast === 'function') showToast('Il faut au moins 2 sessions pour comparer', 'error'); return; }
+    if (!BT_COMPARE_SEL.length || !BT_COMPARE_SEL.every(id => ids.includes(id))) BT_COMPARE_SEL = ids.slice(0, 2);
+    const o = document.getElementById('bt-session-overlay');
+    if (o) { o.style.display = 'block'; document.body.style.overflow = 'hidden'; }
+    renderBtCompare();
+  }
+  function btCompareToggle(id) {
+    const i = BT_COMPARE_SEL.indexOf(id);
+    if (i >= 0) { if (BT_COMPARE_SEL.length > 1) BT_COMPARE_SEL.splice(i, 1); }
+    else { BT_COMPARE_SEL.push(id); if (BT_COMPARE_SEL.length > 4) BT_COMPARE_SEL.shift(); }
+    renderBtCompare();
+  }
+  function btCompareStats(sid) {
+    const ts = BACKTEST_TRADES.filter(t => t.sessionId === sid);
+    const cf = t => t.confirms || {};
+    const sum = a => a.reduce((s, t) => s + (+t.rRealised || 0), 0);
+    const tp = ts.filter(t => t.result === 'TP').length, sl = ts.filter(t => t.result === 'SL').length, be = ts.filter(t => t.result === 'BE').length;
+    const dec = tp + sl;
+    const dates = ts.map(t => t.date || '').filter(Boolean).sort();
+    const bySetup = {}; const byZone = {}; const byTag = {};
+    ts.forEach(t => {
+      const s = cf(t).setup; if (s) { (bySetup[s] = bySetup[s] || []).push(t); }
+      const z = cf(t).zone; if (z) { (byZone[z] = byZone[z] || []).push(t); }
+      (cf(t).tags || []).forEach(tg => { byTag[tg] = (byTag[tg] || 0) + 1; });
+    });
+    return { ts, n: ts.length, tp, sl, be, r: sum(ts), wr: dec ? tp / dec * 100 : 0, exp: ts.length ? sum(ts) / ts.length : 0, dates, bySetup, byZone, byTag, sum };
+  }
+  function renderBtCompare() {
+    const body = document.getElementById('bt-session-overlay-body');
+    if (!body) return;
+    const ids = btAllSessionIds();
+    const dFr = d => /^\d{4}-\d{2}-\d{2}$/.test(d) ? d.split('-').reverse().join('/') : d;
+    const chip = id => {
+      const on = BT_COMPARE_SEL.includes(id);
+      const nm = btSessName(id, '') || ('Session ' + dFr((BACKTEST_TRADES.find(t => t.sessionId === id) || {}).date || ''));
+      return `<button onclick="btCompareToggle('${id}')" style="padding:9px 15px; border-radius:99px; border:1.5px solid ${on ? 'var(--accent)' : 'var(--border)'}; background:${on ? 'var(--accent-soft)' : 'var(--bg-2)'}; color:${on ? 'var(--accent)' : 'var(--text-2)'}; font-size:12.5px; font-weight:700; cursor:pointer;">${on ? '✓ ' : ''}${nm}</button>`;
+    };
+    const zoneLbl = { jaune: '🟨 Jaune', orange: '🟧 Orange', interdite: '🟥 Interdite' };
+    const setupLbl = { absorption: 'ABS', exhaustion: 'EXH' };
+    const col = sid => {
+      const st = btCompareStats(sid);
+      const nm = btSessName(sid, '') || 'Session';
+      const period = st.dates.length ? dFr(st.dates[0]) + (st.dates[st.dates.length - 1] !== st.dates[0] ? ' → ' + dFr(st.dates[st.dates.length - 1]) : '') : '—';
+      const tile = (lb, val, colr) => `<div style="text-align:center; padding:12px 4px; background:var(--bg-2); border-radius:10px;"><div class="mono" style="font-size:21px; font-weight:800; color:${colr};">${val}</div><div style="font-size:10px; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-3); margin-top:3px;">${lb}</div></div>`;
+      const line = (lb, a) => {
+        const r = st.sum(a); const dec2 = a.filter(t => t.result === 'TP' || t.result === 'SL').length;
+        const wr = dec2 ? (a.filter(t => t.result === 'TP').length / dec2 * 100).toFixed(0) + '%' : '—';
+        return `<div style="display:flex; justify-content:space-between; gap:8px; padding:7px 0; border-bottom:1px solid var(--border); font-size:12.5px;"><span>${lb}</span><span class="mono" style="color:var(--text-2);">${a.length} tr · WR ${wr}</span><span class="mono" style="font-weight:800; color:${r >= 0 ? 'var(--green)' : 'var(--red)'};">${r >= 0 ? '+' : ''}${r.toFixed(1)}R</span></div>`;
+      };
+      const tags = Object.entries(st.byTag).sort((a, b) => b[1] - a[1]).slice(0, 6)
+        .map(([tg, n2]) => `<span style="font-size:11px; padding:3px 10px; border-radius:99px; background:var(--accent-soft); color:var(--accent); font-weight:700;">${tg} ×${n2}</span>`).join(' ');
+      return `<div class="card" style="padding:0; overflow:hidden;">
+        <div style="padding:14px 16px; border-bottom:1px solid var(--border); background:var(--bg-2);">
+          <div style="font-size:15px; font-weight:800;">${nm}</div>
+          <div style="font-size:11px; color:var(--text-3); margin-top:2px;">${period}</div>
+        </div>
+        <div style="padding:14px 16px;">
+          <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin-bottom:14px;">
+            ${tile('Trades', st.n, 'var(--text-0)')}
+            ${tile('Win rate', st.wr.toFixed(0) + '%', st.wr >= 50 ? 'var(--green)' : 'var(--red)')}
+            ${tile('R cumulé', (st.r >= 0 ? '+' : '') + st.r.toFixed(1), st.r >= 0 ? 'var(--green)' : 'var(--red)')}
+            ${tile('Expectancy', (st.exp >= 0 ? '+' : '') + st.exp.toFixed(2) + 'R', st.exp >= 0 ? 'var(--green)' : 'var(--red)')}
+          </div>
+          <div style="font-size:10.5px; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-3); margin-bottom:4px;">Résultats</div>
+          <div style="display:flex; gap:6px; margin-bottom:14px; font-size:12px;" class="mono">
+            <span style="color:var(--green); font-weight:800;">${st.tp} TP</span> · <span style="color:var(--red); font-weight:800;">${st.sl} SL</span> · <span style="color:var(--amber); font-weight:800;">${st.be} BE</span>
+          </div>
+          <div style="font-size:10.5px; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-3); margin-bottom:2px;">Par setup</div>
+          ${Object.keys(st.bySetup).length ? Object.entries(st.bySetup).map(([s, a]) => line(setupLbl[s] || s, a)).join('') : '<div class="muted" style="font-size:12px; padding:6px 0;">—</div>'}
+          <div style="font-size:10.5px; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-3); margin:12px 0 2px;">Par zone</div>
+          ${Object.keys(st.byZone).length ? Object.entries(st.byZone).map(([z, a]) => line(zoneLbl[z] || z, a)).join('') : '<div class="muted" style="font-size:12px; padding:6px 0;">—</div>'}
+          ${tags ? `<div style="font-size:10.5px; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-3); margin:12px 0 6px;">Mots-clés fréquents</div><div style="display:flex; gap:6px; flex-wrap:wrap;">${tags}</div>` : ''}
+        </div>
+      </div>`;
+    };
+    body.innerHTML = `
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px; flex-wrap:wrap;">
+        <div style="font-size:19px; font-weight:800;">⇆ Comparaison de sessions</div>
+        <button class="btn" onclick="closeBtSessionOverlay(); renderBacktest();">✕ Fermer</button>
+      </div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:18px;">${ids.map(chip).join('')}</div>
+      <div style="display:grid; grid-template-columns:repeat(${Math.min(BT_COMPARE_SEL.length, 4)}, 1fr); gap:14px; align-items:start;">
+        ${BT_COMPARE_SEL.map(col).join('')}
+      </div>`;
   }
   function renderBtSessionsList() {
     const el = document.getElementById('bt-sessions-list');
