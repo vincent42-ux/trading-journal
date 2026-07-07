@@ -5620,7 +5620,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono" id="app-version-full">2026-07-06 · r79</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono" id="app-version-full">2026-07-07 · r80</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -14707,6 +14707,7 @@
       session: (typeof SESSION !== 'undefined') ? SESSION : null,
       backtestScenarios: (typeof SCENARIOS !== 'undefined') ? SCENARIOS : null,
       backtestTrades: (typeof BACKTEST_TRADES !== 'undefined') ? BACKTEST_TRADES : null,
+      btSessMeta: (typeof BT_SESS_META !== 'undefined') ? BT_SESS_META : null, // r80 : noms des sessions backtest — manquaient au coffre
       capital: (typeof CAPITAL !== 'undefined') ? CAPITAL : null,
       routine: (typeof ROUTINE !== 'undefined') ? ROUTINE : null,
       routineLog: (typeof ROUTINE_LOG !== 'undefined') ? ROUTINE_LOG : null,
@@ -14773,6 +14774,11 @@
           BACKTEST_TRADES = data.backtestTrades;
         }
         try { localStorage.setItem('backtest_trades', JSON.stringify(BACKTEST_TRADES)); } catch (e2) {}
+      }
+      // r80 : noms/meta des sessions backtest — fusion (le distant plus récent gagne sur une même clé)
+      if (data.btSessMeta && typeof data.btSessMeta === 'object' && typeof BT_SESS_META !== 'undefined') {
+        BT_SESS_META = mergeTrades ? { ...BT_SESS_META, ...data.btSessMeta } : data.btSessMeta;
+        if (typeof saveBtSessMeta === 'function') saveBtSessMeta();
       }
       if (data.capital && typeof data.capital === 'object') {
         CAPITAL = { investi: +data.capital.investi || 0, expenses: Array.isArray(data.capital.expenses) ? data.capital.expenses : [], payouts: Array.isArray(data.capital.payouts) ? data.capital.payouts : [], payoutGoalMonthly: (data.capital.payoutGoalMonthly != null ? +data.capital.payoutGoalMonthly : 1500) };
@@ -14901,7 +14907,34 @@
           await syncPush();
         }
       } else if (localTs > remoteTs) {
-        syncPush(); // le local est plus récent → on pousse
+        // r80 : AVANT de pousser, on récupère ce que le cloud a et que nous n'avons pas.
+        // Sans ça, l'appareil « plus récent » écrasait tout le coffre et effaçait les trades/backtests
+        // faits sur un autre appareil (cause très probable de la perte des backtests du 29/06).
+        try {
+          const addOnly = (localArr, remoteArr) => {
+            if (!Array.isArray(remoteArr) || !Array.isArray(localArr)) return 0;
+            const have = new Set(localArr.filter(x => x && x.id).map(x => x.id));
+            const missing = remoteArr.filter(x => x && x.id && !have.has(x.id));
+            missing.forEach(x => localArr.push(x));
+            return missing.length;
+          };
+          let recovered = 0;
+          recovered += addOnly(TRADES, remote.trades);
+          if (typeof SCENARIOS !== 'undefined') recovered += addOnly(SCENARIOS, remote.backtestScenarios);
+          if (typeof BACKTEST_TRADES !== 'undefined') recovered += addOnly(BACKTEST_TRADES, remote.backtestTrades);
+          if (remote.btSessMeta && typeof BT_SESS_META !== 'undefined') {
+            for (const k in remote.btSessMeta) { if (!BT_SESS_META[k]) { BT_SESS_META[k] = remote.btSessMeta[k]; recovered++; } }
+            if (typeof saveBtSessMeta === 'function') saveBtSessMeta();
+          }
+          if (recovered > 0) {
+            saveTrades(true);
+            try { localStorage.setItem('backtest_scenarios', JSON.stringify(SCENARIOS)); localStorage.setItem('backtest_trades', JSON.stringify(BACKTEST_TRADES)); } catch (e3) {}
+            if (typeof render === 'function') render();
+            if (typeof rehydratePhotos === 'function') rehydratePhotos();
+            console.log('[sync] ' + recovered + ' éléments présents dans le cloud mais absents en local → récupérés avant le push');
+          }
+        } catch (e2) { console.error('[sync merge-before-push]', e2); }
+        syncPush(); // le local (complété du cloud) est plus récent → on pousse
       } else {
         // r79 : un pull réussi = la synchro est VIVANTE, même si rien n'a changé.
         // Sans ça, lastSync restait à 0 sur un appareil « déjà à jour » → fausse bannière « en panne depuis 20641 j » (calcul depuis 1970).
@@ -15446,7 +15479,7 @@
   if (!BT_TAG_PRESETS.length) BT_TAG_PRESETS = ['2e mèche', 'bulle', 'news', 'rapide', 'lent', 'contre-tendance', 're-test', 'hésitation'];
   let BT_SESS_META = {};
   try { BT_SESS_META = JSON.parse(localStorage.getItem('bt_sess_meta') || '{}'); } catch (e) { BT_SESS_META = {}; }
-  function saveBtSessMeta() { try { localStorage.setItem('bt_sess_meta', JSON.stringify(BT_SESS_META)); } catch (e) {} }
+  function saveBtSessMeta() { try { localStorage.setItem('bt_sess_meta', JSON.stringify(BT_SESS_META)); } catch (e) {} if (!window.__syncApplying && typeof markLocalChange === 'function') markLocalChange(); } // r80 : renommer une session pousse au cloud
   let BT_REVIEW_ID = null;
   function btSessName(sid, fallback) { return (BT_SESS_META[sid] && BT_SESS_META[sid].name) || fallback || ''; }
   function btRenameSession(sid) {
