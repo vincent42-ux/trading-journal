@@ -12413,37 +12413,48 @@
   }
 
   // ========== OBJECTIFS — ESCALIER DE PALIERS ==========
-  // Escalier d'objectifs — version Vincent (18 juin 2026) : agressif sur le management, discipliné sur le trading.
+  // Escalier v3 — BUSINESS PLAN du 08/07/2026 (décision Vincent : sortie usine FERME le 31/07/2026, ses 26 ans).
+  // Plan maître : 1 ans/Trading/BUSINESS-PLAN.md — réviser là-bas d'abord, puis pousser ici (bump GOALS_VERSION).
   const DEFAULT_GOALS_LADDER = [
-    { id: 'm3', horizon: '3 MOIS', due: 'Septembre 2026', title: 'Valider et encaisser', items: [
-      { text: 'Valider l\'éval MFFU 50K (cible $3 000)', done: false },
-      { text: 'Valider l\'éval MFFU 25K (cible $1 500)', done: false },
-      { text: 'Passer funded + encaisser mon 1er payout', done: false },
-      { text: 'Atteindre 1 000–1 500 €/mois de payouts', done: false },
-      { text: 'Discipline moyenne ≥ 80 % sur le mois', done: false }
+    { id: 'jul26', horizon: 'JUILLET', due: '08 → 31 juillet 2026', title: 'Le sprint — tout se joue ici', items: [
+      { text: 'RH cette semaine : rupture conventionnelle (priorité) ou préavis calé pour le 31/07', done: false },
+      { text: 'Chiffrer solde de tout compte + besoin vital mensuel du couple', done: false },
+      { text: 'Finir le test 30 trades (lecture corrigée, EXH > ABS) — ~10/semaine', done: false },
+      { text: 'Décision à 30 trades : expectancy ≥ +0,3R net → GO scaling, sinon on corrige', done: false },
+      { text: 'Valider l\'éval Flex 50K (cible ~$3 000)', done: false },
+      { text: 'Discipline ≥ 80 % sur le mois, journal 100 %', done: false },
+      { text: '31/07 : dernier jour d\'usine 🏭🎂', done: false }
     ]},
-    { id: 'm6', horizon: '6 MOIS', due: 'Décembre 2026', title: 'Devenir régulier', items: [
-      { text: '2 500–3 000 €/mois sur 2–3 mois consécutifs', done: false },
-      { text: 'Plusieurs comptes funded actifs', done: false },
-      { text: 'Règle de consistance respectée à chaque payout', done: false },
-      { text: 'Aucun compte cramé par indiscipline', done: false }
+    { id: 'aug26', horizon: 'AOÛT', due: 'Août 2026 — mois à 0 salaire', title: 'La traversée', items: [
+      { text: 'Vérifier AVANT les règles payout MFFU (jours min, consistance)', done: false },
+      { text: 'Passer funded + réclamer le 1er payout (500–1 000 €, tout > 0 = victoire)', done: false },
+      { text: 'Débloquer les heures fortes : 11h tous les jours, sizing INCHANGÉ (0,25 %)', done: false },
+      { text: '2e éval 50K uniquement en promo et uniquement si GO au test', done: false },
+      { text: 'Fin août : cash check honnête (payouts + ARE vs besoin vital) — sinon plan B intérim', done: false }
     ]},
-    { id: 'y1', horizon: '1 AN', due: 'Juin 2027', title: 'Remplacer le salaire', items: [
-      { text: '4 000–6 000 €/mois pendant 3 mois d\'affilée', done: false },
-      { text: 'Matelas de sécurité reconstitué', done: false },
-      { text: 'Quitter l\'usine 🏭→🏠 (mai→juillet 2027)', done: false }
+    { id: 'sep26', horizon: 'SEPT', due: 'Septembre 2026', title: 'Prouver la paie', items: [
+      { text: '1 500–2 000 € de payouts sur le mois', done: false },
+      { text: '2 comptes actifs (1 funded + 1 éval→funded)', done: false },
+      { text: 'Discipline ≥ 80 %, 0 compte cramé', done: false }
     ]},
-    { id: 'y2', horizon: '2 ANS', due: '2028', title: 'Trader à temps plein', items: [
-      { text: 'Vivre du trading sans stress financier', done: false },
-      { text: 'Scaling multi-comptes maîtrisé', done: false },
-      { text: 'Capital personnel en croissance', done: false }
+    { id: 'm3', horizon: '3 MOIS', due: 'Octobre 2026', title: 'Le bas de la cible', items: [
+      { text: '3 000 €/mois de payouts', done: false },
+      { text: '2–3 comptes funded, consistance respectée à chaque payout', done: false },
+      { text: 'Matelas de sécurité : 1 mois reconstitué', done: false }
     ]},
-    { id: 'y5', horizon: '5 ANS', due: '2031', title: 'La liberté', items: [
-      { text: 'Indépendance financière installée', done: false },
-      { text: 'Faire ce que je veux, quand je veux', done: false }
+    { id: 'm6', horizon: '6 MOIS', due: 'Janvier 2027', title: 'La stabilité', items: [
+      { text: '4 000 €/mois sur 3 mois consécutifs', done: false },
+      { text: 'Scaling master → followers démarré (multiplicateur ×N)', done: false },
+      { text: '0 compte cramé par indiscipline', done: false },
+      { text: 'Matelas : 3 mois', done: false }
+    ]},
+    { id: 'y1', horizon: '1 AN', due: 'Juillet 2027 — 27 ans', title: 'Le métier installé', items: [
+      { text: '5 000–6 000 €/mois via multi-comptes synchronisés', done: false },
+      { text: 'Matelas : 6 mois', done: false },
+      { text: 'Un an de liberté fêté 🏖️', done: false }
     ]}
   ];
-  const GOALS_VERSION = 2; // incrémenter pour pousser un nouvel escalier par défaut chez Vincent
+  const GOALS_VERSION = 3; // incrémenter pour pousser un nouvel escalier par défaut chez Vincent
   let GOALS_LADDER = JSON.parse(JSON.stringify(DEFAULT_GOALS_LADDER));
   function loadGoalsLadder() {
     try {
@@ -12668,6 +12679,14 @@
     let streak = 0;
     for (let k = nowK - 1; k >= nowK - 36; k--) { if ((byMo[k] || 0) >= EXIT) streak++; else break; }
     const reached = monthIn >= EXIT;
+    // Sortie FERME décidée le 08/07/2026 : dernier jour d'usine = 31/07/2026 (26 ans). Plan : Trading/BUSINESS-PLAN.md
+    const exitDate = new Date(2026, 6, 31, 23, 59, 59);
+    const daysLeft = Math.ceil((exitDate - now) / 86400000);
+    const countdownHtml = daysLeft > 0
+      ? `<div class="mono" style="font-size:30px; font-weight:800; color:var(--accent-bright, #d946ef);">J−${daysLeft}</div>
+         <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-3); margin-top:2px;">avant la sortie · 31/07</div>`
+      : `<div style="font-size:26px; font-weight:800;">✊ Libre</div>
+         <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-3); margin-top:2px;">usine quittée le 31/07/2026</div>`;
     el.innerHTML = `
       <div class="card" style="position:relative; overflow:hidden; border-left:3px solid var(--accent); background:linear-gradient(135deg, color-mix(in srgb, var(--accent) 10%, var(--bg-1)), var(--bg-1) 60%);">
         <div style="position:absolute; top:0; left:0; right:0; height:3px; background:linear-gradient(90deg, var(--accent), var(--accent-bright, #d946ef));"></div>
@@ -12675,12 +12694,15 @@
           <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;">
             <div style="min-width:220px;">
               <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-3); margin-bottom:6px;">Ma destination</div>
-              <div style="font-size:22px; font-weight:800; letter-spacing:-0.01em;">🏭 → 🏖️ Quitter l'usine</div>
-              <div style="margin-top:8px; font-size:12.5px; color:var(--text-2); line-height:1.5;">Condition de sortie : <strong style="color:var(--text-1);">3 mois consécutifs à ${eur(EXIT)}+</strong> de payouts prouvés.</div>
+              <div style="font-size:22px; font-weight:800; letter-spacing:-0.01em;">🏭 → 🏖️ Sortie d'usine : 31 juillet 2026</div>
+              <div style="margin-top:8px; font-size:12.5px; color:var(--text-2); line-height:1.5;">${daysLeft > 0 ? 'Décision ferme (mes 26 ans). Après : les payouts sont le revenu.' : 'C\'est fait.'} Cible de stabilité : <strong style="color:var(--text-1);">${eur(EXIT)}+/mois, 3 mois d\'affilée</strong>.</div>
+            </div>
+            <div style="text-align:center; padding:12px 20px; border-radius:14px; background:var(--bg-2); border:1px solid var(--border);">
+              ${countdownHtml}
             </div>
             <div style="text-align:center; padding:12px 20px; border-radius:14px; background:var(--bg-2); border:1px solid var(--border);">
               <div class="mono" style="font-size:30px; font-weight:800; color:${streak >= 3 ? 'var(--green)' : 'var(--accent)'};">${streak}<span style="font-size:16px; color:var(--text-3);">/3</span></div>
-              <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-3); margin-top:2px;">mois prouvés</div>
+              <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-3); margin-top:2px;">mois au niveau cible</div>
             </div>
           </div>
           <div style="margin-top:20px;">
