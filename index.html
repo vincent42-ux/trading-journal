@@ -5234,8 +5234,14 @@
 
       <!-- ============ OBJECTIVES ============ -->
       <section class="view" id="view-objectives">
-        <!-- NORTH STAR : la destination -->
+        <!-- NORTH STAR : LA LIBERTÉ -->
         <div id="goals-northstar" style="margin-bottom:20px;"></div>
+
+        <!-- LA SAUCE DU JOUR : questionnaire lun-ven (mixte auto/manuel) -->
+        <div id="obj2-day" style="margin-bottom:18px;"></div>
+
+        <!-- LA SEMAINE : pastilles + objectifs hebdo (dimanche = bilan + préparation) -->
+        <div id="obj2-week" style="margin-bottom:18px;"></div>
 
         <!-- COURT TERME : auto-mesuré depuis les trades -->
         <div class="stats-section-title">Maintenant — mesuré automatiquement sur tes trades</div>
@@ -12413,48 +12419,72 @@
   }
 
   // ========== OBJECTIFS — ESCALIER DE PALIERS ==========
-  // Escalier v3 — BUSINESS PLAN du 08/07/2026 (décision Vincent : sortie usine FERME le 31/07/2026, ses 26 ans).
+  // Escalier v4 — BUSINESS PLAN révisé le 08/07/2026 : AUCUNE annonce à l'usine, sortie déclenchée par
+  // les critères (4 k€ × 3 mois consécutifs), point de décision formel AVRIL 2027. Le plan avance en silence.
   // Plan maître : 1 ans/Trading/BUSINESS-PLAN.md — réviser là-bas d'abord, puis pousser ici (bump GOALS_VERSION).
   const DEFAULT_GOALS_LADDER = [
-    { id: 'jul26', horizon: 'JUILLET', due: '08 → 31 juillet 2026', title: 'Le sprint — tout se joue ici', items: [
-      { text: 'RH cette semaine : rupture conventionnelle (priorité) ou préavis calé pour le 31/07', done: false },
-      { text: 'Chiffrer solde de tout compte + besoin vital mensuel du couple', done: false },
-      { text: 'Finir le test 30 trades (lecture corrigée, EXH > ABS) — ~10/semaine', done: false },
-      { text: 'Décision à 30 trades : expectancy ≥ +0,3R net → GO scaling, sinon on corrige', done: false },
-      { text: 'Valider l\'éval Flex 50K (cible ~$3 000)', done: false },
-      { text: 'Discipline ≥ 80 % sur le mois, journal 100 %', done: false },
-      { text: '31/07 : dernier jour d\'usine 🏭🎂', done: false }
+    { id: 'jul26', horizon: 'JUILLET', due: '08 → 31 juillet 2026', title: 'Le sprint — test 30 trades, semaine par semaine', items: [
+      { text: 'S1 · Trade 1 pris, checklist validée avant le clic', done: false },
+      { text: 'S1 · Compteur 5/30', done: false },
+      { text: 'S1 · 0 entorse (jamais plus de 2 SL par session)', done: false },
+      { text: 'S1 · Dim 12/07 : bilan — expectancy notée, même moche', done: false },
+      { text: 'S2 · Lundi 13/07, 11h honoré — ton meilleur créneau', done: false },
+      { text: 'S2 · Compteur 15/30', done: false },
+      { text: 'S2 · Discipline ≥ 80 % sur la semaine', done: false },
+      { text: 'S2 · Dim 19/07 : lecture corrigée confirmée en live ? oui / à ajuster', done: false },
+      { text: 'S3 · Compteur 25/30', done: false },
+      { text: 'S3 · Zéro journée sans note /5 au journal', done: false },
+      { text: 'S3 · Dim 26/07 : pré-verdict — expectancy ≥ +0,3R en vue ?', done: false },
+      { text: 'S4 · 30/30 atteint', done: false },
+      { text: 'S4 · DÉCISION rendue : GO scaling / correction avant de remettre de l\'argent', done: false },
+      { text: 'S4 · Si GO : éval Flex avancée (+1 500 $)', done: false },
+      { text: 'S4 · Ven 31/07 : étape 1 bouclée ✅', done: false }
     ]},
-    { id: 'aug26', horizon: 'AOÛT', due: 'Août 2026 — mois à 0 salaire', title: 'La traversée', items: [
-      { text: 'Vérifier AVANT les règles payout MFFU (jours min, consistance)', done: false },
-      { text: 'Passer funded + réclamer le 1er payout (500–1 000 €, tout > 0 = victoire)', done: false },
-      { text: 'Débloquer les heures fortes : 11h tous les jours, sizing INCHANGÉ (0,25 %)', done: false },
-      { text: '2e éval 50K uniquement en promo et uniquement si GO au test', done: false },
-      { text: 'Fin août : cash check honnête (payouts + ARE vs besoin vital) — sinon plan B intérim', done: false }
+    { id: 'aug26', horizon: 'AOÛT', due: 'Août 2026 — séquence à cocher dans l\'ordre, pas de dates', title: 'Encaisser la mécanique', items: [
+      { text: '1 · Règles payout MFFU vérifiées noir sur blanc (jours min, consistance, plafonds)', done: false },
+      { text: '2 · Éval Flex validée (+3 000 $)', done: false },
+      { text: '3 · Compte FUNDED activé 💎', done: false },
+      { text: '4 · 5 premiers jours funded sans entorse', done: false },
+      { text: '5 · Jours minimum de trading atteints', done: false },
+      { text: '6 · Consistance respectée (aucun jour au-dessus du seuil)', done: false },
+      { text: '7 · 1er payout demandé', done: false },
+      { text: '8 · 1er payout REÇU : 500-1 000 € sur MON compte 🎉', done: false },
+      { text: '9 · 2e éval 50K prise en promo (uniquement si GO au test)', done: false },
+      { text: '10 · Discipline ≥ 80 % sur le mois', done: false }
     ]},
-    { id: 'sep26', horizon: 'SEPT', due: 'Septembre 2026', title: 'Prouver la paie', items: [
-      { text: '1 500–2 000 € de payouts sur le mois', done: false },
+    { id: 'm3', horizon: 'SEPT-OCT', due: 'Septembre – octobre 2026', title: 'Prouver la paie', items: [
+      { text: 'Septembre : 1 500-2 000 € de payouts', done: false },
       { text: '2 comptes actifs (1 funded + 1 éval→funded)', done: false },
+      { text: 'Octobre : 3 000 €/mois atteints', done: false },
+      { text: '2-3 comptes funded, consistance à chaque payout', done: false },
+      { text: 'Matelas : 2 mois (salaire + payouts, rien de flambé)', done: false },
       { text: 'Discipline ≥ 80 %, 0 compte cramé', done: false }
     ]},
-    { id: 'm3', horizon: '3 MOIS', due: 'Octobre 2026', title: 'Le bas de la cible', items: [
-      { text: '3 000 €/mois de payouts', done: false },
-      { text: '2–3 comptes funded, consistance respectée à chaque payout', done: false },
-      { text: 'Matelas de sécurité : 1 mois reconstitué', done: false }
-    ]},
-    { id: 'm6', horizon: '6 MOIS', due: 'Janvier 2027', title: 'La stabilité', items: [
-      { text: '4 000 €/mois sur 3 mois consécutifs', done: false },
+    { id: 'm6', horizon: 'NOV-JANV', due: 'Novembre 2026 – janvier 2027', title: 'La régularité', items: [
+      { text: '3 000 €/mois tenus 3 mois d\'affilée', done: false },
       { text: 'Scaling master → followers démarré (multiplicateur ×N)', done: false },
       { text: '0 compte cramé par indiscipline', done: false },
-      { text: 'Matelas : 3 mois', done: false }
+      { text: 'Matelas : 3-4 mois', done: false }
     ]},
-    { id: 'y1', horizon: '1 AN', due: 'Juillet 2027 — 27 ans', title: 'Le métier installé', items: [
-      { text: '5 000–6 000 €/mois via multi-comptes synchronisés', done: false },
-      { text: 'Matelas : 6 mois', done: false },
-      { text: 'Un an de liberté fêté 🏖️', done: false }
+    { id: 'exitfile', horizon: 'FÉV-AVR', due: 'Février – avril 2027', title: 'Le dossier de sortie', items: [
+      { text: '4 000 €+ — mois n°1', done: false },
+      { text: '4 000 €+ — mois n°2', done: false },
+      { text: '4 000 €+ — mois n°3 : critère rempli 🔑', done: false },
+      { text: 'Besoin vital mensuel du couple chiffré noir sur blanc', done: false },
+      { text: 'Matelas : 6 mois de besoin vital', done: false }
+    ]},
+    { id: 'apr27', horizon: '🔑 AVRIL', due: 'Avril 2027 — LE point de décision', title: 'Bilan à froid & décision', items: [
+      { text: 'Bilan avec le coach : les chiffres vs les critères, sans émotion', done: false },
+      { text: 'Critère rempli + matelas 6 mois → préparer la sortie (rupture conventionnelle, date calée)', done: false },
+      { text: 'Pas rempli → on continue en silence, revue au trimestre suivant — aucune honte', done: false }
+    ]},
+    { id: 'y1', horizon: 'ÉTÉ 2027', due: 'Été 2027', title: 'La liberté', items: [
+      { text: 'Sortie faite ou date posée — selon le verdict d\'avril', done: false },
+      { text: '5 000-6 000 €/mois via multi-comptes synchronisés', done: false },
+      { text: 'Trading = métier installé, plus une tentative 🏖️', done: false }
     ]}
   ];
-  const GOALS_VERSION = 3; // incrémenter pour pousser un nouvel escalier par défaut chez Vincent
+  const GOALS_VERSION = 4; // incrémenter pour pousser un nouvel escalier par défaut chez Vincent
   let GOALS_LADDER = JSON.parse(JSON.stringify(DEFAULT_GOALS_LADDER));
   function loadGoalsLadder() {
     try {
@@ -12679,14 +12709,8 @@
     let streak = 0;
     for (let k = nowK - 1; k >= nowK - 36; k--) { if ((byMo[k] || 0) >= EXIT) streak++; else break; }
     const reached = monthIn >= EXIT;
-    // Sortie FERME décidée le 08/07/2026 : dernier jour d'usine = 31/07/2026 (26 ans). Plan : Trading/BUSINESS-PLAN.md
-    const exitDate = new Date(2026, 6, 31, 23, 59, 59);
-    const daysLeft = Math.ceil((exitDate - now) / 86400000);
-    const countdownHtml = daysLeft > 0
-      ? `<div class="mono" style="font-size:30px; font-weight:800; color:var(--accent-bright, #d946ef);">J−${daysLeft}</div>
-         <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-3); margin-top:2px;">avant la sortie · 31/07</div>`
-      : `<div style="font-size:26px; font-weight:800;">✊ Libre</div>
-         <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-3); margin-top:2px;">usine quittée le 31/07/2026</div>`;
+    // Révisé le 08/07/2026 AVEC Vincent : aucune annonce à l'usine, le plan avance en silence.
+    // Sortie déclenchée par les critères (4 k€ × 3 mois + matelas) — point de décision : AVRIL 2027.
     el.innerHTML = `
       <div class="card" style="position:relative; overflow:hidden; border-left:3px solid var(--accent); background:linear-gradient(135deg, color-mix(in srgb, var(--accent) 10%, var(--bg-1)), var(--bg-1) 60%);">
         <div style="position:absolute; top:0; left:0; right:0; height:3px; background:linear-gradient(90deg, var(--accent), var(--accent-bright, #d946ef));"></div>
@@ -12694,11 +12718,12 @@
           <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;">
             <div style="min-width:220px;">
               <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-3); margin-bottom:6px;">Ma destination</div>
-              <div style="font-size:22px; font-weight:800; letter-spacing:-0.01em;">🏭 → 🏖️ Sortie d'usine : 31 juillet 2026</div>
-              <div style="margin-top:8px; font-size:12.5px; color:var(--text-2); line-height:1.5;">${daysLeft > 0 ? 'Décision ferme (mes 26 ans). Après : les payouts sont le revenu.' : 'C\'est fait.'} Cible de stabilité : <strong style="color:var(--text-1);">${eur(EXIT)}+/mois, 3 mois d\'affilée</strong>.</div>
+              <div style="font-size:24px; font-weight:800; letter-spacing:-0.01em;">🏔️ LA LIBERTÉ</div>
+              <div style="margin-top:8px; font-size:12.5px; color:var(--text-2); line-height:1.5;">Quitter l'usine par le trading — <strong style="color:var(--text-1);">en silence</strong>, personne à prévenir. La sortie se déclenche aux critères : <strong style="color:var(--text-1);">${eur(EXIT)}+/mois, 3 mois d'affilée</strong> + matelas 6 mois.</div>
             </div>
             <div style="text-align:center; padding:12px 20px; border-radius:14px; background:var(--bg-2); border:1px solid var(--border);">
-              ${countdownHtml}
+              <div class="mono" style="font-size:22px; font-weight:800; color:var(--accent-bright, #d946ef);">📅 AVRIL 2027</div>
+              <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-3); margin-top:2px;">bilan & décision, à froid</div>
             </div>
             <div style="text-align:center; padding:12px 20px; border-radius:14px; background:var(--bg-2); border:1px solid var(--border);">
               <div class="mono" style="font-size:30px; font-weight:800; color:${streak >= 3 ? 'var(--green)' : 'var(--accent)'};">${streak}<span style="font-size:16px; color:var(--text-3);">/3</span></div>
@@ -12718,8 +12743,313 @@
         </div>
       </div>`;
   }
+  // ========== OBJECTIFS v2 — « LA SAUCE » (construit avec Vincent le 08/07/2026) ==========
+  // Lun-ven : questionnaire du jour, mixte — 3 cases AUTO (mesurées sur les trades) + cases MANUELLES.
+  // Dimanche : bilan de la semaine + préparation des objectifs de la semaine suivante (proposés, modifiables).
+  // Les propositions s'adaptent à l'étape en cours de l'escalier. Sync cloud via markLocalChange.
+  let OBJ2 = { daily: {}, weeks: {} };
+  function loadObj2() {
+    try { const raw = localStorage.getItem('objectifs_v2'); if (raw) { const d = JSON.parse(raw); OBJ2 = { daily: (d && d.daily) || {}, weeks: (d && d.weeks) || {} }; } } catch (e) {}
+  }
+  loadObj2();
+  function saveObj2() {
+    try { localStorage.setItem('objectifs_v2', JSON.stringify(OBJ2)); } catch (e) {}
+    if (typeof markLocalChange === 'function') markLocalChange();
+  }
+  function obj2CurrentEtape() {
+    if (typeof GOALS_LADDER === 'undefined' || !GOALS_LADDER.length) return null;
+    return GOALS_LADDER.find(st => st.items.some(it => !it.done)) || GOALS_LADDER[GOALS_LADDER.length - 1];
+  }
+  // Compteur du test 30 trades : trades live depuis le 08/07/2026
+  function obj2TestCount() {
+    const start = new Date(2026, 6, 8);
+    return uniqueLogicalTrades(TRADES).filter(t => { const d = parseTradeDate(t.date); return d && d >= start; }).length;
+  }
+  function obj2TradesOfDay(d) {
+    const key = routineDayKey(d);
+    return uniqueLogicalTrades(TRADES).filter(t => { const td = parseTradeDate(t.date); return td && routineDayKey(td) === key; });
+  }
+  // Les 3 cases AUTO — mesurées sur les trades du jour (0 trade = rien violé → vert)
+  function obj2AutoChecks(d) {
+    const list = obj2TradesOfDay(d);
+    const n = list.length;
+    let creneau = true;
+    for (const t of list) {
+      if (!t.time) continue;
+      const h = parseInt(String(t.time).slice(0, 2), 10);
+      if (isNaN(h)) continue;
+      if (h !== 11 && h !== 14 && h !== 15) { creneau = false; break; } // jamais 13h ni hors fenêtre
+    }
+    const sl = list.filter(t => (t.pnl || 0) < -10).length;
+    const journal = list.every(t => t.rules && Object.keys(t.rules).length);
+    return [
+      { id: 'a_creneau', text: '⏱️ Créneau respecté (11h · 14h-15h · jamais 13h)', ok: creneau },
+      { id: 'a_2sl', text: `🛑 Maximum 2 SL — ${sl} aujourd'hui`, ok: sl <= 2 },
+      { id: 'a_journal', text: `📓 Journal 100 % rempli — ${n} trade${n > 1 ? 's' : ''} ce jour`, ok: journal },
+    ];
+  }
+  // Les cases MANUELLES — dépendent de l'étape (funded → + consistance)
+  function obj2ManualItems() {
+    const et = obj2CurrentEtape();
+    const items = [
+      { id: 'm_mental', text: '🟢 Mental vert au check (ou journée OFF assumée = réussie aussi)' },
+      { id: 'm_checklist', text: '✅ Checklist validée AVANT chaque entrée (30s · 4-11 bougies · SL 1 tick · TP 1:2 · BE)' },
+      { id: 'm_note', text: '📝 Note du jour /5 + l\'axe de demain posés' },
+    ];
+    if (et && et.id !== 'jul26') items.splice(2, 0, { id: 'm_consist', text: '⚖️ Consistance du jour respectée (compte funded)' });
+    return items;
+  }
+  function toggleObj2(id) {
+    const key = routineDayKey();
+    const day = OBJ2.daily[key] || (OBJ2.daily[key] = {});
+    day[id] = !day[id];
+    saveObj2(); renderObj2Day(); renderObj2Week();
+  }
+  // État d'un jour ouvré : 'ok' | 'ko' | 'nodata' (null le week-end)
+  function obj2DayState(d) {
+    const wd = (d || new Date()).getDay();
+    if (wd === 0 || wd === 6) return null;
+    const log = (OBJ2.daily || {})[routineDayKey(d)] || {};
+    const hasManual = Object.values(log).some(Boolean);
+    const trades = obj2TradesOfDay(d).length;
+    if (!hasManual && !trades) return 'nodata';
+    const manOk = obj2ManualItems().every(it => log[it.id]);
+    const autoOk = obj2AutoChecks(d).every(a => a.ok);
+    return (manOk && autoOk) ? 'ok' : 'ko';
+  }
+  function obj2Streak() {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    let streak = 0;
+    for (let i = 0; i < 400; i++) {
+      const d = new Date(today); d.setDate(today.getDate() - i);
+      const st = obj2DayState(d);
+      if (st === null || st === 'nodata') continue;      // week-end / pas de données → on saute
+      if (st === 'ok') streak++;
+      else { if (i === 0) continue; break; }             // aujourd'hui pas fini → ne casse pas la série
+    }
+    return streak;
+  }
+  // Objectifs hebdo proposés selon l'étape en cours (modifiables le dimanche)
+  function obj2WeekProposals() {
+    const et = obj2CurrentEtape();
+    const etId = et ? et.id : 'jul26';
+    if (etId === 'jul26') {
+      const n = obj2TestCount();
+      const target = Math.min(30, n + 10);
+      return [
+        n >= 30 ? '🎯 Test terminé — rendre la DÉCISION avec le coach' : `🎯 Compteur test à ${target}/30 (~10 trades)`,
+        '🛡️ Discipline ≥ 80 % (moyenne ≥ 4/5)',
+        '📅 Lundi 11h honoré',
+        '🚫 0 entorse (jamais plus de 2 SL par session)',
+      ];
+    }
+    if (etId === 'aug26') return [
+      '💎 Cocher le palier suivant de la séquence funded → payout',
+      '🛡️ Discipline ≥ 80 %',
+      '⚖️ Consistance respectée chaque jour',
+      '🚫 0 entorse',
+    ];
+    return [
+      `🎯 ${et ? et.title : 'Étape'} : cocher au moins 1 palier de l'étape`,
+      '🛡️ Discipline ≥ 80 %',
+      '🚫 0 entorse',
+    ];
+  }
+  function obj2WeekEntry(weekKey, createWithProposals) {
+    let w = OBJ2.weeks[weekKey];
+    if (!w && createWithProposals) {
+      w = OBJ2.weeks[weekKey] = { goals: obj2WeekProposals().map(t => ({ text: t, done: false })), validated: false };
+    }
+    return w;
+  }
+  function obj2ToggleWeekGoal(weekKey, i) {
+    const w = OBJ2.weeks[weekKey]; if (!w || !w.goals[i]) return;
+    w.goals[i].done = !w.goals[i].done;
+    if (w.goals[i].done && typeof pushNotif === 'function') pushNotif('info', '🎯', `<strong>Objectif de la semaine coché !</strong> ${escPlanText(w.goals[i].text)}`, null);
+    saveObj2(); renderObj2Week();
+  }
+  function obj2EditWeekGoal(weekKey, i) {
+    const w = OBJ2.weeks[weekKey]; if (!w || !w.goals[i]) return;
+    const nv = prompt('Modifier l\'objectif :', w.goals[i].text);
+    if (nv == null || !nv.trim()) return;
+    w.goals[i].text = nv.trim(); saveObj2(); renderObj2Week();
+  }
+  function obj2RemoveWeekGoal(weekKey, i) {
+    const w = OBJ2.weeks[weekKey]; if (!w) return;
+    w.goals.splice(i, 1); saveObj2(); renderObj2Week();
+  }
+  function obj2AddWeekGoal(weekKey) {
+    const inp = document.getElementById('obj2-week-new'); if (!inp || !inp.value.trim()) return;
+    const w = obj2WeekEntry(weekKey, true);
+    w.goals.push({ text: inp.value.trim(), done: false });
+    inp.value = ''; saveObj2(); renderObj2Week();
+  }
+  function obj2ValidateWeek(weekKey) {
+    const w = obj2WeekEntry(weekKey, true);
+    w.validated = true; saveObj2(); renderObj2Week();
+    if (typeof pushNotif === 'function') pushNotif('info', '📆', '<strong>Objectifs de la semaine validés.</strong> Bonne semaine — la sauce, rien que la sauce.', null);
+  }
+  // --- Rendu : la sauce du jour ---
+  function renderObj2Day() {
+    const el = document.getElementById('obj2-day'); if (!el) return;
+    const now = new Date();
+    const wd = now.getDay();
+    const et = obj2CurrentEtape();
+    if (wd === 6) { // samedi
+      el.innerHTML = `<div class="card"><div class="card-body" style="text-align:center; padding:26px;">
+        <div style="font-size:30px;">🌴</div><div style="font-size:15px; font-weight:700; margin-top:6px;">Samedi — on coupe.</div>
+        <div style="font-size:12px; color:var(--text-2); margin-top:4px;">Repos, copine, famille. La sauce reprend lundi.</div></div></div>`;
+      return;
+    }
+    if (wd === 0) { // dimanche → le bloc semaine prend le relais
+      el.innerHTML = `<div class="card"><div class="card-body" style="text-align:center; padding:22px;">
+        <div style="font-size:26px;">📋</div><div style="font-size:15px; font-weight:700; margin-top:6px;">Dimanche — jour de bilan.</div>
+        <div style="font-size:12px; color:var(--text-2); margin-top:4px;">Pas de trade. En dessous : le bilan de ta semaine et les objectifs de la prochaine.</div></div></div>`;
+      return;
+    }
+    const dayLog = (OBJ2.daily || {})[routineDayKey()] || {};
+    const manual = obj2ManualItems();
+    const auto = obj2AutoChecks(now);
+    const doneCount = manual.filter(it => dayLog[it.id]).length + auto.filter(a => a.ok).length;
+    const total = manual.length + auto.length;
+    const allDone = doneCount === total && manual.every(it => dayLog[it.id]);
+    const streak = obj2Streak();
+    const autoRow = (a) => `
+      <div style="display:flex; align-items:center; gap:12px; padding:11px 12px; margin:2px 0; border-radius:11px; ${a.ok ? 'background:rgba(16,185,129,0.10);' : 'background:rgba(239,68,68,0.08);'}">
+        <span style="flex:1; font-size:13.5px; color:${a.ok ? 'var(--green)' : 'var(--red)'};">${a.text}</span>
+        <span style="font-size:10px; padding:2px 7px; border-radius:99px; background:var(--bg-2); border:1px solid var(--border); color:var(--text-3);">⚡ auto</span>
+        <span style="width:25px; height:25px; flex:0 0 auto; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:14px; color:#fff; background:${a.ok ? 'var(--green)' : 'var(--red)'};">${a.ok ? '✓' : '✗'}</span>
+      </div>`;
+    const manRow = (it) => { const d = !!dayLog[it.id]; return `
+      <div onclick="toggleObj2('${it.id}')" style="display:flex; align-items:center; gap:12px; padding:12px; margin:2px 0; border-radius:11px; cursor:pointer; ${d ? 'background:rgba(16,185,129,0.14);' : 'border-bottom:1px solid var(--border);'}">
+        <span style="flex:1; font-size:13.5px; font-weight:${d ? '600' : '400'}; color:${d ? 'var(--green)' : 'var(--text-0)'};">${it.text}</span>
+        <span style="width:25px; height:25px; flex:0 0 auto; border-radius:8px; border:2px solid ${d ? 'var(--green)' : 'var(--border)'}; background:${d ? 'var(--green)' : 'transparent'}; display:flex; align-items:center; justify-content:center; color:#fff; font-size:14px;">${d ? '✓' : ''}</span>
+      </div>`; };
+    el.innerHTML = `
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">🍝 La sauce du jour — ${now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
+          <span class="muted" style="font-size:11px;"><span class="mono" style="color:${streak > 0 ? 'var(--amber)' : 'var(--text-3)'}; font-weight:700;">🔥 ${streak} j</span> · <span class="mono ${allDone ? 'pos' : ''}" style="font-weight:700;">${doneCount}/${total}</span>${et ? ' · étape : ' + et.horizon : ''}</span>
+        </div>
+        <div class="card-body">
+          <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-3); margin-bottom:4px;">Mesuré automatiquement sur tes trades</div>
+          ${auto.map(autoRow).join('')}
+          <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-3); margin:14px 0 4px;">À cocher toi-même</div>
+          ${manual.map(manRow).join('')}
+          ${allDone
+            ? `<div style="text-align:center; margin-top:14px; padding:13px; border-radius:12px; background:rgba(16,185,129,0.12); border:1px solid var(--green);"><strong style="color:var(--green);">Journée dans la sauce ✅</strong><div style="font-size:11.5px; color:var(--text-2); margin-top:2px;">Peu importe le P&L — c'est ça qui construit la sortie.</div></div>`
+            : `<div style="text-align:center; margin-top:14px; font-size:12px; color:var(--text-2);">La journée est réussie quand tout est vert — <strong>peu importe le P&L</strong>.</div>`}
+        </div>
+      </div>`;
+  }
+  // --- Rendu : la semaine (pastilles + objectifs, dimanche = bilan + préparation) ---
+  function renderObj2Week() {
+    const el = document.getElementById('obj2-week'); if (!el) return;
+    const now = new Date();
+    const isSunday = now.getDay() === 0;
+    const weekKey = routineWeekKey();
+    const monday = new Date(weekKey + 'T00:00:00');
+    // Pastilles lundi → vendredi
+    const dots = [];
+    const labels = ['L', 'M', 'M', 'J', 'V'];
+    for (let i = 0; i < 5; i++) {
+      const d = new Date(monday); d.setDate(monday.getDate() + i);
+      const isToday = routineDayKey(d) === routineDayKey(now);
+      const future = d > now && !isToday;
+      const st = future ? 'future' : obj2DayState(d);
+      const bg = st === 'ok' ? 'var(--green)' : st === 'ko' ? 'var(--red)' : 'var(--bg-2)';
+      const bd = isToday ? 'var(--accent)' : 'var(--border)';
+      const ic = st === 'ok' ? '✓' : st === 'ko' ? '✗' : '';
+      dots.push(`<div style="text-align:center;">
+        <div style="width:34px; height:34px; border-radius:50%; background:${bg}; border:2px solid ${bd}; display:flex; align-items:center; justify-content:center; color:#fff; font-weight:800; font-size:14px;">${ic}</div>
+        <div style="font-size:10px; color:var(--text-3); margin-top:3px;">${labels[i]}</div>
+      </div>`);
+    }
+    // Mini-calendrier : 8 dernières semaines
+    let mini = '';
+    for (let w = 7; w >= 1; w--) {
+      const wm = new Date(monday); wm.setDate(monday.getDate() - 7 * w);
+      let row = '';
+      for (let i = 0; i < 5; i++) {
+        const d = new Date(wm); d.setDate(wm.getDate() + i);
+        const st = d > now ? 'future' : obj2DayState(d);
+        const c = st === 'ok' ? 'var(--green)' : st === 'ko' ? 'var(--red)' : 'var(--bg-2)';
+        row += `<span style="display:inline-block; width:11px; height:11px; border-radius:3px; background:${c}; border:1px solid var(--border); margin-right:3px;"></span>`;
+      }
+      mini += `<div style="display:flex; align-items:center; gap:8px; margin:2px 0;"><span class="mono" style="font-size:9.5px; color:var(--text-3); width:38px;">${wm.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}</span>${row}</div>`;
+    }
+    const weekGoalsRows = (wk, editable) => {
+      const w = OBJ2.weeks[wk];
+      const goals = w ? w.goals : [];
+      if (!goals.length) return '<div style="padding:12px; text-align:center; color:var(--text-3); font-size:12px;">Pas encore d\'objectifs pour cette semaine.</div>';
+      return goals.map((g, i) => `
+        <div style="display:flex; align-items:center; gap:10px; padding:10px 8px; border-bottom:1px solid var(--border);">
+          <div onclick="obj2ToggleWeekGoal('${wk}', ${i})" style="width:24px; height:24px; flex:0 0 auto; border-radius:7px; border:2px solid ${g.done ? 'var(--green)' : 'var(--border)'}; background:${g.done ? 'var(--green)' : 'transparent'}; display:flex; align-items:center; justify-content:center; color:#fff; font-size:13px; cursor:pointer;">${g.done ? '✓' : ''}</div>
+          <span style="flex:1; font-size:13px; ${g.done ? 'color:var(--green); font-weight:600;' : ''}" ${editable ? `onclick="obj2EditWeekGoal('${wk}', ${i})" title="Cliquer pour modifier"` : ''}>${escPlanText(g.text)}</span>
+          ${editable ? `<button class="plan-item-del" onclick="obj2RemoveWeekGoal('${wk}', ${i})" title="Supprimer">✕</button>` : ''}
+        </div>`).join('');
+    };
+    let body = '';
+    if (isSunday) {
+      // ===== DIMANCHE : bilan de la semaine + préparation de la suivante =====
+      const risk = (typeof PLAN !== 'undefined' && PLAN.riskPerTrade > 0) ? PLAN.riskPerTrade : 125;
+      const weekTrades = uniqueLogicalTrades(TRADES).filter(t => { const d = parseTradeDate(t.date); return d && d >= monday && d <= now; });
+      const weekR = weekTrades.reduce((s, t) => s + tradeRValue(t, risk), 0);
+      const withRules = weekTrades.filter(t => t.rules && Object.keys(t.rules).length);
+      const discAvg = withRules.length ? (withRules.reduce((s, t) => s + disciplineCountForRules(t.rules), 0) / withRules.length / 5 * 100) : null;
+      let okDays = 0, koDays = 0;
+      for (let i = 0; i < 5; i++) { const d = new Date(monday); d.setDate(monday.getDate() + i); const st = obj2DayState(d); if (st === 'ok') okDays++; else if (st === 'ko') koDays++; }
+      const nextKey = routineDayKey(new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 7));
+      const nextW = obj2WeekEntry(nextKey, true);
+      const testN = obj2TestCount();
+      body = `
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(110px, 1fr)); gap:10px; margin-bottom:16px;">
+          <div style="text-align:center; padding:12px; border-radius:12px; background:var(--bg-2); border:1px solid var(--border);"><div class="mono" style="font-size:20px; font-weight:800;">${weekTrades.length}</div><div style="font-size:10px; color:var(--text-3); text-transform:uppercase;">trades</div></div>
+          <div style="text-align:center; padding:12px; border-radius:12px; background:var(--bg-2); border:1px solid var(--border);"><div class="mono ${weekR >= 0 ? 'pos' : 'neg'}" style="font-size:20px; font-weight:800;">${(weekR >= 0 ? '+' : '') + weekR.toFixed(1)}R</div><div style="font-size:10px; color:var(--text-3); text-transform:uppercase;">résultat</div></div>
+          <div style="text-align:center; padding:12px; border-radius:12px; background:var(--bg-2); border:1px solid var(--border);"><div class="mono" style="font-size:20px; font-weight:800; color:${discAvg == null ? 'var(--text-3)' : discAvg >= 80 ? 'var(--green)' : 'var(--amber)'};">${discAvg == null ? '—' : discAvg.toFixed(0) + '%'}</div><div style="font-size:10px; color:var(--text-3); text-transform:uppercase;">discipline</div></div>
+          <div style="text-align:center; padding:12px; border-radius:12px; background:var(--bg-2); border:1px solid var(--border);"><div class="mono" style="font-size:20px; font-weight:800; color:${okDays >= 4 ? 'var(--green)' : 'var(--text-0)'};">${okDays}/${okDays + koDays || 5}</div><div style="font-size:10px; color:var(--text-3); text-transform:uppercase;">jours sauce</div></div>
+          <div style="text-align:center; padding:12px; border-radius:12px; background:var(--bg-2); border:1px solid var(--border);"><div class="mono" style="font-size:20px; font-weight:800; color:var(--accent);">${Math.min(testN, 30)}/30</div><div style="font-size:10px; color:var(--text-3); text-transform:uppercase;">test</div></div>
+        </div>
+        <div style="font-size:12px; font-weight:700; margin-bottom:6px;">🧾 Les objectifs que je m'étais fixés</div>
+        <div style="border:1px solid var(--border); border-radius:12px; padding:2px 12px; background:var(--bg-1); margin-bottom:18px;">${weekGoalsRows(weekKey, false)}</div>
+        <div style="font-size:12px; font-weight:700; margin-bottom:6px;">🎯 Semaine prochaine — proposés selon l'étape, modifie-les puis valide</div>
+        <div style="border:1px solid var(--accent); border-radius:12px; padding:2px 12px; background:var(--accent-soft, var(--bg-1));">${weekGoalsRows(nextKey, true)}</div>
+        <div style="display:flex; gap:6px; margin-top:10px;">
+          <input id="obj2-week-new" placeholder="Ajouter un objectif…" onkeydown="if(event.key==='Enter')obj2AddWeekGoal('${nextKey}')" style="flex:1; padding:9px 11px; border-radius:9px; border:1px solid var(--border); background:var(--bg-2); color:var(--text-0); font-size:13px;">
+          <button class="btn" onclick="obj2AddWeekGoal('${nextKey}')" style="padding:9px 13px;">+</button>
+          <button class="btn btn-primary" onclick="obj2ValidateWeek('${nextKey}')" style="padding:9px 14px;">${nextW.validated ? '✓ Validés' : 'Valider la semaine'}</button>
+        </div>`;
+    } else {
+      // ===== EN SEMAINE : objectifs de la semaine en cours =====
+      const w = OBJ2.weeks[weekKey];
+      body = `
+        <div style="font-size:12px; font-weight:700; margin-bottom:6px;">🎯 Mes objectifs de la semaine${w && w.validated ? '' : ' <span style="color:var(--text-3); font-weight:400;">(à valider le dimanche — clique + pour en ajouter)</span>'}</div>
+        <div style="border:1px solid var(--border); border-radius:12px; padding:2px 12px; background:var(--bg-1);">${weekGoalsRows(weekKey, true)}</div>
+        <div style="display:flex; gap:6px; margin-top:10px;">
+          <input id="obj2-week-new" placeholder="Ajouter un objectif…" onkeydown="if(event.key==='Enter')obj2AddWeekGoal('${weekKey}')" style="flex:1; padding:9px 11px; border-radius:9px; border:1px solid var(--border); background:var(--bg-2); color:var(--text-0); font-size:13px;">
+          <button class="btn" onclick="obj2AddWeekGoal('${weekKey}')" style="padding:9px 13px;">+</button>
+        </div>`;
+    }
+    el.innerHTML = `
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">${isSunday ? '📊 Dimanche — bilan & préparation' : '📆 Ma semaine'}</span>
+          <span class="muted" style="font-size:11px;">🔥 série : ${obj2Streak()} j</span>
+        </div>
+        <div class="card-body">
+          <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:18px; flex-wrap:wrap; margin-bottom:16px;">
+            <div style="display:flex; gap:10px;">${dots.join('')}</div>
+            <div>${mini}</div>
+          </div>
+          ${body}
+        </div>
+      </div>`;
+  }
+
   function renderObjectives(s) {
     renderGoalsNorthStar();
+    renderObj2Day();
+    renderObj2Week();
     renderGoalsAuto();
     renderGoalsLadder();
     renderBadges();
@@ -14802,6 +15132,7 @@
       backtestTrades: (typeof BACKTEST_TRADES !== 'undefined') ? BACKTEST_TRADES : null,
       btSessMeta: (typeof BT_SESS_META !== 'undefined') ? BT_SESS_META : null, // r80 : noms des sessions backtest — manquaient au coffre
       capital: (typeof CAPITAL !== 'undefined') ? CAPITAL : null,
+      obj2: (typeof OBJ2 !== 'undefined') ? OBJ2 : null, // sauce du jour + objectifs hebdo (page Objectifs v2)
       routine: (typeof ROUTINE !== 'undefined') ? ROUTINE : null,
       routineLog: (typeof ROUTINE_LOG !== 'undefined') ? ROUTINE_LOG : null,
       health: (typeof HEALTH !== 'undefined') ? HEALTH : null,
@@ -14876,6 +15207,17 @@
       if (data.capital && typeof data.capital === 'object') {
         CAPITAL = { investi: +data.capital.investi || 0, expenses: Array.isArray(data.capital.expenses) ? data.capital.expenses : [], payouts: Array.isArray(data.capital.payouts) ? data.capital.payouts : [], payoutGoalMonthly: (data.capital.payoutGoalMonthly != null ? +data.capital.payoutGoalMonthly : 1500) };
         try { localStorage.setItem('capital_mm', JSON.stringify(CAPITAL)); } catch (e2) {}
+      }
+      if (data.obj2 && typeof data.obj2 === 'object') {
+        // Fusion douce : par jour et par semaine, le distant complète le local (les coches locales gagnent en cas de doublon)
+        if (mergeTrades && typeof OBJ2 !== 'undefined') {
+          const inc = data.obj2;
+          OBJ2.daily = { ...(inc.daily || {}), ...(OBJ2.daily || {}) };
+          OBJ2.weeks = { ...(inc.weeks || {}), ...(OBJ2.weeks || {}) };
+        } else {
+          OBJ2 = { daily: data.obj2.daily || {}, weeks: data.obj2.weeks || {} };
+        }
+        try { localStorage.setItem('objectifs_v2', JSON.stringify(OBJ2)); } catch (e2) {}
       }
       if (data.routine && typeof data.routine === 'object' && (data.routine.days || data.routine.daily)) {
         ROUTINE = (typeof normalizeRoutine === 'function') ? normalizeRoutine(data.routine) : data.routine;
