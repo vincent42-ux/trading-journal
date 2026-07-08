@@ -3297,30 +3297,43 @@
     transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
   }
   .goal-step-fill.gold { background: linear-gradient(90deg, #059669, #22d39a); box-shadow: 0 0 10px rgba(34, 211, 154, 0.4); }
-  .goal-item {
-    display: flex; align-items: center; gap: 11px;
-    padding: 9px 12px; border-radius: 10px;
-    background: var(--bg-2); border: 1px solid var(--border);
-    margin-bottom: 6px; font-size: 13px;
-    transition: all 0.15s;
+  /* Jalons présentés comme la routine : carte arrondie, case à droite, ligne verte quand cochée */
+  .goal-items-card {
+    border: 1px solid var(--border); border-radius: 16px;
+    background: var(--bg-1); padding: 6px 14px;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.16);
   }
-  .goal-item:hover { border-color: var(--border-strong); }
-  .goal-item.done { opacity: 0.72; }
-  .goal-item.done .goal-item-text { text-decoration: line-through; color: var(--text-2); }
+  .goal-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 13px 12px; margin: 2px 0; border-radius: 11px;
+    font-size: 14px; cursor: default; transition: background 0.15s;
+    border-bottom: 1px solid var(--border);
+  }
+  .goal-item:last-child { border-bottom: none; }
+  .goal-item.done { background: rgba(16, 185, 129, 0.16); border-bottom-color: transparent; }
+  .goal-item-text {
+    flex: 1; cursor: pointer; line-height: 1.45;
+    color: var(--text-0); font-weight: 400;
+  }
+  .goal-item-text:hover { color: var(--accent); }
+  .goal-item.done .goal-item-text { color: var(--green); font-weight: 600; }
+  .goal-item-del {
+    flex: 0 0 auto; background: none; border: none; cursor: pointer;
+    color: var(--text-3); font-size: 12px; padding: 4px;
+    opacity: 0; transition: opacity 0.15s, color 0.15s;
+  }
+  .goal-item:hover .goal-item-del { opacity: 0.65; }
+  .goal-item-del:hover { color: var(--red); opacity: 1; }
   .goal-item-check {
-    width: 22px; height: 22px; border-radius: 7px; flex-shrink: 0;
-    border: 1.5px solid var(--border-strong); cursor: pointer;
+    width: 27px; height: 27px; border-radius: 8px; flex: 0 0 auto;
+    border: 2px solid var(--border); cursor: pointer;
     display: flex; align-items: center; justify-content: center;
-    font-size: 13px; font-weight: 800; color: #fff;
+    font-size: 15px; font-weight: 800; color: #fff;
     transition: all 0.15s;
   }
   .goal-item-check:hover { border-color: var(--green); }
-  .goal-item.done .goal-item-check {
-    background: linear-gradient(135deg, #059669, #22d39a);
-    border-color: transparent;
-    box-shadow: 0 0 10px rgba(34, 211, 154, 0.4);
-  }
-  .goal-item-text { flex: 1; cursor: pointer; line-height: 1.4; }
+  .goal-item.done .goal-item-check { background: var(--green); border-color: var(--green); }
+  .goal-empty { padding: 16px; text-align: center; color: var(--text-3); font-size: 12px; }
   .goal-add-row { display: flex; gap: 8px; margin-top: 8px; }
   .goal-add-row input {
     flex: 1; background: var(--bg-2); border: 1px solid var(--border);
@@ -5646,7 +5659,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono" id="app-version-full">2026-07-07 · r83</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono" id="app-version-full">2026-07-08 · r84</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -12571,12 +12584,14 @@
             </div>
             <div class="goal-step-bar"><div class="goal-step-fill ${complete ? 'gold' : ''}" style="width:${pct}%;"></div></div>
             <div class="goal-step-items">
-              ${step.items.map((it, i) => `
+              <div class="goal-items-card">
+                ${step.items.map((it, i) => `
                 <div class="goal-item ${it.done ? 'done' : ''}">
-                  <div class="goal-item-check" onclick="toggleGoalItem(${g}, ${i})">${it.done ? '✓' : ''}</div>
-                  <div class="goal-item-text" onclick="editGoalItem(${g}, ${i})" title="Cliquer pour modifier">${escPlanText(it.text)}</div>
-                  <button class="plan-item-del" onclick="removeGoalItem(${g}, ${i})" title="Supprimer">✕</button>
-                </div>`).join('')}
+                  <span class="goal-item-text" onclick="editGoalItem(${g}, ${i})" title="Cliquer pour modifier">${escPlanText(it.text)}</span>
+                  <button class="goal-item-del" onclick="event.stopPropagation();removeGoalItem(${g}, ${i})" title="Supprimer">✕</button>
+                  <span class="goal-item-check" onclick="toggleGoalItem(${g}, ${i})">${it.done ? '✓' : ''}</span>
+                </div>`).join('') || '<div class="goal-empty">Aucun jalon. Ajoute-en un ci-dessous.</div>'}
+              </div>
               <div class="goal-add-row">
                 <input type="text" id="goal-new-${g}" placeholder="Ajouter un jalon…" onkeydown="if(event.key==='Enter')addGoalItem(${g})">
                 <button class="btn" onclick="addGoalItem(${g})" style="padding:6px 13px;">+</button>
@@ -12983,10 +12998,10 @@
       const goals = w ? w.goals : [];
       if (!goals.length) return '<div style="padding:12px; text-align:center; color:var(--text-3); font-size:12px;">Pas encore d\'objectifs pour cette semaine.</div>';
       return goals.map((g, i) => `
-        <div style="display:flex; align-items:center; gap:10px; padding:10px 8px; border-bottom:1px solid var(--border);">
-          <div onclick="obj2ToggleWeekGoal('${wk}', ${i})" style="width:24px; height:24px; flex:0 0 auto; border-radius:7px; border:2px solid ${g.done ? 'var(--green)' : 'var(--border)'}; background:${g.done ? 'var(--green)' : 'transparent'}; display:flex; align-items:center; justify-content:center; color:#fff; font-size:13px; cursor:pointer;">${g.done ? '✓' : ''}</div>
-          <span style="flex:1; font-size:13px; ${g.done ? 'color:var(--green); font-weight:600;' : ''}" ${editable ? `onclick="obj2EditWeekGoal('${wk}', ${i})" title="Cliquer pour modifier"` : ''}>${escPlanText(g.text)}</span>
-          ${editable ? `<button class="plan-item-del" onclick="obj2RemoveWeekGoal('${wk}', ${i})" title="Supprimer">✕</button>` : ''}
+        <div style="display:flex; align-items:center; gap:12px; padding:12px 10px; margin:2px 0; border-radius:11px; ${g.done ? 'background:rgba(16,185,129,0.14);' : 'border-bottom:1px solid var(--border);'}">
+          <span style="flex:1; font-size:13.5px; ${g.done ? 'color:var(--green); font-weight:600;' : 'color:var(--text-0);'}" ${editable ? `onclick="obj2EditWeekGoal('${wk}', ${i})" title="Cliquer pour modifier"` : ''}>${escPlanText(g.text)}</span>
+          ${editable ? `<button class="plan-item-del" onclick="event.stopPropagation();obj2RemoveWeekGoal('${wk}', ${i})" title="Supprimer">✕</button>` : ''}
+          <span onclick="obj2ToggleWeekGoal('${wk}', ${i})" style="width:27px; height:27px; flex:0 0 auto; border-radius:8px; border:2px solid ${g.done ? 'var(--green)' : 'var(--border)'}; background:${g.done ? 'var(--green)' : 'transparent'}; display:flex; align-items:center; justify-content:center; color:#fff; font-size:15px; cursor:pointer;">${g.done ? '✓' : ''}</span>
         </div>`).join('');
     };
     let body = '';
