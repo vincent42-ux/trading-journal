@@ -5659,7 +5659,7 @@
           <div id="integrity-result" style="margin-top:10px;"></div>
           <div id="storage-gauge" style="margin-top:14px;"></div>
           <button class="btn" onclick="compactStorageManual()" style="width:100%; margin-top:10px;">🧹 Alléger le stockage maintenant</button>
-          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono" id="app-version-full">2026-07-08 · r84</strong></div>
+          <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--text-3);">Version <strong class="mono" id="app-version-full">2026-07-08 · r85</strong></div>
         </div>
 
         <!-- Démo / Vider compte -->
@@ -12056,6 +12056,18 @@
     saveAccountsAndRotation();
     renderAccounts();
   }
+  // Modifier le R (1R = $) directement depuis la carte du compte — c'est Vincent qui décide
+  function editAccountRisk(id) {
+    const acc = ACCOUNTS.find(a => a.id === id);
+    if (!acc) return;
+    const nv = prompt('1R = combien de $ sur ce compte ?\n(ton risque par trade — sert de référence R partout)', acc.risk || '');
+    if (nv == null) return;
+    const v = parseFloat(String(nv).replace(',', '.'));
+    if (isNaN(v) || v <= 0) { uiAlert('Entre un montant en $ supérieur à 0 (ex. 125).'); return; }
+    acc.risk = Math.round(v * 100) / 100;
+    saveAccountsAndRotation();
+    renderAccounts();
+  }
   // P&L d'un compte = base (P&L réel saisi, optionnel) + les trades ajoutés depuis cette base.
   // Sans P&L réel saisi → simple somme des trades. Avec → realPnl + (trades actuels − trades au moment de la saisie).
   function accountTradesSum(acc) {
@@ -12356,6 +12368,12 @@
                      <button class="acc-mult-btn" onclick="event.stopPropagation(); bumpMultiplier('${acc.id}', 1)">+</button>
                    </span>`}
             </div>` : ''}
+
+            <!-- Risque (1R = $) — éditable en direct, c'est Vincent qui décide, visible même en éval -->
+            <div class="acc-risk-line" onclick="event.stopPropagation(); editAccountRisk('${acc.id}')" title="Cliquer pour modifier ton risque (1R en $)" style="display:flex; align-items:center; gap:7px; margin-top:12px; padding:9px 12px; border-radius:10px; background:var(--bg-2); border:1px solid var(--border); font-size:12px; color:var(--text-2); cursor:pointer;">
+              <span>💰 1R =</span><strong class="mono" style="color:var(--text-0); font-size:13px;">$${(acc.risk || 0).toLocaleString('en-US')}</strong>
+              <span style="margin-left:auto; opacity:.7;">✏️ modifier</span>
+            </div>
 
             <!-- Actions -->
             <div class="account-actions">
@@ -12814,10 +12832,10 @@
     if (et && et.id !== 'jul26') items.splice(2, 0, { id: 'm_consist', text: '⚖️ Consistance du jour respectée (compte funded)' });
     return items;
   }
-  function toggleObj2(id) {
+  function toggleObj2(id, cur) {
     const key = routineDayKey();
     const day = OBJ2.daily[key] || (OBJ2.daily[key] = {});
-    day[id] = !day[id];
+    day[id] = (cur === undefined) ? !day[id] : !cur; // cur = état effectif affiché (permet de décocher une suggestion auto)
     saveObj2(); renderObj2Day(); renderObj2Week();
   }
   // État d'un jour ouvré : 'ok' | 'ko' | 'nodata' (null le week-end)
@@ -12825,11 +12843,12 @@
     const wd = (d || new Date()).getDay();
     if (wd === 0 || wd === 6) return null;
     const log = (OBJ2.daily || {})[routineDayKey(d)] || {};
-    const hasManual = Object.values(log).some(Boolean);
     const trades = obj2TradesOfDay(d).length;
-    if (!hasManual && !trades) return 'nodata';
-    const manOk = obj2ManualItems().every(it => log[it.id]);
-    const autoOk = obj2AutoChecks(d).every(a => a.ok);
+    if (!Object.keys(log).length && !trades) return 'nodata';
+    // état effectif : override manuel s'il existe, sinon suggestion auto (manuels par défaut = false)
+    const eff = (id, autoOk) => (id in log) ? !!log[id] : (autoOk !== undefined ? !!autoOk : false);
+    const manOk = obj2ManualItems().every(it => eff(it.id));
+    const autoOk = obj2AutoChecks(d).every(a => eff(a.id, a.ok));
     return (manOk && autoOk) ? 'ok' : 'ko';
   }
   function obj2Streak() {
@@ -12925,20 +12944,18 @@
     const dayLog = (OBJ2.daily || {})[routineDayKey()] || {};
     const manual = obj2ManualItems();
     const auto = obj2AutoChecks(now);
-    const doneCount = manual.filter(it => dayLog[it.id]).length + auto.filter(a => a.ok).length;
+    // État effectif : si Vincent a coché/décoché à la main → sa valeur ; sinon → la suggestion auto (false par défaut pour les manuels)
+    const effState = (id, autoOk) => (id in dayLog) ? !!dayLog[id] : (autoOk !== undefined ? !!autoOk : false);
+    const doneCount = manual.filter(it => effState(it.id)).length + auto.filter(a => effState(a.id, a.ok)).length;
     const total = manual.length + auto.length;
-    const allDone = doneCount === total && manual.every(it => dayLog[it.id]);
+    const allDone = total > 0 && doneCount === total;
     const streak = obj2Streak();
-    const autoRow = (a) => `
-      <div style="display:flex; align-items:center; gap:12px; padding:11px 12px; margin:2px 0; border-radius:11px; ${a.ok ? 'background:rgba(16,185,129,0.10);' : 'background:rgba(239,68,68,0.08);'}">
-        <span style="flex:1; font-size:13.5px; color:${a.ok ? 'var(--green)' : 'var(--red)'};">${a.text}</span>
-        <span style="font-size:10px; padding:2px 7px; border-radius:99px; background:var(--bg-2); border:1px solid var(--border); color:var(--text-3);">⚡ auto</span>
-        <span style="width:25px; height:25px; flex:0 0 auto; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:14px; color:#fff; background:${a.ok ? 'var(--green)' : 'var(--red)'};">${a.ok ? '✓' : '✗'}</span>
-      </div>`;
-    const manRow = (it) => { const d = !!dayLog[it.id]; return `
-      <div onclick="toggleObj2('${it.id}')" style="display:flex; align-items:center; gap:12px; padding:12px; margin:2px 0; border-radius:11px; cursor:pointer; ${d ? 'background:rgba(16,185,129,0.14);' : 'border-bottom:1px solid var(--border);'}">
-        <span style="flex:1; font-size:13.5px; font-weight:${d ? '600' : '400'}; color:${d ? 'var(--green)' : 'var(--text-0)'};">${it.text}</span>
-        <span style="width:25px; height:25px; flex:0 0 auto; border-radius:8px; border:2px solid ${d ? 'var(--green)' : 'var(--border)'}; background:${d ? 'var(--green)' : 'transparent'}; display:flex; align-items:center; justify-content:center; color:#fff; font-size:14px;">${d ? '✓' : ''}</span>
+    // Une seule ligne cochable façon routine — l'auto n'est qu'une suggestion, Vincent décide (cocher OU décocher)
+    const checkRow = (id, text, autoOk) => { const d = effState(id, autoOk); return `
+      <div onclick="toggleObj2('${id}', ${d})" style="display:flex; align-items:center; gap:12px; padding:12px; margin:2px 0; border-radius:11px; cursor:pointer; transition:background .15s; ${d ? 'background:rgba(16,185,129,0.14);' : 'border-bottom:1px solid var(--border);'}">
+        <span style="flex:1; font-size:13.5px; font-weight:${d ? '600' : '400'}; color:${d ? 'var(--green)' : 'var(--text-0)'};">${text}</span>
+        ${autoOk !== undefined ? `<span style="font-size:10px; padding:2px 7px; border-radius:99px; background:var(--bg-2); border:1px solid var(--border); color:var(--text-3);">⚡ auto</span>` : ''}
+        <span style="width:27px; height:27px; flex:0 0 auto; border-radius:8px; border:2px solid ${d ? 'var(--green)' : 'var(--border)'}; background:${d ? 'var(--green)' : 'transparent'}; display:flex; align-items:center; justify-content:center; color:#fff; font-size:15px;">${d ? '✓' : ''}</span>
       </div>`; };
     el.innerHTML = `
       <div class="card">
@@ -12947,10 +12964,10 @@
           <span class="muted" style="font-size:11px;"><span class="mono" style="color:${streak > 0 ? 'var(--amber)' : 'var(--text-3)'}; font-weight:700;">🔥 ${streak} j</span> · <span class="mono ${allDone ? 'pos' : ''}" style="font-weight:700;">${doneCount}/${total}</span>${et ? ' · étape : ' + et.horizon : ''}</span>
         </div>
         <div class="card-body">
-          <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-3); margin-bottom:4px;">Mesuré automatiquement sur tes trades</div>
-          ${auto.map(autoRow).join('')}
+          <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-3); margin-bottom:4px;">Suggéré par tes trades — à toi de valider</div>
+          ${auto.map(a => checkRow(a.id, a.text, a.ok)).join('')}
           <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-3); margin:14px 0 4px;">À cocher toi-même</div>
-          ${manual.map(manRow).join('')}
+          ${manual.map(it => checkRow(it.id, it.text)).join('')}
           ${allDone
             ? `<div style="text-align:center; margin-top:14px; padding:13px; border-radius:12px; background:rgba(16,185,129,0.12); border:1px solid var(--green);"><strong style="color:var(--green);">Journée dans la sauce ✅</strong><div style="font-size:11.5px; color:var(--text-2); margin-top:2px;">Peu importe le P&L — c'est ça qui construit la sortie.</div></div>`
             : `<div style="text-align:center; margin-top:14px; font-size:12px; color:var(--text-2);">La journée est réussie quand tout est vert — <strong>peu importe le P&L</strong>.</div>`}
@@ -14450,7 +14467,7 @@
     document.getElementById('am-trailing').value = t.trailing;
     document.getElementById('am-payoutTarget').value = t.payoutTarget;
     document.getElementById('am-dll').value = t.dll;
-    document.getElementById('am-risk').value = t.risk;
+    { const rEl = document.getElementById('am-risk'); if (rEl && !String(rEl.value).trim()) rEl.value = t.risk; } // ne PAS écraser un R saisi à la main
     const nameEl = document.getElementById('am-name');
     if (nameEl && !nameEl.value.trim()) nameEl.value = firm + ' ' + (t.size / 1000) + 'K';
   }
